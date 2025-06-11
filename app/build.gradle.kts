@@ -63,4 +63,5 @@ dependencies {
     implementation ("androidx.recyclerview:recyclerview:1.3.2")
     implementation ("com.github.bumptech.glide:glide:4.16.0")
     implementation ("androidx.compose.material3:material3:1.2.1")
+    implementation ("androidx.graphics:graphics-shapes:1.0.1")
 }

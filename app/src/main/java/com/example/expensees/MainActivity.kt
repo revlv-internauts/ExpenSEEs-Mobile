@@ -92,10 +92,37 @@ import androidx.compose.material3.AlertDialog
 import android.os.Build
 import android.os.Environment
 import android.webkit.WebView
+import androidx.compose.animation.core.Spring
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import java.io.IOException
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -158,6 +185,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
         composable("home") {
             HomeScreen(
+                expenses = expenses,
                 onRecordExpensesClick = { navController.navigate("record_expenses") },
                 onListExpensesClick = { navController.navigate("list_expenses") },
                 onLogoutClick = { navController.navigate("login") { popUpTo("login") { inclusive = true } } },
@@ -211,12 +239,24 @@ fun LoadingScreen(modifier: Modifier = Modifier, onLoadingComplete: () -> Unit =
 }
 
 @Composable
-fun LoginScreen(modifier: Modifier = Modifier, onLoginClick: (String, String) -> Unit = { _, _ -> }) {
+fun LoginScreen(
+    modifier: Modifier = Modifier,
+    onLoginClick: (String, String) -> Unit = { _, _ -> }
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isLoginComplete by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && !isLoading && !isLoginComplete) 0.95f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "button_scale"
+    )
 
     Column(
         modifier = modifier
@@ -263,34 +303,70 @@ fun LoginScreen(modifier: Modifier = Modifier, onLoginClick: (String, String) ->
             )
         }
 
-        Button(
-            onClick = {
-                if (email.isBlank() || password.isBlank()) {
-                    errorMessage = "Please enter email and password"
-                } else {
-                    coroutineScope.launch {
-                        onLoginClick(email, password)
-                        if (email != "andrew@gmail.com" || password != "123") {
-                            errorMessage = "Invalid email or password"
-                            Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .scale(scale)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.secondary
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .alpha(if (isLoginComplete) 0.5f else 1f) // Fade button after login
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = rememberRipple(),
+                    enabled = !isLoading && !isLoginComplete
+                ) {
+                    if (email.isBlank() || password.isBlank()) {
+                        errorMessage = "Please enter email and password"
+                    } else {
+                        coroutineScope.launch {
+                            if (email == "andrew@gmail.com" && password == "123") {
+                                isLoading = true
+                                delay(1500L) // Simulate processing
+                                isLoading = false
+                                isLoginComplete = true
+                                onLoginClick(email, password)
+                                Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
+                            } else {
+                                errorMessage = "Invalid email or password"
+                                Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Login",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            } else if (!isLoginComplete) {
+                Text(
+                    text = "Login",
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
+            // No content shown after login completes
         }
 
         TextButton(
@@ -311,7 +387,7 @@ data class Expense(
     val amount: Double,
     val category: String,
     val photoUri: Uri? = null,
-    val date: String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    val date: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
 ) {
     companion object {
         const val DEFAULT_CATEGORY = "Other"
@@ -333,6 +409,8 @@ fun RecordExpensesScreen(
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var showPermissionRationale by remember { mutableStateOf(false) }
     var permissionType by remember { mutableStateOf("") }
+    var showExpenseDialog by remember { mutableStateOf(false) }
+    var selectedExpense by remember { mutableStateOf<Expense?>(null) }
     val categories = listOf(
         "Utilities",
         "Food",
@@ -351,18 +429,22 @@ fun RecordExpensesScreen(
     // Camera and gallery launchers
     val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success && selectedImageUri != null) {
-            selectedImageBitmap = BitmapFactory.decodeStream(
-                context.contentResolver.openInputStream(selectedImageUri!!)
-            )
+            selectedImageBitmap = try {
+                BitmapFactory.decodeStream(context.contentResolver.openInputStream(selectedImageUri!!))
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
     val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             selectedImageUri = it
-            selectedImageBitmap = BitmapFactory.decodeStream(
-                context.contentResolver.openInputStream(it)
-            )
+            selectedImageBitmap = try {
+                BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
@@ -434,6 +516,84 @@ fun RecordExpensesScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    // Expense details dialog
+    if (showExpenseDialog && selectedExpense != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showExpenseDialog = false
+                selectedExpense = null
+            },
+            title = { Text("Expense Details") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Description: ${selectedExpense!!.description}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Amount: $${String.format("%.2f", selectedExpense!!.amount)}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Category: ${selectedExpense!!.category}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Date: ${selectedExpense!!.date}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    selectedExpense!!.photoUri?.let { uri ->
+                        val bitmap = try {
+                            BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                        } catch (e: Exception) {
+                            null
+                        }
+                        bitmap?.let {
+                            Text(
+                                text = "Receipt Photo:",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "Expense receipt",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .padding(bottom = 8.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExpenseDialog = false
+                        selectedExpense = null
+                    }
+                ) {
+                    Text("Close")
+                }
+            },
+            dismissButton = {}
         )
     }
 
@@ -511,8 +671,7 @@ fun RecordExpensesScreen(
                             Toast.makeText(context, "About clicked", Toast.LENGTH_SHORT).show()
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier.fillMaxSize()
-
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "About",
@@ -681,7 +840,7 @@ fun RecordExpensesScreen(
                         ) {
                             if (ActivityCompat.shouldShowRequestPermissionRationale(
                                     context as Activity,
-                                    storagePermission
+                                    Manifest.permission.READ_EXTERNAL_STORAGE
                                 )
                             ) {
                                 showPermissionRationale = true
@@ -724,7 +883,8 @@ fun RecordExpensesScreen(
                     if (description.isNotBlank() && amount.isNotBlank() && category.isNotBlank()) {
                         val amountValue = amount.toDoubleOrNull()
                         if (amountValue != null) {
-                            expenses.add(Expense(description, amountValue, category, selectedImageUri))
+                            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                            expenses.add(Expense(description, amountValue, category, selectedImageUri, timestamp))
                             description = ""
                             amount = ""
                             category = ""
@@ -765,11 +925,22 @@ fun RecordExpensesScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                items(expenses) { expense ->
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                items(expenses.sortedByDescending {
+                    try {
+                        dateFormat.parse(it.date) ?: Date(0)
+                    } catch (e: Exception) {
+                        Date(0)
+                    }
+                }) { expense ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                selectedExpense = expense
+                                showExpenseDialog = true
+                            },
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         )
@@ -808,20 +979,43 @@ fun RecordExpensesScreen(
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    expenses: List<Expense>,
     onRecordExpensesClick: () -> Unit = {},
     onListExpensesClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {}
 ) {
-    val quotes = listOf(
-        "Save money, and money will save you.",
-        "A penny saved is a penny earned.",
-        "Budgeting is the key to financial freedom.",
-        "Track your expenses to build your wealth."
-    )
-    val randomQuote by remember { mutableStateOf(quotes[Random.nextInt(quotes.size)]) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val categories = listOf(
+        "Utilities",
+        "Food",
+        "Transportation",
+        "Gas",
+        "Office Supplies",
+        "Rent",
+        "Parking",
+        "Electronic Supplies",
+        "Other Expenses"
+    )
+
+    // Calculate category totals and top 5
+    val categoryTotals = expenses.groupBy { it.category }
+        .mapValues { entry -> entry.value.sumOf { it.amount } }
+        .toList()
+        .sortedByDescending { it.second }
+        .take(5)
+    val chartData = categories.map { category ->
+        expenses.filter { it.category == category }.sumOf { it.amount }
+    }
+
+    // State for dragging the top 5 categories list
+    val offsetY = remember { mutableStateOf(0f) }
+    val maxDragHeight = with(LocalDensity.current) { 100.dp.toPx() } // Max drag distance
+
+    // State for showing transactions dialog
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    val transactionsForCategory = expenses.filter { it.category == selectedCategory }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -829,7 +1023,7 @@ fun HomeScreen(
             ModalDrawerSheet {
                 Column(
                     modifier = Modifier
-                        .fillMaxHeight()
+                        .heightIn(max = 500.dp)
                         .padding(16.dp)
                 ) {
                     Row(
@@ -929,15 +1123,21 @@ fun HomeScreen(
             modifier = modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            // Main content (scrollable)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 16.dp)
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { scope.launch { drawerState.open() } }) {
@@ -949,39 +1149,212 @@ fun HomeScreen(
                     }
                     Text(
                         text = "ExpenSEEs",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Text(
                     text = "Welcome to ExpenSEEs!",
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 32.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
-                Text(
-                    text = randomQuote,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                )
+                Spacer(modifier = Modifier.height(32.dp))
+                if (expenses.isEmpty()) {
+                    Text(
+                        text = "No expenses recorded yet.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    // Pie Chart Section
+                    AndroidView(
+                        factory = { context ->
+                            WebView(context).apply {
+                                settings.javaScriptEnabled = true
+                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                loadDataWithBaseURL(
+                                    null,
+                                    """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <style>
+                        html, body {
+                            margin: 0;
+                            padding: 0;
+                            background: transparent;
+                            height: 100%;
+                            width: 100%;
+                        }
+                        #expenseChart {
+                            width: 100%;
+                            height: 100%;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <canvas id="expenseChart"></canvas>
+                    <script>
+                        const ctx = document.getElementById('expenseChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'pie',
+                            data: {
+                                labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses'],
+                                datasets: [{
+                                    data: [${chartData.joinToString()}],
+                                    backgroundColor: [
+                                        '#FF6B6B',
+                                        '#4ECDC4',
+                                        '#45B7D1',
+                                        '#96CEB4',
+                                        '#FFEEAD',
+                                        '#D4A5A5',
+                                        '#A8DADC',
+                                        '#F4A261',
+                                        '#E76F51'
+                                    ],
+                                    borderColor: ['#FFFFFF'],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Expense Distribution by Category',
+                                        color: '#333333',
+                                        font: { size: 18 },
+                                        align: 'center'
+                                    }
+                                }
+                            }
+                        });
+                    </script>
+                </body>
+                </html>
+                """.trimIndent(),
+                                    "text/html",
+                                    "UTF-8",
+                                    null
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(250.dp) // adjust as needed
+                            .padding(vertical = 8.dp)
+                    )
+
+
+                    Spacer(modifier = Modifier.height(32.dp))
+                    // Top 5 Categories Section
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp), // fix here
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface // fix here
+                        )
+                    )
+
+                    {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Your Top 5 Expenses",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 200.dp)
+                                    .offset { IntOffset(0, offsetY.value.roundToInt()) }
+                                    .pointerInput(Unit) {
+                                        detectDragGestures { _, dragAmount ->
+                                            val newOffset = offsetY.value + dragAmount.y
+                                            offsetY.value = newOffset.coerceIn(-maxDragHeight, 0f)
+                                        }
+                                    }
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                                ) {
+                                    itemsIndexed(categoryTotals) { index, (category, amount) ->
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp, horizontal = 8.dp)
+                                                .clickable { selectedCategory = category },
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surface
+                                            ),
+                                            elevation = CardDefaults.cardElevation(
+                                                defaultElevation = 2.dp
+                                            )
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = "${index + 1}. $category",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "$${String.format("%.2f", amount)}",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
+            // Buttons at the bottom
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.CenterHorizontally)
-                    .padding(bottom = 0.dp),
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
                     onClick = onListExpensesClick,
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp),
-                    shape = RectangleShape,
+                        .height(56.dp)
+                        .padding(end = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -997,8 +1370,9 @@ fun HomeScreen(
                     onClick = onRecordExpensesClick,
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp),
-                    shape = RectangleShape,
+                        .height(56.dp)
+                        .padding(start = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -1012,9 +1386,80 @@ fun HomeScreen(
                 }
             }
         }
+        // Transactions Dialog
+        if (selectedCategory != null) {
+            AlertDialog(
+                onDismissRequest = { selectedCategory = null },
+                title = {
+                    Text(
+                        text = "Transactions for $selectedCategory",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                text = {
+                    if (transactionsForCategory.isEmpty()) {
+                        Text(
+                            text = "No transactions found for this category.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp)
+                        ) {
+                            items(transactionsForCategory) { expense ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = expense.date.toString(), // Assuming Expense has a date property
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.align(Alignment.Start)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = expense.description,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "$${String.format("%.2f", expense.amount)}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedCategory = null }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
     }
 }
-
 
 @Composable
 fun ExpenseListScreen(
@@ -1028,27 +1473,6 @@ fun ExpenseListScreen(
     val context = LocalContext.current
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
     var selectedImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    val categories = listOf(
-        "Utilities",
-        "Food",
-        "Transportation",
-        "Gas",
-        "Office Supplies",
-        "Rent",
-        "Parking",
-        "Electronic Supplies",
-        "Other Expenses"
-    )
-
-    // Calculate category totals and top 5
-    val categoryTotals = expenses.groupBy { it.category }
-        .mapValues { entry -> entry.value.sumOf { it.amount } }
-        .toList()
-        .sortedByDescending { it.second }
-        .take(5)
-    val chartData = categories.map { category ->
-        expenses.filter { it.category == category }.sumOf { it.amount }
-    }
 
     LaunchedEffect(selectedExpense) {
         selectedExpense?.photoUri?.let { uri ->
@@ -1257,91 +1681,9 @@ fun ExpenseListScreen(
                 )
             }
 
-            Text(
-                text = "Expense Distribution",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Pie Chart
-            AndroidView(
-                factory = { context ->
-                    WebView(context).apply {
-                        settings.javaScriptEnabled = true
-                        loadDataWithBaseURL(
-                            null,
-                            """
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-                            </head>
-                            <body>
-                                <canvas id="expenseChart"></canvas>
-                                <script>
-                                    const ctx = document.getElementById('expenseChart').getContext('2d');
-                                    new Chart(ctx, {
-                                        type: 'pie',
-                                        data: {
-                                            labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses'],
-                                            datasets: [{
-                                                data: [${chartData.joinToString()}],
-                                                backgroundColor: [
-                                                    '#FF6B6B',
-                                                    '#4ECDC4',
-                                                    '#45B7D1',
-                                                    '#96CEB4',
-                                                    '#FFEEAD',
-                                                    '#D4A5A5',
-                                                    '#A8DADC',
-                                                    '#F4A261',
-                                                    '#E76F51'
-                                                ],
-                                                borderColor: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
-                                                borderWidth: 1
-                                            }]
-                                        },
-                                        options: {
-                                            responsive: true,
-                                            plugins: {
-                                                legend: {
-                                                    position: 'top',
-                                                    labels: { color: '#333333' }
-                                                },
-                                                title: {
-                                                    display: true,
-                                                    text: 'Expense Distribution by Category',
-                                                    color: '#333333',
-                                                    font: { size: 16 }
-                                                }
-                                            }
-                                        }
-                                    });
-                                </script>
-                            </body>
-                            </html>
-                            """.trimIndent(),
-                            "text/html",
-                            "UTF-8",
-                            null
-                        )
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(3f) // 3/4 of screen height
-                    .padding(bottom = 16.dp)
-            )
-
-            Text(
-                text = "Your Top 5 Expense Categories",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            if (categoryTotals.isEmpty()) {
+            if (expenses.isEmpty()) {
                 Text(
-                    text = "No expenses recorded yet.",
+                    text = "No expenses recorded.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -1351,15 +1693,14 @@ fun ExpenseListScreen(
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f) // Remaining 1/4 of screen height
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(categoryTotals) { (category, amount) ->
+                    items(expenses) { expense ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 4.dp)
+                                .clickable { selectedExpense = expense },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             )
@@ -1370,13 +1711,20 @@ fun ExpenseListScreen(
                                     .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Column {
+                                    Text(
+                                        text = expense.description,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = expense.category,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Text(
-                                    text = category,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "$${String.format("%.2f", amount)}",
+                                    text = "$${String.format("%.2f", expense.amount)}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -1457,9 +1805,17 @@ fun LoginScreenPreview() {
 
 @Preview(showBackground = true)
 @Composable
-fun HomeScreenPreview() {
+fun HomeScreenPreviewWithData() {
     ExpenSEEsTheme {
-        HomeScreen()
+        HomeScreen(
+            expenses = listOf(
+                Expense("Electricity", 120.50, "Utilities", null, "2025-06-01 10:00:00"),
+                Expense("Groceries", 85.25, "Food", null, "2025-06-02 12:30:00")
+            ),
+            onRecordExpensesClick = {},
+            onListExpensesClick = {},
+            onLogoutClick = {}
+        )
     }
 }
 
@@ -1467,7 +1823,10 @@ fun HomeScreenPreview() {
 @Composable
 fun RecordExpensesScreenPreview() {
     ExpenSEEsTheme {
-        RecordExpensesScreen(navController = rememberNavController(), expenses = mutableListOf())
+        RecordExpensesScreen(
+            navController = rememberNavController(),
+            expenses = mutableListOf()
+        )
     }
 }
 
