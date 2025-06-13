@@ -1,39 +1,64 @@
 package com.example.expensees
 
-import android.Manifest
 import android.app.Activity
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -64,64 +89,50 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.expensees.ui.theme.ExpenSEEsTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import kotlin.random.Random
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.AlertDialog
-import android.os.Build
-import android.os.Environment
-import android.webkit.WebView
-import androidx.compose.animation.core.Spring
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.app.ActivityCompat
-import java.io.IOException
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.border
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.ripple.rememberRipple
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
+import android.graphics.drawable.Drawable
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
+
 
 
 class MainActivity : ComponentActivity() {
@@ -138,11 +149,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun createImageUri(context: Context): Uri? {
+
+private fun createImageUri(context: Context): Uri? {
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
     return try {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-            ?: throw IOException("External files directory not available")
         val imageFile = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
         FileProvider.getUriForFile(
             context,
@@ -150,7 +161,6 @@ fun createImageUri(context: Context): Uri? {
             imageFile
         )
     } catch (e: Exception) {
-        e.printStackTrace()
         null
     }
 }
@@ -387,7 +397,8 @@ data class Expense(
     val amount: Double,
     val category: String,
     val photoUri: Uri? = null,
-    val date: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+    val dateOfTransaction: String,
+    val dateAdded: String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
 ) {
     companion object {
         const val DEFAULT_CATEGORY = "Other"
@@ -404,6 +415,7 @@ fun RecordExpensesScreen(
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
+    var dateOfTransaction by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     var selectedImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -411,6 +423,7 @@ fun RecordExpensesScreen(
     var permissionType by remember { mutableStateOf("") }
     var showExpenseDialog by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
+    var showFullScreenImage by remember { mutableStateOf(false) }
     val categories = listOf(
         "Utilities",
         "Food",
@@ -425,6 +438,20 @@ fun RecordExpensesScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // Date picker for Date of Transaction
+    val calendar = Calendar.getInstance()
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                dateOfTransaction = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+    }
 
     // Camera and gallery launchers
     val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -454,7 +481,7 @@ fun RecordExpensesScreen(
     ) { permissions ->
         when (permissionType) {
             "camera" -> {
-                if (permissions[Manifest.permission.CAMERA] == true) {
+                if (permissions[android.Manifest.permission.CAMERA] == true) {
                     createImageUri(context)?.let { uri ->
                         selectedImageUri = uri
                         takePictureLauncher.launch(uri)
@@ -465,9 +492,9 @@ fun RecordExpensesScreen(
             }
             "storage" -> {
                 val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    Manifest.permission.READ_MEDIA_IMAGES
+                    android.Manifest.permission.READ_MEDIA_IMAGES
                 } else {
-                    Manifest.permission.READ_EXTERNAL_STORAGE
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
                 }
                 if (permissions[storagePermission] == true) {
                     pickImageLauncher.launch("image/*")
@@ -497,11 +524,11 @@ fun RecordExpensesScreen(
                     onClick = {
                         showPermissionRationale = false
                         val permission = when (permissionType) {
-                            "camera" -> Manifest.permission.CAMERA
+                            "camera" -> android.Manifest.permission.CAMERA
                             "storage" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                Manifest.permission.READ_MEDIA_IMAGES
+                                android.Manifest.permission.READ_MEDIA_IMAGES
                             } else {
-                                Manifest.permission.READ_EXTERNAL_STORAGE
+                                android.Manifest.permission.READ_EXTERNAL_STORAGE
                             }
                             else -> ""
                         }
@@ -540,7 +567,7 @@ fun RecordExpensesScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Amount: $${String.format("%.2f", selectedExpense!!.amount)}",
+                        text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -552,7 +579,13 @@ fun RecordExpensesScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Date: ${selectedExpense!!.date}",
+                        text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Date Added: ${selectedExpense!!.dateAdded}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -578,6 +611,10 @@ fun RecordExpensesScreen(
                                     .height(200.dp)
                                     .clip(MaterialTheme.shapes.medium)
                                     .padding(bottom = 8.dp)
+                                    .clickable {
+                                        selectedImageBitmap = it
+                                        showFullScreenImage = true
+                                    },
                             )
                         }
                     }
@@ -594,6 +631,58 @@ fun RecordExpensesScreen(
                 }
             },
             dismissButton = {}
+        )
+    }
+
+    if (showFullScreenImage) {
+        AlertDialog(
+            onDismissRequest = { showFullScreenImage = false },
+            modifier = Modifier.fillMaxSize(),
+            confirmButton = {
+                TextButton(onClick = { showFullScreenImage = false }) {
+                    Text("Close")
+                }
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(
+                            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    selectedImageBitmap?.let { bitmap ->
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Full screen expense photo",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    } ?: selectedImageUri?.let { uri ->
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = "Full screen expense photo",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentScale = ContentScale.Fit,
+                            onError = {
+                                Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    } ?: Text(
+                        text = "No image available",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
         )
     }
 
@@ -695,6 +784,7 @@ fun RecordExpensesScreen(
                             color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
@@ -754,7 +844,7 @@ fun RecordExpensesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = 8.dp)
             ) {
                 OutlinedTextField(
                     value = category,
@@ -786,6 +876,35 @@ fun RecordExpensesScreen(
                 }
             }
 
+            // Date of Transaction Field with Fixed Icon
+            val interactionSource = remember { MutableInteractionSource() }
+            OutlinedTextField(
+                value = dateOfTransaction,
+                onValueChange = { },
+                label = { Text("Date of Transaction (YYYY-MM-DD)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                readOnly = true,
+                interactionSource = interactionSource,
+                trailingIcon = {
+                    IconButton(onClick = { datePickerDialog.show() }) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Select date",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            )
+            LaunchedEffect(interactionSource) {
+                interactionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) {
+                        datePickerDialog.show()
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -796,16 +915,16 @@ fun RecordExpensesScreen(
                     onClick = {
                         permissionType = "camera"
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                            context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+                            context.checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                         ) {
                             if (ActivityCompat.shouldShowRequestPermissionRationale(
                                     context as Activity,
-                                    Manifest.permission.CAMERA
+                                    android.Manifest.permission.CAMERA
                                 )
                             ) {
                                 showPermissionRationale = true
                             } else {
-                                multiplePermissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                                multiplePermissionsLauncher.launch(arrayOf(android.Manifest.permission.CAMERA))
                             }
                         } else {
                             createImageUri(context)?.let { uri ->
@@ -831,16 +950,16 @@ fun RecordExpensesScreen(
                     onClick = {
                         permissionType = "storage"
                         val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            Manifest.permission.READ_MEDIA_IMAGES
+                            android.Manifest.permission.READ_MEDIA_IMAGES
                         } else {
-                            Manifest.permission.READ_EXTERNAL_STORAGE
+                            android.Manifest.permission.READ_EXTERNAL_STORAGE
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                             context.checkSelfPermission(storagePermission) != PackageManager.PERMISSION_GRANTED
                         ) {
                             if (ActivityCompat.shouldShowRequestPermissionRationale(
                                     context as Activity,
-                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                                    storagePermission
                                 )
                             ) {
                                 showPermissionRationale = true
@@ -875,19 +994,30 @@ fun RecordExpensesScreen(
                         .height(200.dp)
                         .padding(bottom = 16.dp)
                         .clip(MaterialTheme.shapes.medium)
+                        .clickable { showFullScreenImage = true }
                 )
             }
 
             Button(
                 onClick = {
-                    if (description.isNotBlank() && amount.isNotBlank() && category.isNotBlank()) {
+                    if (description.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
                         val amountValue = amount.toDoubleOrNull()
                         if (amountValue != null) {
                             val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-                            expenses.add(Expense(description, amountValue, category, selectedImageUri, timestamp))
+                            expenses.add(
+                                Expense(
+                                    description = description,
+                                    amount = amountValue,
+                                    category = category,
+                                    photoUri = selectedImageUri,
+                                    dateOfTransaction = dateOfTransaction,
+                                    dateAdded = timestamp
+                                )
+                            )
                             description = ""
                             amount = ""
                             category = ""
+                            dateOfTransaction = ""
                             selectedImageBitmap = null
                             selectedImageUri = null
                             Toast.makeText(context, "Expense added", Toast.LENGTH_SHORT).show()
@@ -928,7 +1058,7 @@ fun RecordExpensesScreen(
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                 items(expenses.sortedByDescending {
                     try {
-                        dateFormat.parse(it.date) ?: Date(0)
+                        dateFormat.parse(it.dateAdded) ?: Date(0)
                     } catch (e: Exception) {
                         Date(0)
                     }
@@ -964,7 +1094,7 @@ fun RecordExpensesScreen(
                                 )
                             }
                             Text(
-                                text = "$${String.format("%.2f", expense.amount)}",
+                                text = "₱${String.format("%.2f", expense.amount)}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -975,6 +1105,7 @@ fun RecordExpensesScreen(
         }
     }
 }
+
 
 @Composable
 fun HomeScreen(
@@ -1000,6 +1131,7 @@ fun HomeScreen(
     )
 
     // Calculate category totals and top 5
+    val totalExpenses = expenses.sumOf { it.amount }
     val categoryTotals = expenses.groupBy { it.category }
         .mapValues { entry -> entry.value.sumOf { it.amount } }
         .toList()
@@ -1011,11 +1143,16 @@ fun HomeScreen(
 
     // State for dragging the top 5 categories list
     val offsetY = remember { mutableStateOf(0f) }
-    val maxDragHeight = with(LocalDensity.current) { 100.dp.toPx() } // Max drag distance
+    val maxDragHeight = with(LocalDensity.current) { 100.dp.toPx() }
 
     // State for showing transactions dialog
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var selectedTransaction by remember { mutableStateOf<Expense?>(null) }
     val transactionsForCategory = expenses.filter { it.category == selectedCategory }
+
+    // State for full-screen image dialog
+    var showFullScreenImage by remember { mutableStateOf(false) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -1177,102 +1314,132 @@ fun HomeScreen(
                 } else {
                     // Pie Chart Section
                     AndroidView(
-                        factory = { context ->
-                            WebView(context).apply {
+                        factory = { ctx ->
+                            WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                                loadDataWithBaseURL(
-                                    null,
-                                    """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-                    <style>
-                        html, body {
-                            margin: 0;
-                            padding: 0;
-                            background: transparent;
-                            height: 100%;
-                            width: 100%;
-                        }
-                        #expenseChart {
-                            width: 100%;
-                            height: 100%;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <canvas id="expenseChart"></canvas>
-                    <script>
-                        const ctx = document.getElementById('expenseChart').getContext('2d');
-                        new Chart(ctx, {
-                            type: 'pie',
-                            data: {
-                                labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses'],
-                                datasets: [{
-                                    data: [${chartData.joinToString()}],
-                                    backgroundColor: [
-                                        '#FF6B6B',
-                                        '#4ECDC4',
-                                        '#45B7D1',
-                                        '#96CEB4',
-                                        '#FFEEAD',
-                                        '#D4A5A5',
-                                        '#A8DADC',
-                                        '#F4A261',
-                                        '#E76F51'
-                                    ],
-                                    borderColor: ['#FFFFFF'],
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: false
+                                try {
+                                    loadDataWithBaseURL(
+                                        null,
+                                        """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                        <style>
+                            html, body {
+                                margin: 0;
+                                padding: 0;
+                                background: transparent;
+                                height: 100%;
+                                width: 100%;
+                            }
+                            #expenseChart {
+                                width: 100%;
+                                height: 100%;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <canvas id="expenseChart"></canvas>
+                        <script>
+                            const chartData = [${chartData.joinToString()}];
+                            const totalExpenses = chartData.reduce((sum, value) => sum + value, 0);
+                            const ctx = document.getElementById('expenseChart').getContext('2d');
+                            const chart = new Chart(ctx, {
+                                type: 'pie',
+                                data: {
+                                    labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses'],
+                                    datasets: [{
+                                        data: chartData,
+                                        backgroundColor: [
+                                            '#FF6B6B',
+                                            '#4ECDC4',
+                                            '#45B7D1',
+                                            '#96CEB4',
+                                            '#FFEEAD',
+                                            '#D4A5A5',
+                                            '#A8DADC',
+                                            '#F4A261',
+                                            '#E76F51'
+                                        ],
+                                        borderColor: ['#FFFFFF'],
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        title: {
+                                            display: true,
+                                            text: 'Expense Distribution by Category',
+                                            color: '#333333',
+                                            font: { size: 18 },
+                                            align: 'center'
+                                        },
+                                        tooltip: {
+                                            enabled: true
+                                        }
                                     },
-                                    title: {
-                                        display: true,
-                                        text: 'Expense Distribution by Category',
-                                        color: '#333333',
-                                        font: { size: 18 },
-                                        align: 'center'
+                                    onClick: (event, elements, chart) => {
+                                        if (elements.length > 0) {
+                                            const index = elements[0].index;
+                                            const label = chart.data.labels[index];
+                                            const value = chart.data.datasets[0].data[index];
+                                            const percentage = totalExpenses > 0 ? ((value / totalExpenses) * 100).toFixed(2) : 0;
+                                            chart.options.plugins.title.text = label + ': ' + percentage + '% of total expenses';
+                                            chart.update();
+                                        } else {
+                                            chart.options.plugins.title.text = 'Expense Distribution by Category';
+                                            chart.update();
+                                        }
                                     }
                                 }
-                            }
-                        });
-                    </script>
-                </body>
-                </html>
-                """.trimIndent(),
-                                    "text/html",
-                                    "UTF-8",
-                                    null
-                                )
+                            });
+                        </script>
+                    </body>
+                    </html>
+                    """.trimIndent(),
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(ctx, "Failed to load chart", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(250.dp) // adjust as needed
+                            .height(250.dp)
                             .padding(vertical = 8.dp)
                     )
-
-
+                    // Total Expenses Display
+                    Text(
+                        text = "Total Expenses: ₱${String.format("%.2f", totalExpenses)}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(modifier = Modifier.height(32.dp))
                     // Top 5 Categories Section
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp), // fix here
+                            .padding(vertical = 8.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface // fix here
+                            containerColor = MaterialTheme.colorScheme.surface
                         )
-                    )
-
-                    {
+                    ) {
                         Column(
                             modifier = Modifier.padding(16.dp)
                         ) {
@@ -1296,10 +1463,7 @@ fun HomeScreen(
                                     }
                             ) {
                                 LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     itemsIndexed(categoryTotals) { index, (category, amount) ->
                                         Card(
@@ -1326,7 +1490,11 @@ fun HomeScreen(
                                                     color = MaterialTheme.colorScheme.onSurface
                                                 )
                                                 Text(
-                                                    text = "$${String.format("%.2f", amount)}",
+                                                    text = if (totalExpenses > 0) {
+                                                        "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
+                                                    } else {
+                                                        "0.00%"
+                                                    },
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     color = MaterialTheme.colorScheme.primary
                                                 )
@@ -1392,7 +1560,7 @@ fun HomeScreen(
                 onDismissRequest = { selectedCategory = null },
                 title = {
                     Text(
-                        text = "Transactions for $selectedCategory",
+                        text = "Transactions for ${selectedCategory ?: ""}",
                         style = MaterialTheme.typography.titleMedium
                     )
                 },
@@ -1403,47 +1571,173 @@ fun HomeScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
-                        LazyColumn(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 400.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            items(transactionsForCategory) { expense ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    ),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                                ) {
-                                    Column(
+                            // Pie Chart for Transactions
+                            AndroidView(
+                                factory = { ctx ->
+                                    WebView(ctx).apply {
+                                        settings.javaScriptEnabled = true
+                                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                        try {
+                                            loadDataWithBaseURL(
+                                                null,
+                                                """
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                                <style>
+                                    html, body {
+                                        margin: 0;
+                                        padding: 0;
+                                        background: transparent;
+                                        height: 100%;
+                                        width: 100%;
+                                    }
+                                    #transactionChart {
+                                        width: 100%;
+                                        height: 100%;
+                                    }
+                                </style>
+                            </head>
+                            <body>
+                                <canvas id="transactionChart"></canvas>
+                                <script>
+                                    const transactionData = [${transactionsForCategory.map { it.amount }.joinToString()}];
+                                    const totalTransactions = transactionData.reduce((sum, value) => sum + value, 0);
+                                    const ctx = document.getElementById('transactionChart').getContext('2d');
+                                    const chart = new Chart(ctx, {
+                                        type: 'bar',
+                                        data: {
+                                            labels: [${transactionsForCategory.mapIndexed { index, expense ->
+                                                    "'${expense.description.replace("'", "\\'")}'"
+                                                }.joinToString()}],
+                                            datasets: [{
+                                                data: transactionData,
+                                                backgroundColor: [
+                                                    '#FF6B6B',
+                                                    '#4ECDC4',
+                                                    '#45B7D1',
+                                                    '#96CEB4',
+                                                    '#FFEEAD',
+                                                    '#D4A5A5',
+                                                    '#A8DADC',
+                                                    '#F4A261',
+                                                    '#E76F51'
+                                                ],
+                                                borderColor: ['#FFFFFF'],
+                                                borderWidth: 1
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: {
+                                                    display: false
+                                                },
+                                                title: {
+                                                    display: true,
+                                                    text: 'Transaction Distribution for ${selectedCategory ?: ""}',
+                                                    color: '#333333',
+                                                    font: { size: 18 },
+                                                    align: 'center'
+                                                },
+                                                tooltip: {
+                                                    enabled: true,
+                                                    callbacks: {
+                                                        label: function(context) {
+                                                            const label = context.label || '';
+                                                            const value = context.raw || 0;
+                                                            const percentage = totalTransactions > 0 ? ((value / totalTransactions) * 100).toFixed(2) : 0;
+                                                            return ': ' + value;
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            onClick: (event, elements, chart) => {
+                                                if (elements.length > 0) {
+                                                    const index = elements[0].index;
+                                                    const label = chart.data.labels[index];
+                                                    const value = chart.data.datasets[0].data[index];
+                                                    const percentage = totalTransactions > 0 ? ((value / totalTransactions) * 100).toFixed(2) : 0;
+                                                    chart.options.plugins.title.text = label + ': ' + percentage + '%';
+                                                    chart.update();
+                                                } else {
+                                                    chart.options.plugins.title.text = 'Transaction Distribution for ${selectedCategory ?: ""}';
+                                                    chart.update();
+                                                }
+                                            }
+                                        }
+                                    });
+                                </script>
+                            </body>
+                            </html>
+                            """.trimIndent(),
+                                                "text/html",
+                                                "UTF-8",
+                                                null
+                                            )
+                                        } catch (e: Exception) {
+                                            Toast.makeText(ctx, "Failed to load transaction chart", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(250.dp)
+                                    .padding(vertical = 8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            // Transaction List with Date
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 200.dp)
+                            ) {
+                                items(transactionsForCategory) { expense ->
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(12.dp)
+                                            .padding(vertical = 4.dp)
+                                            .clickable { selectedTransaction = expense },
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        ),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                     ) {
-                                        Text(
-                                            text = expense.date.toString(), // Assuming Expense has a date property
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.align(Alignment.Start)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp)
                                         ) {
                                             Text(
-                                                text = expense.description,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurface
+                                                text = expense.dateOfTransaction,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.align(Alignment.Start)
                                             )
-                                            Text(
-                                                text = "$${String.format("%.2f", expense.amount)}",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = expense.description,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "₱${String.format("%.2f", expense.amount)}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1458,8 +1752,137 @@ fun HomeScreen(
                 }
             )
         }
+        // Transaction Details Dialog
+        if (selectedTransaction != null) {
+            AlertDialog(
+                onDismissRequest = { selectedTransaction = null },
+                title = {
+                    Text(
+                        text = "Transaction Details",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Category: ${selectedTransaction?.category ?: "N/A"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Description: ${selectedTransaction?.description ?: "N/A"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Amount: ₱${String.format("%.2f", selectedTransaction?.amount ?: 0.0)}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Purchase Date: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Date Added: ${selectedTransaction?.dateAdded ?: "N/A"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        selectedTransaction?.photoUri?.let { uri ->
+                            Text(
+                                text = "Receipt Photo:",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Receipt photo",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        selectedImageUri = uri
+                                        showFullScreenImage = true
+                                    },
+                                contentScale = ContentScale.Fit,
+                                onError = {
+                                    Toast.makeText(context, "Failed to load receipt photo", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        } ?: Text(
+                            text = "No photo available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedTransaction = null }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+        // Full-screen image dialog
+        if (showFullScreenImage) {
+            AlertDialog(
+                onDismissRequest = { showFullScreenImage = false },
+                modifier = Modifier.fillMaxSize(),
+                confirmButton = {
+                    TextButton(onClick = { showFullScreenImage = false }) {
+                        Text("Close")
+                    }
+                },
+                text = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(
+                                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        selectedImageUri?.let { uri ->
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Full screen receipt photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                contentScale = ContentScale.Fit,
+                                onError = {
+                                    Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        } ?: Text(
+                            text = "No image available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+            )
+        }
     }
 }
+
+
 
 @Composable
 fun ExpenseListScreen(
@@ -1472,19 +1895,8 @@ fun ExpenseListScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
-    var selectedImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
-    LaunchedEffect(selectedExpense) {
-        selectedExpense?.photoUri?.let { uri ->
-            try {
-                selectedImageBitmap = BitmapFactory.decodeStream(
-                    context.contentResolver.openInputStream(uri)
-                )
-            } catch (e: Exception) {
-                selectedImageBitmap = null
-            }
-        } ?: run { selectedImageBitmap = null }
-    }
+    var showFullScreenImage by remember { mutableStateOf(false) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -1523,7 +1935,7 @@ fun ExpenseListScreen(
                             )
                             Text(
                                 text = "andrew@gmail.com",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1635,7 +2047,7 @@ fun ExpenseListScreen(
                                             )
                                         }
                                         Text(
-                                            text = "$${String.format("%.2f", expense.amount)}",
+                                            text = "₱${String.format("%.2f", expense.amount)}",
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -1724,7 +2136,7 @@ fun ExpenseListScreen(
                                     )
                                 }
                                 Text(
-                                    text = "$${String.format("%.2f", expense.amount)}",
+                                    text = "₱${String.format("%.2f", expense.amount)}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -1737,48 +2149,121 @@ fun ExpenseListScreen(
             selectedExpense?.let { expense ->
                 AlertDialog(
                     onDismissRequest = { selectedExpense = null },
-                    title = { Text("Expense Details") },
+                    title = {
+                        Text(
+                            text = "Expense Details",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
                     text = {
-                        Column {
-                            selectedImageBitmap?.let { bitmap ->
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            expense.photoUri?.let { uri ->
+                                AsyncImage(
+                                    model = uri,
                                     contentDescription = "Expense photo",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
                                         .padding(bottom = 16.dp)
-                                        .clip(MaterialTheme.shapes.medium)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedImageUri = uri
+                                            showFullScreenImage = true
+                                        },
+                                    contentScale = ContentScale.Fit,
+                                    onError = {
+                                        Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+                                    }
                                 )
                             } ?: Text(
                                 text = "No photo available",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                             Text(
                                 text = "Description: ${expense.description}",
                                 style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Category: ${expense.category}",
                                 style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
-                                text = "Amount: $${String.format("%.2f", expense.amount)}",
+                                text = "Amount: ₱${String.format("%.2f", expense.amount)}",
                                 style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
-                                text = "Date: ${expense.date}",
-                                style = MaterialTheme.typography.bodyLarge
+                                text = "Purchase Date: ${expense.dateOfTransaction ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = "Date Added: ${expense.dateAdded ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
                     },
                     confirmButton = {
                         TextButton(onClick = { selectedExpense = null }) {
                             Text("Close")
+                        }
+                    }
+                )
+            }
+
+            // Full-screen image dialog
+            if (showFullScreenImage) {
+                AlertDialog(
+                    onDismissRequest = { showFullScreenImage = false },
+                    modifier = Modifier.fillMaxSize(),
+                    confirmButton = {
+                        TextButton(onClick = { showFullScreenImage = false }) {
+                            Text("Close")
+                        }
+                    },
+                    text = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(
+                                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            selectedImageUri?.let { uri ->
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Full screen expense photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    contentScale = ContentScale.Fit,
+                                    onError = {
+                                        Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            } ?: Text(
+                                text = "No image available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
                         }
                     }
                 )
