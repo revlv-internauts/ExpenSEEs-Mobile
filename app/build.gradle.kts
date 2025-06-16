@@ -74,4 +74,7 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.glide.compose)
     implementation(libs.coil.compose)
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
+
+
 }
