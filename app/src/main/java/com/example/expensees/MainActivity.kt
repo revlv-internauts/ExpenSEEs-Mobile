@@ -1,5 +1,3 @@
-@file:Suppress("UNREACHABLE_CODE", "UNREACHABLE_CODE")
-
 package com.example.expensees
 
 import android.Manifest
@@ -17,15 +15,19 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,7 +53,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +62,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -147,7 +150,6 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -161,7 +163,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
 
 private fun createImageUri(context: Context): Uri? {
     val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -187,24 +188,22 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     NavHost(navController = navController, startDestination = "loading") {
         composable("loading") {
             LoadingScreen(
+                modifier = modifier,
                 onLoadingComplete = {
                     navController.navigate("login") {
                         popUpTo("loading") { inclusive = true }
                     }
-                },
-                modifier = modifier
+                }
             )
         }
         composable("login") {
             LoginScreen(
-                onLoginClick = { email, password ->
-                    if (email == "andrew@gmail.com" && password == "123") {
-                        navController.navigate("home") {
-                            popUpTo("login") { inclusive = true }
-                        }
+                modifier = modifier,
+                onLoginClick = { _, _ ->
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
                     }
-                },
-                modifier = modifier
+                }
             )
         }
         composable("home") {
@@ -237,6 +236,9 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             ExpenseListScreen(
                 navController = navController,
                 expenses = expenses,
+                onDeleteExpenses = { expensesToDelete ->
+                    expenses.removeAll(expensesToDelete)
+                },
                 onLogoutClick = {
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
@@ -259,11 +261,15 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 modifier = modifier
             )
         }
+        composable("reset_password") {
+            ResetPassword(
+                navController = navController,
+                modifier = modifier
+            )
+        }
     }
 }
 
-
-// Data class for expense items
 data class ExpenseItem(
     val category: String,
     val quantity: Int,
@@ -271,13 +277,16 @@ data class ExpenseItem(
     val remarks: String = ""
 )
 
-// Data class for submitted budgets
+enum class BudgetStatus {
+    PENDING, APPROVED, DENIED
+}
+
 data class SubmittedBudget(
     val name: String,
     val expenses: List<ExpenseItem>,
-    val total: Double
+    val total: Double,
+    val status: BudgetStatus = BudgetStatus.PENDING
 )
-
 
 data class Expense(
     val description: String,
@@ -291,9 +300,6 @@ data class Expense(
         const val DEFAULT_CATEGORY = "Other"
     }
 }
-
-
-
 
 @Composable
 fun LoadingScreen(modifier: Modifier = Modifier, onLoadingComplete: () -> Unit = {}) {
@@ -409,10 +415,10 @@ fun LoginScreen(
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
-                .alpha(if (isLoginComplete) 0.5f else 1f) // Fade button after login
+                .alpha(if (isLoginComplete) 0.5f else 1f)
                 .clickable(
                     interactionSource = interactionSource,
-                    indication =rememberRipple(),
+                    indication = rememberRipple(),
                     enabled = !isLoading && !isLoginComplete
                 ) {
                     if (email.isBlank() || password.isBlank()) {
@@ -421,7 +427,7 @@ fun LoginScreen(
                         coroutineScope.launch {
                             if (email == "andrew@gmail.com" && password == "123") {
                                 isLoading = true
-                                delay(1500L) // Simulate processing
+                                delay(1500L)
                                 isLoading = false
                                 isLoginComplete = true
                                 onLoginClick(email, password)
@@ -450,7 +456,6 @@ fun LoginScreen(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
-            // No content shown after login completes
         }
 
         TextButton(
@@ -466,7 +471,198 @@ fun LoginScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ResetPassword(
+    modifier: Modifier = Modifier,
+    navController: NavController
+) {
+    var email by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isResetComplete by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && !isLoading && !isResetComplete) 0.95f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "button_scale"
+    )
 
+    // Handle system back button
+    BackHandler(enabled = true) {
+        navController.navigate("home") {
+            popUpTo("home") { inclusive = false }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Reset Password",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = false }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        },
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Reset Your Password",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+
+            OutlinedTextField(
+                value = newPassword,
+                onValueChange = { newPassword = it },
+                label = { Text("New Password") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            )
+
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("Confirm Password") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            )
+
+            errorMessage?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .scale(scale)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    )
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.secondary
+                            ),
+                            start = Offset(0f, 0f),
+                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .alpha(if (isResetComplete) 0.5f else 1f)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = rememberRipple(),
+                        enabled = !isLoading && !isResetComplete
+                    ) {
+                        if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
+                            errorMessage = "Please fill all fields"
+                        } else if (newPassword != confirmPassword) {
+                            errorMessage = "Passwords do not match"
+                        } else if (email != "andrew@gmail.com") {
+                            errorMessage = "Email not found"
+                        } else {
+                            coroutineScope.launch {
+                                isLoading = true
+                                delay(1500L)
+                                isLoading = false
+                                isResetComplete = true
+                                errorMessage = null
+                                Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    .padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else if (!isResetComplete) {
+                    Text(
+                        text = "Reset Password",
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                } else {
+                    Text(
+                        text = "Reset Complete",
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun RecordExpensesScreen(
@@ -504,7 +700,6 @@ fun RecordExpensesScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Date picker for Date of Transaction
     val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
         DatePickerDialog(
@@ -518,7 +713,6 @@ fun RecordExpensesScreen(
         )
     }
 
-    // Camera and gallery launchers
     val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success && selectedImageUri != null) {
             selectedImageBitmap = try {
@@ -540,7 +734,6 @@ fun RecordExpensesScreen(
         }
     }
 
-    // Permission launcher for multiple permissions
     val multiplePermissionsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -570,7 +763,6 @@ fun RecordExpensesScreen(
         }
     }
 
-    // Permission rationale dialog
     if (showPermissionRationale) {
         AlertDialog(
             onDismissRequest = { showPermissionRationale = false },
@@ -611,7 +803,6 @@ fun RecordExpensesScreen(
         )
     }
 
-    // Expense details dialog (shows only receipt photo)
     if (showExpenseDialog && selectedExpense != null) {
         AlertDialog(
             onDismissRequest = {
@@ -643,7 +834,7 @@ fun RecordExpensesScreen(
                                     .clickable {
                                         expenseImageBitmap = it
                                         showFullScreenImage = true
-                                    },
+                                    }
                             )
                         } ?: Text(
                             text = "No receipt photo available",
@@ -681,7 +872,6 @@ fun RecordExpensesScreen(
         )
     }
 
-    // Info dialog (shows all expense details except photo)
     if (showInfoDialog && selectedExpense != null) {
         AlertDialog(
             onDismissRequest = {
@@ -695,7 +885,7 @@ fun RecordExpensesScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     Text(
-                        text = "Description: ${selectedExpense!!.description}",
+                        text = "Category: ${selectedExpense!!.category}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -707,19 +897,13 @@ fun RecordExpensesScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Category: ${selectedExpense!!.category}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
                         text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Date Added: ${selectedExpense!!.dateAdded}",
+                        text = "Remarks: ${selectedExpense!!.description}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -738,7 +922,6 @@ fun RecordExpensesScreen(
         )
     }
 
-    // Full screen image dialog (uses expenseImageBitmap)
     if (showFullScreenImage) {
         AlertDialog(
             onDismissRequest = { showFullScreenImage = false },
@@ -836,13 +1019,13 @@ fun RecordExpensesScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     TextButton(
                         onClick = {
-                            Toast.makeText(context, "Change Password clicked", Toast.LENGTH_SHORT).show()
+                            navController.navigate("reset_password")
                             scope.launch { drawerState.close() }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Change Password",
+                            text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -927,25 +1110,6 @@ fun RecordExpensesScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Remarks") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            )
-
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text("Amount") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -981,7 +1145,16 @@ fun RecordExpensesScreen(
                 }
             }
 
-            // Date of Transaction Field with Fixed Icon
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Amount") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
             val interactionSource = remember { MutableInteractionSource() }
             OutlinedTextField(
                 value = dateOfTransaction,
@@ -1009,6 +1182,15 @@ fun RecordExpensesScreen(
                     }
                 }
             }
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Remarks") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
 
             Row(
                 modifier = Modifier
@@ -1211,8 +1393,6 @@ fun RecordExpensesScreen(
     }
 }
 
-
-
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -1237,7 +1417,6 @@ fun HomeScreen(
         "Other Expenses"
     )
 
-    // Calculate category totals and top 5
     val totalExpenses = expenses.sumOf { it.amount }
     val categoryTotals = expenses.groupBy { it.category }
         .mapValues { entry -> entry.value.sumOf { it.amount } }
@@ -1248,37 +1427,45 @@ fun HomeScreen(
         expenses.filter { it.category == category }.sumOf { it.amount }
     }
 
-    // State for dragging the top 5 categories list
-    val offsetY = remember { mutableStateOf(0f) }
-    val maxDragHeight = with(LocalDensity.current) { 100.dp.toPx() }
-
-    // State for showing transactions dialog
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedTransaction by remember { mutableStateOf<Expense?>(null) }
     val transactionsForCategory = expenses.filter { it.category == selectedCategory }
 
-    // State for full-screen image dialog
     var showFullScreenImage by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // State for pie chart selection
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
 
-    // Map categories to their colors for text coloring
     val categoryColors = categories.zip(
         listOf(
-            Color(0xFFFF6B6B), // Utilities
-            Color(0xFF4ECDC4), // Food
-            Color(0xFF45B7D1), // Transportation
-            Color(0xFF96CEB4), // Gas
-            Color(0xFFFFEEAD), // Office Supplies
-            Color(0xFFD4A5A5), // Rent
-            Color(0xFFA8DADC), // Parking
-            Color(0xFFF4A261), // Electronic Supplies
-            Color(0xFFE76F51)  // Other Expenses
+            Color(0xFFFF6B6B),
+            Color(0xFF4ECDC4),
+            Color(0xFF45B7D1),
+            Color(0xFF96CEB4),
+            Color(0xFFFFEEAD),
+            Color(0xFFD4A5A5),
+            Color(0xFFA8DADC),
+            Color(0xFFF4A261),
+            Color(0xFFE76F51)
         )
     ).toMap()
+
+    val animatedScale = remember { List(categoryTotals.size) { Animatable(0f) } }
+    LaunchedEffect(categoryTotals) {
+        animatedScale.forEachIndexed { index, animatable ->
+            launch {
+                animatable.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        delayMillis = index * 100,
+                        easing = FastOutSlowInEasing
+                    )
+                )
+            }
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -1325,13 +1512,13 @@ fun HomeScreen(
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
                     TextButton(
                         onClick = {
-                            Toast.makeText(context, "Change Password clicked", Toast.LENGTH_SHORT).show()
+                            navController.navigate("reset_password")
                             scope.launch { drawerState.close() }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Change Password",
+                            text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -1387,67 +1574,59 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Main content (scrollable)
-            Column(
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = 16.dp)
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp, top = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Open navigation drawer",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        text = "ExpenSEEs",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open navigation drawer",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
                 Text(
-                    text = "Welcome to ExpenSEEs!",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.SemiBold
+                    text = "ExpenSEEs",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold
                     ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(32.dp))
-                if (expenses.isEmpty()) {
-                    Text(
-                        text = "No expenses recorded yet.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    // Pie Chart Section
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                settings.javaScriptEnabled = true
-                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                                try {
-                                    loadDataWithBaseURL(
-                                        null,
-                                        """
+            }
+            Text(
+                text = "Welcome to ExpenSEEs!",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (expenses.isEmpty()) {
+                Text(
+                    text = "No expenses recorded yet.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            settings.javaScriptEnabled = true
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            try {
+                                loadDataWithBaseURL(
+                                    null,
+                                    """
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -1528,114 +1707,146 @@ fun HomeScreen(
                     </body>
                     </html>
                     """.trimIndent(),
-                                        "text/html",
-                                        "UTF-8",
-                                        null
-                                    )
-                                } catch (e: Exception) {
-                                    Toast.makeText(ctx, "Failed to load chart", Toast.LENGTH_SHORT).show()
-                                }
-                                addJavascriptInterface(object : Any() {
-                                    @JavascriptInterface
-                                    fun onCategorySelected(category: String, amount: Double) {
-                                        scope.launch {
-                                            selectedChartCategory = if (category.isEmpty()) null else category
-                                            selectedCategoryAmount = amount
-                                        }
-                                    }
-                                }, "android")
+                                    "text/html",
+                                    "UTF-8",
+                                    null
+                                )
+                            } catch (e: Exception) {
+                                Toast.makeText(ctx, "Failed to load chart", Toast.LENGTH_SHORT).show()
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(250.dp)
-                            .padding(vertical = 8.dp)
-                    )
-                    // Total Expenses Display
-                    Text(
-                        text = if (selectedChartCategory != null) {
-                            "${selectedChartCategory} Expenses: ₱${String.format("%.2f", selectedCategoryAmount)}"
-                        } else {
-                            "Total Expenses: ₱${String.format("%.2f", totalExpenses)}"
-                        },
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = selectedChartCategory?.let { categoryColors[it] } ?: MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    // Top 5 Categories Section
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Your Top 5 Expenses",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 200.dp)
-                                    .offset { IntOffset(0, offsetY.value.roundToInt()) }
-                                    .pointerInput(Unit) {
-                                        detectDragGestures { _, dragAmount ->
-                                            val newOffset = offsetY.value + dragAmount.y
-                                            offsetY.value = newOffset.coerceIn(-maxDragHeight, 0f)
-                                        }
+                            addJavascriptInterface(object : Any() {
+                                @JavascriptInterface
+                                fun onCategorySelected(category: String, amount: Double) {
+                                    scope.launch {
+                                        selectedChartCategory = if (category.isEmpty()) null else category
+                                        selectedCategoryAmount = amount
                                     }
-                            ) {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxWidth()
+                                }
+                            }, "android")
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .padding(vertical = 4.dp)
+                )
+                Text(
+                    text = if (selectedChartCategory != null) {
+                        "${selectedChartCategory} Expenses: ₱${String.format("%.2f", selectedCategoryAmount)}"
+                    } else {
+                        "Total Expenses: ₱${String.format("%.2f", totalExpenses)}"
+                    },
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = selectedChartCategory?.let { categoryColors[it] } ?: MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(
+                            text = "Your Top 5 Expenses",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Medium
+                            ),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            categoryTotals.forEachIndexed { index, (category, amount) ->
+                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp)
+                                        .scale(scale)
+                                        .clickable { selectedCategory = category },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color.Transparent
                                 ) {
-                                    itemsIndexed(categoryTotals) { index, (category, amount) ->
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp, horizontal = 8.dp)
-                                                .clickable { selectedCategory = category },
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface
-                                            ),
-                                            elevation = CardDefaults.cardElevation(
-                                                defaultElevation = 2.dp
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(
+                                                        categoryColors[category]!!.copy(alpha = 0.2f),
+                                                        categoryColors[category]!!.copy(alpha = 0.05f)
+                                                    ),
+                                                    start = Offset(0f, 0f),
+                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                                )
                                             )
+                                            .border(
+                                                1.dp,
+                                                categoryColors[category]!!,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(8.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = when (index) {
+                                                    0 -> Color(0xFFFFD700)
+                                                    1 -> Color(0xFFC0C0C0)
+                                                    2 -> Color(0xFFCD7F32)
+                                                    else -> MaterialTheme.colorScheme.primary
+                                                },
+                                                modifier = Modifier.size(28.dp)
                                             ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = "${index + 1}",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.onPrimary,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
                                                 Text(
-                                                    text = "${index + 1}. $category",
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = MaterialTheme.colorScheme.onSurface
+                                                    text = category,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontWeight = FontWeight.SemiBold
                                                 )
                                                 Text(
-                                                    text = if (totalExpenses > 0) {
-                                                        "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
-                                                    } else {
-                                                        "0.00%"
-                                                    },
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = MaterialTheme.colorScheme.primary
+                                                    text = "₱${String.format("%.2f", amount)}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            Text(
+                                                text = if (totalExpenses > 0) {
+                                                    "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
+                                                } else {
+                                                    "0.00%"
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = categoryColors[category]!!,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
                                 }
@@ -1643,9 +1854,8 @@ fun HomeScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
-            // Buttons at the bottom
+            Spacer(modifier = Modifier.weight(1f))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1737,7 +1947,6 @@ fun HomeScreen(
                 }
             }
         }
-        // Transactions Dialog
         if (selectedCategory != null) {
             AlertDialog(
                 onDismissRequest = { selectedCategory = null },
@@ -1760,7 +1969,6 @@ fun HomeScreen(
                                 .heightIn(max = 400.dp)
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            // Pie Chart for Transactions
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
@@ -1877,7 +2085,6 @@ fun HomeScreen(
                                     .padding(vertical = 8.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            // Transaction List with Date
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1935,7 +2142,6 @@ fun HomeScreen(
                 }
             )
         }
-        // Transaction Details Dialog
         if (selectedTransaction != null) {
             AlertDialog(
                 onDismissRequest = { selectedTransaction = null },
@@ -2019,7 +2225,6 @@ fun HomeScreen(
                 }
             )
         }
-        // Full-screen image dialog
         if (showFullScreenImage) {
             AlertDialog(
                 onDismissRequest = { showFullScreenImage = false },
@@ -2079,6 +2284,33 @@ fun LiquidationReport(
         maximumFractionDigits = 2
     }
 
+    // Define status colors
+    val statusColors = mapOf(
+        BudgetStatus.PENDING to Color(0xFFFFCA28), // Yellow
+        BudgetStatus.APPROVED to Color(0xFF4CAF50), // Green
+        BudgetStatus.DENIED to Color(0xFFF44336) // Red
+    )
+
+    // Define text colors for budget list
+    val textColors = mapOf(
+        BudgetStatus.PENDING to Color.Gray,
+        BudgetStatus.APPROVED to Color.Black,
+        BudgetStatus.DENIED to Color.Black
+    )
+
+    // Handle system back button
+    BackHandler(enabled = true) {
+        if (selectedBudget != null) {
+            selectedBudget = null
+        } else {
+            if (navController.currentBackStackEntry?.destination?.route != "home") {
+                navController.navigate("home") {
+                    popUpTo("home") { inclusive = false }
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -2092,10 +2324,21 @@ fun LiquidationReport(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = {
+                        if (selectedBudget != null) {
+                            selectedBudget = null // Return to budget selection
+                        } else {
+                            // Navigate to home if not already there
+                            if (navController.currentBackStackEntry?.destination?.route != "home") {
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = false }
+                                }
+                            }
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back to Home",
+                            contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -2158,147 +2401,199 @@ fun LiquidationReport(
                                     .fillMaxWidth()
                                     .padding(16.dp)
                             ) {
-                                Text(
-                                    text = budget.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = budget.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = textColors[budget.status] ?: MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(statusColors[budget.status] ?: Color.Gray)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Total: ₱${numberFormat.format(budget.total)}",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = textColors[budget.status] ?: MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = statusColors[budget.status] ?: MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
             } else {
-                // Display selected budget's liquidation report
-                Text(
-                    text = "Liquidation Report: ${selectedBudget!!.name}",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "Total Expenses: ₱${numberFormat.format(selectedBudget!!.total)}",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "Expense Details",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(selectedBudget!!.expenses) { expense ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
+                selectedBudget?.let { budget ->
+                    Text(
+                        text = "Liquidation Report: ${budget.name}",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = statusColors[budget.status] ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(statusColors[budget.status] ?: Color.Gray)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Total Expenses: ₱${numberFormat.format(budget.total)}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = "Expense Details",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(budget.expenses) { expense ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
                                 ) {
-                                    Text(
-                                        text = expense.category,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Quantity: ${expense.quantity}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Unit Price: ₱${numberFormat.format(expense.amountPerUnit)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (expense.remarks.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = expense.category,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Upload receipt for ${expense.category}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Upload receipt",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "Remarks: ${expense.remarks}",
+                                        text = "Quantity: ${expense.quantity}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Text(
+                                        text = "Unit Price: ₱${numberFormat.format(expense.amountPerUnit)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (expense.remarks.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Remarks: ${expense.remarks}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Button(
-                        onClick = { selectedBudget = null },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(end = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Back to Budgets",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSecondary
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            Toast.makeText(
-                                context,
-                                "Liquidation Report Generated for ${selectedBudget!!.name}",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(start = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "Generate Report",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                        Button(
+                            onClick = { selectedBudget = null },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .padding(end = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Text(
+                                text = "Back to Budgets",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSecondary
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                Toast.makeText(
+                                    context,
+                                    "Liquidation Report Generated for ${budget.name}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(
+                                text = "Generate Report",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
             }
@@ -2524,7 +2819,8 @@ fun FundRequest(
                             SubmittedBudget(
                                 name = budgetName,
                                 expenses = expenses.toList(),
-                                total = totalExpenses
+                                total = totalExpenses,
+                                status = BudgetStatus.PENDING
                             )
                         )
                         coroutineScope.launch {
@@ -2678,43 +2974,24 @@ fun FundRequest(
 
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
     expenses: List<Expense>,
-    onDeleteExpenses: (List<Expense>) -> Unit = {},
-    onLogoutClick: () -> Unit = {}
+    onDeleteExpenses: (List<Expense>) -> Unit,
+    onLogoutClick: () -> Unit
 ) {
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    var selectedExpenses by remember { mutableStateOf(setOf<Expense>()) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDetailsDialog by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
     var showFullScreenImage by remember { mutableStateOf(false) }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    val selectedExpenses = remember { mutableStateListOf<Expense>() }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-    var expensesToDelete by remember { mutableStateOf<List<Expense>>(emptyList()) }
-
-    // Toggle selection of an expense
-    fun toggleSelection(expense: Expense) {
-        if (selectedExpenses.contains(expense)) {
-            selectedExpenses.remove(expense)
-        } else {
-            selectedExpenses.add(expense)
-        }
-    }
-
-    // Clear all selections
-    fun clearSelections() {
-        selectedExpenses.clear()
-    }
-
-    // Initiate deletion (single or multiple)
-    fun initiateDeletion(expenses: List<Expense>) {
-        expensesToDelete = expenses
-        showDeleteConfirmation = true
-    }
+    val context = LocalContext.current
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -2753,21 +3030,21 @@ fun ExpenseListScreen(
                             )
                             Text(
                                 text = "andrew@gmail.com",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     TextButton(
                         onClick = {
-                            Toast.makeText(context, "Change Password clicked", Toast.LENGTH_SHORT).show()
+                            navController.navigate("reset_password")
                             scope.launch { drawerState.close() }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Change Password",
+                            text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -2814,12 +3091,64 @@ fun ExpenseListScreen(
                             color = MaterialTheme.colorScheme.onSecondary
                         )
                     }
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(
-                        text = "Your Expenses",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "List of Expenses",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        navigationIcon = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = {
+                                    navController.navigate("home") {
+                                        popUpTo("home") { inclusive = false }
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowBack,
+                                        contentDescription = "Back to home",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Open navigation drawer",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.primary
+                        )
                     )
+                },
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                modifier = modifier.fillMaxSize()
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
                     if (expenses.isEmpty()) {
                         Text(
                             text = "No expenses recorded yet.",
@@ -2832,18 +3161,24 @@ fun ExpenseListScreen(
                         )
                     } else {
                         LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(expenses) { expense ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
+                                        .clickable {
+                                            selectedExpense = expense
+                                            showDetailsDialog = true
+                                        },
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
+                                        containerColor = if (expense in selectedExpenses)
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        else
+                                            MaterialTheme.colorScheme.surface
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -2852,42 +3187,45 @@ fun ExpenseListScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Checkbox(
-                                            checked = selectedExpenses.contains(expense),
-                                            onCheckedChange = { toggleSelection(expense) },
+                                            checked = expense in selectedExpenses,
+                                            onCheckedChange = { checked ->
+                                                selectedExpenses = if (checked) {
+                                                    selectedExpenses + expense
+                                                } else {
+                                                    selectedExpenses - expense
+                                                }
+                                            },
                                             colors = CheckboxDefaults.colors(
                                                 checkedColor = MaterialTheme.colorScheme.primary
                                             )
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clickable { selectedExpense = expense }
-                                        ) {
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = expense.description,
                                                 style = MaterialTheme.typography.bodyLarge,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
-                                                text = expense.category,
+                                                text = "₱${String.format("%.2f", expense.amount)}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = expense.dateOfTransaction,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
-                                        Text(
-                                            text = "₱${String.format("%.2f", expense.amount)}",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        IconButton(
-                                            onClick = { initiateDeletion(listOf(expense)) }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = "Delete expense",
-                                                tint = MaterialTheme.colorScheme.error
+                                        expense.photoUri?.let {
+                                            AsyncImage(
+                                                model = it,
+                                                contentDescription = "Expense receipt",
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { showFullScreenImage = true },
+                                                contentScale = ContentScale.Crop
                                             )
                                         }
                                     }
@@ -2896,268 +3234,99 @@ fun ExpenseListScreen(
                         }
                     }
                 }
-            }
-        }
-    ) {
-        Scaffold(
-            floatingActionButton = {
-                if (selectedExpenses.isNotEmpty()) {
-                    ExtendedFloatingActionButton(
-                        onClick = { initiateDeletion(selectedExpenses.toList()) },
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError,
-                        icon = { Icon(Icons.Default.Delete, contentDescription = "Delete") },
-                        text = { Text("Delete (${selectedExpenses.size})") }
-                    )
-                }
-            },
-            floatingActionButtonPosition = FabPosition.End
-        ) { innerPadding ->
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { navController.navigate("home") }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back to home",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Open navigation drawer",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        text = "List of Expenses",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (selectedExpenses.isNotEmpty()) {
-                        TextButton(onClick = { clearSelections() }) {
-                            Text(
-                                text = "Deselect All",
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-
-                if (expenses.isEmpty()) {
-                    Text(
-                        text = "No expenses recorded.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(expenses) { expense ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (selectedExpenses.contains(expense))
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    else
-                                        MaterialTheme.colorScheme.surface
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(
-                                        checked = selectedExpenses.contains(expense),
-                                        onCheckedChange = { toggleSelection(expense) },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = MaterialTheme.colorScheme.primary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { selectedExpense = expense }
-                                    ) {
-                                        Text(
-                                            text = expense.description,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = expense.category,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Text(
-                                        text = "₱${String.format("%.2f", expense.amount)}",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(
-                                        onClick = { initiateDeletion(listOf(expense)) }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete expense",
-                                            tint = MaterialTheme.colorScheme.error
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Expenses") },
+                        text = { Text("Are you sure you want to delete ${selectedExpenses.size} expense(s)?") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    onDeleteExpenses(selectedExpenses.toList())
+                                    selectedExpenses = emptySet()
+                                    showDeleteDialog = false
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Expenses deleted",
+                                            duration = SnackbarDuration.Short
                                         )
                                     }
                                 }
+                            ) {
+                                Text("Delete")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) {
+                                Text("Cancel")
                             }
                         }
-                    }
+                    )
                 }
-
-                // Expense Details Dialog
-                selectedExpense?.let { expense ->
+                if (showDetailsDialog && selectedExpense != null) {
                     AlertDialog(
-                        onDismissRequest = { selectedExpense = null },
-                        title = {
-                            Text(
-                                text = "Expense Details",
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                        onDismissRequest = {
+                            showDetailsDialog = false
+                            selectedExpense = null
                         },
+                        title = { Text("Expense Details") },
                         text = {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .verticalScroll(rememberScrollState())
                             ) {
-                                expense.photoUri?.let { uri ->
+                                Text(
+                                    text = "Description: ${selectedExpense!!.description}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Category: ${selectedExpense!!.category}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Date: ${selectedExpense!!.dateOfTransaction}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                selectedExpense!!.photoUri?.let { uri ->
                                     AsyncImage(
                                         model = uri,
-                                        contentDescription = "Expense photo",
+                                        contentDescription = "Receipt photo",
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(200.dp)
-                                            .padding(bottom = 16.dp)
+                                            .height(150.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                selectedImageUri = uri
-                                                showFullScreenImage = true
-                                            },
-                                        contentScale = ContentScale.Fit,
-                                        onError = {
-                                            Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
-                                        }
+                                            .clickable { showFullScreenImage = true },
+                                        contentScale = ContentScale.Fit
                                     )
-                                } ?: Text(
-                                    text = "No photo available",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
-                                Text(
-                                    text = "Description: ${expense.description}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Text(
-                                    text = "Category: ${expense.category}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Text(
-                                    text = "Amount: ₱${String.format("%.2f", expense.amount)}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Text(
-                                    text = "Purchase Date: ${expense.dateOfTransaction ?: "N/A"}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Text(
-                                    text = "Date Added: ${expense.dateAdded ?: "N/A"}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
+                                }
                             }
                         },
                         confirmButton = {
-                            TextButton(onClick = { selectedExpense = null }) {
+                            TextButton(
+                                onClick = {
+                                    showDetailsDialog = false
+                                    selectedExpense = null
+                                }
+                            ) {
                                 Text("Close")
                             }
                         }
                     )
                 }
-
-                // Delete Confirmation Dialog
-                if (showDeleteConfirmation) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteConfirmation = false },
-                        title = {
-                            Text(
-                                text = "Confirm Deletion",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        },
-                        text = {
-                            Text(
-                                text = if (expensesToDelete.size == 1)
-                                    "Are you sure you want to delete the expense '${expensesToDelete.first().description}'? This action cannot be undone."
-                                else
-                                    "Are you sure you want to delete ${expensesToDelete.size} expenses? This action cannot be undone.",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    onDeleteExpenses(expensesToDelete)
-                                    clearSelections()
-                                    showDeleteConfirmation = false
-                                    Toast.makeText(context, "${expensesToDelete.size} expense(s) deleted", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text("Delete", color = MaterialTheme.colorScheme.onError)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDeleteConfirmation = false }) {
-                                Text("Cancel")
-                            }
-                        },
-                        properties = DialogProperties(dismissOnClickOutside = true)
-                    )
-                }
-
-                // Full-screen image dialog
-                if (showFullScreenImage) {
+                if (showFullScreenImage && selectedExpense != null) {
                     AlertDialog(
                         onDismissRequest = { showFullScreenImage = false },
                         modifier = Modifier.fillMaxSize(),
@@ -3170,39 +3339,60 @@ fun ExpenseListScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.background)
-                                    .padding(
-                                        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                                    ),
+                                    .background(MaterialTheme.colorScheme.background),
                                 contentAlignment = Alignment.Center
                             ) {
-                                selectedImageUri?.let { uri ->
+                                selectedExpense!!.photoUri?.let { uri ->
                                     AsyncImage(
                                         model = uri,
-                                        contentDescription = "Full screen expense photo",
+                                        contentDescription = "Full screen receipt photo",
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(16.dp),
-                                        contentScale = ContentScale.Fit,
-                                        onError = {
-                                            Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
-                                        }
+                                        contentScale = ContentScale.Fit
                                     )
                                 } ?: Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(16.dp)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     )
                 }
             }
+            // Bottom FABs for Deselect and Delete
+            if (selectedExpenses.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ExtendedFloatingActionButton(
+                        onClick = { selectedExpenses = emptySet() },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Clear, contentDescription = "Deselect all")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Deselect All")
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = { showDeleteDialog = true },
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete (${selectedExpenses.size})")
+                    }
+                }
+            }
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
@@ -3216,7 +3406,24 @@ fun LiquidationReportPreview() {
                         ExpenseItem("Materials", 10, 50.0, "Wood"),
                         ExpenseItem("Labor", 5, 100.0, "Construction")
                     ),
-                    total = 750.0
+                    total = 750.0,
+                    status = BudgetStatus.APPROVED
+                ),
+                SubmittedBudget(
+                    name = "Project B",
+                    expenses = listOf(
+                        ExpenseItem("Tools", 3, 200.0, "Rental")
+                    ),
+                    total = 600.0,
+                    status = BudgetStatus.PENDING
+                ),
+                SubmittedBudget(
+                    name = "Project C",
+                    expenses = listOf(
+                        ExpenseItem("Supplies", 2, 150.0, "Office")
+                    ),
+                    total = 300.0,
+                    status = BudgetStatus.DENIED
                 )
             ),
             navController = rememberNavController(),
@@ -3288,10 +3495,12 @@ fun RecordExpensesScreenPreview() {
 fun ExpenseListScreenPreview() {
     ExpenSEEsTheme {
         ExpenseListScreen(
-            navController = rememberNavController(),
-            expenses = listOf(),
-            onLogoutClick = {},
+            navController = NavController(LocalContext.current),
+            expenses = listOf(), // Empty list
+            onDeleteExpenses = { /* No-op for preview */ },
+            onLogoutClick = { /* No-op for preview */ },
             modifier = Modifier
         )
     }
 }
+
