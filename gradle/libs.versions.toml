@@ -12,6 +12,7 @@ navigationComposeAndroid = "2.9.0"
 glide = "4.16.0"
 glide-compose = "1.0.0-beta01"
 coil-compose = "2.7.0"
+gamesActivity = "4.0.0"
 
 
 [libraries]
@@ -33,6 +34,7 @@ androidx-navigation-compose-android = { group = "androidx.navigation", name = "n
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 glide-compose = { module = "com.github.bumptech.glide:compose", version.ref = "glide-compose" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil-compose" }
+androidx-games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

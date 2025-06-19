@@ -1,6 +1,7 @@
 package com.example.expensees
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.Context
@@ -54,10 +55,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -68,6 +72,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -107,6 +112,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -126,6 +132,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -139,6 +146,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
@@ -156,9 +164,18 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.*
+import java.util.*
+
+
+
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -187,6 +204,7 @@ private fun createImageUri(context: Context): Uri? {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigation(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -980,6 +998,7 @@ fun RecordExpensesScreen(
         "Rent",
         "Parking",
         "Electronic Supplies",
+        "Grocery",
         "Other Expenses"
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -1579,11 +1598,7 @@ fun RecordExpensesScreen(
                         },
                     contentScale = ContentScale.Crop
                 )
-            } ?: Text(
-                text = "No image selected",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            }
 
             if (showFullScreenImage) {
                 AlertDialog(
@@ -1617,7 +1632,8 @@ fun RecordExpensesScreen(
                             } ?: Text(
                                 text = "No image available",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
                             )
                         }
                     }
@@ -1732,6 +1748,7 @@ fun RecordExpensesScreen(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -1753,7 +1770,8 @@ fun HomeScreen(
         "Rent",
         "Parking",
         "Electronic Supplies",
-        "Other Expenses"
+        "Other Expenses",
+        "Grocery" // Added new category
     )
 
     val totalExpenses = expenses.sumOf { it.amount }
@@ -1781,15 +1799,16 @@ fun HomeScreen(
 
     val categoryColors = categories.zip(
         listOf(
-            Color(0xFFFF6B6B),
-            Color(0xFF4ECDC4),
-            Color(0xFF45B7D1),
-            Color(0xFF96CEB4),
-            Color(0xFFFFEEAD),
-            Color(0xFFD4A5A5),
-            Color(0xFFA8DADC),
-            Color(0xFFF4A261),
-            Color(0xFFE76F51)
+            Color(0xFFEF476F), // Utilities - Vibrant Pink
+            Color(0xFF06D6A0), // Food - Bright Teal
+            Color(0xFF118AB2), // Transportation - Deep Blue
+            Color(0xFFFFD166), // Gas - Warm Yellow
+            Color(0xFFF4A261), // Office Supplies - Soft Orange (replaces Light Pink)
+            Color(0xFF8D5524), // Rent - Rich Brown
+            Color(0xFFC9CBA3), // Parking - Light Olive
+            Color(0xFF6B7280), // Electronic Supplies - Slate Gray
+            Color(0xFFFFA400),  // Other Expenses - Bright Orange
+            Color(0xFF2E7D32)   // Grocery - Forest Green
         )
     ).toMap()
 
@@ -1995,7 +2014,7 @@ fun HomeScreen(
                             const chart = new Chart(ctx, {
                                 type: 'pie',
                                 data: {
-                                    labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses'],
+                                    labels: ['Utilities', 'Food', 'Transportation', 'Gas', 'Office Supplies', 'Rent', 'Parking', 'Electronic Supplies', 'Other Expenses', 'Grocery'],
                                     datasets: [{
                                         data: chartData,
                                         backgroundColor: [
@@ -2003,11 +2022,12 @@ fun HomeScreen(
                                             '#4ECDC4',
                                             '#45B7D1',
                                             '#96CEB4',
-                                            '#FFEEAD',
+                                            '#FFB6C1',
                                             '#D4A5A5',
                                             '#A8DADC',
                                             '#F4A261',
-                                            '#E76F51'
+                                            '#E76F51',
+                                            '#2E7D32' // Added color for Grocery - Forest Green
                                         ],
                                         borderColor: ['#FFFFFF'],
                                         borderWidth: 1
@@ -2147,12 +2167,7 @@ fun HomeScreen(
                                         ) {
                                             Surface(
                                                 shape = CircleShape,
-                                                color = when (index) {
-                                                    0 -> Color(0xFFFFD700)
-                                                    1 -> Color(0xFFC0C0C0)
-                                                    2 -> Color(0xFFCD7F32)
-                                                    else -> MaterialTheme.colorScheme.primary
-                                                },
+                                                color = categoryColors[category]!!,
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
@@ -2198,119 +2213,195 @@ fun HomeScreen(
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            Column(
+            // Single row layout with blue background and border removed
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .padding(end = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Transparent, // Removed blue background
+                    onClick = onRecordExpensesClick
                 ) {
-                    Button(
-                        onClick = onListExpensesClick,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(end = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "List of Expenses",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Button(
-                        onClick = onRecordExpensesClick,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(start = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "Record Expenses",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            textAlign = TextAlign.Center
-                        )
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Record New Expense",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface // Adjusted tint for visibility
+                            )
+                            Text(
+                                text = "Record",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Transparent, // Removed blue background
+                    onClick = onListExpensesClick
                 ) {
-                    Button(
-                        onClick = { navController.navigate("fund_request") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(end = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "Request Fund",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            textAlign = TextAlign.Center
-                        )
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.List,
+                                contentDescription = "View List of Expenses",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface // Adjusted tint for visibility
+                            )
+                            Text(
+                                text = "List",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                    Button(
-                        onClick = { navController.navigate("liquidation_report") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .padding(start = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            text = "Liquidation Report",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            textAlign = TextAlign.Center
-                        )
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Transparent, // Removed blue background
+                    onClick = { navController.navigate("fund_request") }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.RequestQuote,
+                                contentDescription = "Request Fund",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface // Adjusted tint for visibility
+                            )
+                            Text(
+                                text = "Request",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .padding(start = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Transparent, // Removed blue background
+                    onClick = { navController.navigate("liquidation_report") }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Assignment,
+                                contentDescription = "View Liquidation Report",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurface // Adjusted tint for visibility
+                            )
+                            Text(
+                                text = "Report",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
         }
         if (selectedCategory != null) {
-            AlertDialog(
+            Dialog(
                 onDismissRequest = { selectedCategory = null },
-                title = {
-                    Text(
-                        text = "Transactions for ${selectedCategory ?: ""}",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                },
-                text = {
-                    if (transactionsForCategory.isEmpty()) {
-                        Text(
-                            text = "No transactions found for this category.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    } else {
-                        Column(
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                val dialogAlpha by animateFloatAsState(
+                    targetValue = if (selectedCategory != null) 1f else 0f,
+                    animationSpec = tween(200, easing = LinearOutSlowInEasing)
+                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .fillMaxHeight(0.75f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .alpha(dialogAlpha),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 400.dp)
-                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text(
+                                text = "${selectedCategory} Transactions",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            IconButton(
+                                onClick = { selectedCategory = null },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close dialog",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (transactionsForCategory.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No transactions recorded for this category.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            // Generate shades for the category color
+                            val baseColor = categoryColors[selectedCategory]!!
+                            val transactionColors = transactionsForCategory.indices.map { index ->
+                                val factor = 1f - (index * 0.1f).coerceAtMost(0.5f) // Adjust shade darkness
+                                val red = (baseColor.red * factor).coerceIn(0f, 1f) * 255
+                                val green = (baseColor.green * factor).coerceIn(0f, 1f) * 255
+                                val blue = (baseColor.blue * factor).coerceIn(0f, 1f) * 255
+                                // Convert to hex without android.graphics.Color.rgb
+                                val r = red.toInt().coerceIn(0, 255)
+                                val g = green.toInt().coerceIn(0, 255)
+                                val b = blue.toInt().coerceIn(0, 255)
+                                "#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}"
+                            }
+
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
@@ -2342,7 +2433,6 @@ fun HomeScreen(
                                 <canvas id="transactionChart"></canvas>
                                 <script>
                                     const transactionData = [${transactionsForCategory.map { it.amount }.joinToString()}];
-                                    const totalTransactions = transactionData.reduce((sum, value) => sum + value, 0);
                                     const ctx = document.getElementById('transactionChart').getContext('2d');
                                     const chart = new Chart(ctx, {
                                         type: 'bar',
@@ -2352,18 +2442,8 @@ fun HomeScreen(
                                                 }.joinToString()}],
                                             datasets: [{
                                                 data: transactionData,
-                                                backgroundColor: [
-                                                    '#FF6B6B',
-                                                    '#4ECDC4',
-                                                    '#45B7D1',
-                                                    '#96CEB4',
-                                                    '#FFEEAD',
-                                                    '#D4A5A5',
-                                                    '#A8DADC',
-                                                    '#F4A261',
-                                                    '#E76F51'
-                                                ],
-                                                borderColor: ['#FFFFFF'],
+                                                backgroundColor: [${transactionColors.joinToString { "'$it'" }}],
+                                                borderColor: '#FFFFFF',
                                                 borderWidth: 1
                                             }]
                                         },
@@ -2376,35 +2456,43 @@ fun HomeScreen(
                                                 },
                                                 title: {
                                                     display: true,
-                                                    text: 'Transaction Distribution for ${selectedCategory ?: ""}',
+                                                    text: 'Transaction Amounts',
                                                     color: '#333333',
-                                                    font: { size: 18 },
+                                                    font: { size: 16, weight: 'bold' },
                                                     align: 'center'
                                                 },
                                                 tooltip: {
                                                     enabled: true,
                                                     callbacks: {
                                                         label: function(context) {
-                                                            const label = context.label || '';
                                                             const value = context.raw || 0;
-                                                            const percentage = totalTransactions > 0 ? ((value / totalTransactions) * 100).toFixed(2) : 0;
-                                                            return ': ' + value;
+                                                            return '₱' + value.toFixed(2);
                                                         }
                                                     }
                                                 }
                                             },
-                                            onClick: (event, elements, chart) => {
-                                                if (elements.length > 0) {
-                                                    const index = elements[0].index;
-                                                    const label = chart.data.labels[index];
-                                                    const value = chart.data.datasets[0].data[index];
-                                                    const percentage = totalTransactions > 0 ? ((value / totalTransactions) * 100).toFixed(2) : 0;
-                                                    chart.options.plugins.title.text = label + ': ' + percentage + '%';
-                                                    chart.update();
-                                                } else {
-                                                    chart.options.plugins.title.text = 'Transaction Distribution for ${selectedCategory ?: ""}';
-                                                    chart.update();
+                                            scales: {
+                                                x: {
+                                                    ticks: {
+                                                        autoSkip: true,
+                                                        maxRotation: 45,
+                                                        minRotation: 45,
+                                                        font: { size: 12 }
+                                                    }
+                                                },
+                                                y: {
+                                                    beginAtZero: true,
+                                                    ticks: {
+                                                        callback: function(value) {
+                                                            return '₱' + value;
+                                                        },
+                                                        font: { size: 12 }
+                                                    }
                                                 }
+                                            },
+                                            animation: {
+                                                duration: 800,
+                                                easing: 'easeOutCubic'
                                             }
                                         }
                                     });
@@ -2423,20 +2511,42 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(250.dp)
-                                    .padding(vertical = 8.dp)
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Transaction Details",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 200.dp)
+                                    .weight(1f)
                             ) {
-                                items(transactionsForCategory) { expense ->
+                                itemsIndexed(transactionsForCategory) { index, expense ->
+                                    val alpha by animateFloatAsState(
+                                        targetValue = if (selectedCategory != null) 1f else 0f,
+                                        animationSpec = tween(
+                                            durationMillis = 200,
+                                            delayMillis = index * 50,
+                                            easing = LinearOutSlowInEasing
+                                        )
+                                    )
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 4.dp)
+                                            .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
                                                 showExpenseDialog = true
@@ -2444,48 +2554,61 @@ fun HomeScreen(
                                         colors = CardDefaults.cardColors(
                                             containerColor = MaterialTheme.colorScheme.surface
                                         ),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                        shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Column(
+                                        Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(12.dp)
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = expense.dateOfTransaction,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.align(Alignment.Start)
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = expense.description,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontWeight = FontWeight.Medium
                                                 )
+                                                Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
-                                                    text = "₱${String.format("%.2f", expense.amount)}",
+                                                    text = expense.dateOfTransaction,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.primary
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
+                                            Text(
+                                                text = "₱${String.format("%.2f", expense.amount)}",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { selectedCategory = null }) {
-                        Text("Close")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { selectedCategory = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(
+                                text = "Close",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
-            )
+            }
         }
         if (showExpenseDialog && selectedTransaction != null) {
             AlertDialog(
@@ -2667,6 +2790,7 @@ fun HomeScreen(
 
 
 
+@SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiquidationReport(
@@ -2679,13 +2803,12 @@ fun LiquidationReport(
     var selectedBudget by remember { mutableStateOf<SubmittedBudget?>(null) }
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
+    // Map to store selected expenses for each expense item, keyed by expense index
     val selectedExpensesMap = remember { mutableStateMapOf<Int, MutableList<Expense>>() }
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
     }
-    val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Define status colors
     val statusColors = mapOf(
@@ -2701,21 +2824,23 @@ fun LiquidationReport(
         BudgetStatus.DENIED to Color.Black
     )
 
-    // Calculate total remaining balance for the selected budget
-    val totalRemainingBalance = selectedBudget?.let { budget ->
-        budget.expenses.withIndex().sumOf { (index, expense) ->
+    // Helper function to calculate total remaining balance
+    fun calculateTotalRemainingBalance(budget: SubmittedBudget): Double {
+        return budget.expenses.withIndex().sumOf { (index, expense) ->
             val budgetedAmount = expense.quantity * expense.amountPerUnit
             val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
             budgetedAmount - actualExpenseTotal
         }
-    } ?: 0.0
+    }
 
-    // Calculate total actual expenses
-    val totalActualExpenses = selectedBudget?.let { budget ->
-        budget.expenses.withIndex().sumOf { (index, _) ->
-            selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-        }
-    } ?: 0.0
+    // Calculate total remaining balance for the selected budget
+    val totalRemainingBalance by derivedStateOf {
+        selectedBudget?.let { calculateTotalRemainingBalance(it) } ?: 0.0
+    }
+
+    // State for report generation
+    var showReportDialog by remember { mutableStateOf(false) }
+    var reportContent by remember { mutableStateOf("") }
 
     // Handle system back button
     BackHandler(enabled = true) {
@@ -2768,7 +2893,6 @@ fun LiquidationReport(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
         Column(
@@ -2952,20 +3076,19 @@ fun LiquidationReport(
                                             }
                                             IconButton(
                                                 onClick = {
-                                                    selectedExpensesMap.remove(index)
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            message = "All receipts removed for ${expense.category}",
-                                                            duration = SnackbarDuration.Short
-                                                        )
-                                                    }
+                                                    selectedExpensesMap[index] = mutableListOf()
+                                                    Toast.makeText(
+                                                        context,
+                                                        "All receipts removed for ${expense.category}",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
                                                 },
-                                                enabled = selectedExpensesMap.containsKey(index)
+                                                enabled = selectedExpensesMap[index]?.isNotEmpty() ?: false
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Delete,
                                                     contentDescription = "Delete receipts",
-                                                    tint = if (selectedExpensesMap.containsKey(index))
+                                                    tint = if (selectedExpensesMap[index]?.isNotEmpty() ?: false)
                                                         MaterialTheme.colorScheme.error
                                                     else
                                                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
@@ -3037,29 +3160,6 @@ fun LiquidationReport(
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    // Display total actual expenses
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = "Total Actual Expenses: ₱${numberFormat.format(totalActualExpenses)}",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
                     // Display total remaining balance for the budget
                     Card(
                         modifier = Modifier
@@ -3110,94 +3210,46 @@ fun LiquidationReport(
                         }
                         Button(
                             onClick = {
-                                // Generate LaTeX report
-                                val reportContent = buildString {
-                                    append("\\documentclass[a4paper,11pt]{article}\n")
-                                    append("\\usepackage[margin=1in]{geometry}\n")
-                                    append("\\usepackage{booktabs}\n")
-                                    append("\\usepackage{tabularx}\n")
-                                    append("\\usepackage{siunitx}\n")
-                                    append("\\usepackage{fancyhdr}\n")
-                                    append("\\usepackage{lastpage}\n")
-                                    append("\\sisetup{group-separator={,},round-mode=places,round-precision=2}\n")
-                                    append("\\pagestyle{fancy}\n")
-                                    append("\\fancyhf{}\n")
-                                    append("\\fancyhead[C]{Liquidation Report: ${budget.name.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")}}\n")
-                                    append("\\fancyfoot[C]{Page \\thepage\\ of \\pageref{LastPage}}\n")
-                                    append("\\renewcommand{\\headrulewidth}{0.4pt}\n")
-                                    append("\\renewcommand{\\footrulewidth}{0.4pt}\n")
-                                    append("\\begin{document}\n")
-                                    append("\\begin{center}\n")
-                                    append("{\\Large \\textbf{Liquidation Report}}\\\\[0.5cm]\n")
-                                    append("{\\large Budget: ${budget.name.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")}}\\\\\n")
-                                    append("Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}\\\\[-0.3cm]\n")
-                                    append("Generated on: ${SimpleDateFormat("MMMM dd, yyyy").format(Date())}\n")
-                                    append("\\end{center}\n")
-                                    append("\\vspace{0.5cm}\n")
+                                // Generate detailed report
+                                val reportBuilder = StringBuilder()
+                                reportBuilder.append("# Liquidation Report: ${budget.name}\n\n")
+                                reportBuilder.append("**Status**: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}\n")
+                                reportBuilder.append("**Total Budgeted Amount**: ₱${numberFormat.format(budget.total)}\n")
+                                reportBuilder.append("**Total Remaining Balance**: ₱${numberFormat.format(totalRemainingBalance)}\n\n")
+                                reportBuilder.append("## Expense Details\n\n")
 
-                                    // Budget Summary
-                                    append("\\section*{Budget Summary}\n")
-                                    append("Total Budgeted Expenses: \\SI{${numberFormat.format(budget.total)}}{PHP}\\\\[-0.2cm]\n")
-                                    append("Total Actual Expenses: \\SI{${numberFormat.format(totalActualExpenses)}}{PHP}\\\\[-0.2cm]\n")
-                                    append("Remaining Balance: \\SI{${numberFormat.format(totalRemainingBalance)}}{PHP}\n")
-                                    append("\\vspace{0.3cm}\n")
+                                budget.expenses.forEachIndexed { index, expense ->
+                                    val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
+                                    val budgetedAmount = expense.quantity * expense.amountPerUnit
+                                    val remainingBalance = budgetedAmount - actualExpenseTotal
 
-                                    // Expense Details Table
-                                    append("\\section*{Expense Details}\n")
-                                    append("\\begin{tabularx}{\\textwidth}{Xrrrc}\n")
-                                    append("\\toprule\n")
-                                    append("Category & Quantity & Unit Price (PHP) & Budgeted (PHP) & Actual (PHP) & Balance (PHP) \\\\\n")
-                                    append("\\midrule\n")
-                                    budget.expenses.withIndex().forEach { (index, expense) ->
-                                        val actualTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-                                        val budgeted = expense.quantity * expense.amountPerUnit
-                                        val balance = budgeted - actualTotal
-                                        append("${expense.category.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")} & " +
-                                                "${expense.quantity} & " +
-                                                "\\SI{${numberFormat.format(expense.amountPerUnit)}}{PHP} & " +
-                                                "\\SI{${numberFormat.format(budgeted)}}{PHP} & " +
-                                                "\\SI{${numberFormat.format(actualTotal)}}{PHP} & " +
-                                                "\\SI{${numberFormat.format(balance)}}{PHP} \\\\\n")
-                                        if (expense.remarks.isNotBlank()) {
-                                            append("\\multicolumn{6}{l}{\\textit{Remarks: ${expense.remarks.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")}}} \\\\\n")
-                                        }
+                                    reportBuilder.append("### ${expense.category}\n")
+                                    reportBuilder.append("- **Budgeted Amount**: ₱${numberFormat.format(budgetedAmount)}\n")
+                                    reportBuilder.append("- **Quantity**: ${expense.quantity}\n")
+                                    reportBuilder.append("- **Unit Price**: ₱${numberFormat.format(expense.amountPerUnit)}\n")
+                                    reportBuilder.append("- **Actual Expenses**: ₱${numberFormat.format(actualExpenseTotal)}\n")
+                                    reportBuilder.append("- **Remaining Balance**: ₱${numberFormat.format(remainingBalance)}\n")
+                                    if (expense.remarks.isNotBlank()) {
+                                        reportBuilder.append("- **Remarks**: ${expense.remarks}\n")
                                     }
-                                    append("\\bottomrule\n")
-                                    append("\\end{tabularx}\n")
-                                    append("\\vspace{0.3cm}\n")
-
-                                    // Receipts Details
-                                    append("\\section*{Receipts Details}\n")
-                                    budget.expenses.withIndex().forEach { (index, expense) ->
-                                        selectedExpensesMap[index]?.let { receipts ->
-                                            if (receipts.isNotEmpty()) {
-                                                append("\\subsection*{${expense.category.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")}}\n")
-                                                append("\\begin{itemize}\n")
-                                                receipts.forEach { receipt ->
-                                                    append("\\item Description: ${receipt.description.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")} \n")
-                                                    append("(\\SI{${numberFormat.format(receipt.amount)}}{PHP}, " +
-                                                            "Date: ${receipt.dateOfTransaction}, " +
-                                                            "Category: ${receipt.category.replace("&", "\\&").replace("%", "\\%").replace("_", "\\_")})\n")
-                                                }
-                                                append("\\end{itemize}\n")
+                                    selectedExpensesMap[index]?.let { selectedExpenses ->
+                                        if (selectedExpenses.isNotEmpty()) {
+                                            reportBuilder.append("- **Uploaded Receipts**:\n")
+                                            selectedExpenses.forEach { selected ->
+                                                reportBuilder.append("  - ${selected.description}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction})\n")
                                             }
                                         }
                                     }
-
-                                    append("\\vspace{0.5cm}\n")
-                                    append("\\noindent \\textbf{Note:} This report reflects the financial status as of the generation date. All amounts are in Philippine Peso (PHP).\n")
-                                    append("\\end{document}\n")
+                                    reportBuilder.append("\n")
                                 }
 
-                                // Note: In a real app, you'd save the LaTeX content to a .tex file and compile it using a LaTeX engine or service.
-                                // For this response, the LaTeX content is provided as the artifact output.
-                                // Show confirmation to the user
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Liquidation Report Generated for ${budget.name}",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
+                                reportContent = reportBuilder.toString()
+                                showReportDialog = true
+                                Toast.makeText(
+                                    context,
+                                    "Liquidation Report Generated for ${budget.name}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -3219,89 +3271,123 @@ fun LiquidationReport(
                 }
             }
         }
-    }
 
-    // Expense selection dialog
-    if (showExpenseSelectionDialog && currentExpenseItem != null) {
-        AlertDialog(
-            onDismissRequest = {
-                showExpenseSelectionDialog = false
-                currentExpenseItem = null
-            },
-            title = { Text("Select Receipt for ${currentExpenseItem!!.first.category}") },
-            text = {
-                if (expenses.isEmpty()) {
-                    Text(
-                        text = "No transactions recorded yet.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp)
-                    ) {
-                        items(expenses) { expense ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        // Initialize the list if not present
-                                        if (!selectedExpensesMap.containsKey(currentExpenseItem!!.second)) {
-                                            selectedExpensesMap[currentExpenseItem!!.second] = mutableListOf()
-                                        }
-                                        // Add expense to the specific expense item's selected expenses
-                                        selectedExpensesMap[currentExpenseItem!!.second]!!.add(expense)
-                                        showExpenseSelectionDialog = false
-                                        currentExpenseItem = null
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = "Selected receipt: ${expense.description}",
-                                                duration = SnackbarDuration.Short
-                                            )
-                                        }
-                                    },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface
-                                )
-                            ) {
-                                Column(
+        // Expense selection dialog with category-specific filtering
+        if (showExpenseSelectionDialog && currentExpenseItem != null) {
+            val filteredExpenses = expenses.filter { it.category == currentExpenseItem!!.first.category }
+            AlertDialog(
+                onDismissRequest = {
+                    showExpenseSelectionDialog = false
+                    currentExpenseItem = null
+                },
+                title = { Text("Select Receipt for ${currentExpenseItem!!.first.category}") },
+                text = {
+                    if (filteredExpenses.isEmpty()) {
+                        Text(
+                            text = "No transactions recorded yet for ${currentExpenseItem!!.first.category}.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp)
+                        ) {
+                            items(filteredExpenses) { expense ->
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp)
+                                        .padding(vertical = 4.dp)
+                                        .clickable {
+                                            // Ensure the list is initialized
+                                            val expenseList = selectedExpensesMap.getOrPut(currentExpenseItem!!.second) { mutableListOf() }
+                                            // Add expense to the specific expense item's selected expenses
+                                            if (!expenseList.contains(expense)) {
+                                                val newList = expenseList.toMutableList().apply { add(expense) }
+                                                selectedExpensesMap[currentExpenseItem!!.second] = newList
+                                                Toast.makeText(
+                                                    context,
+                                                    "Selected receipt: ${expense.description}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Receipt already selected: ${expense.description}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            showExpenseSelectionDialog = false
+                                            currentExpenseItem = null
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    )
                                 ) {
-                                    Text(
-                                        text = expense.description,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "₱${numberFormat.format(expense.amount)}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "Category: ${expense.category}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Text(
+                                            text = expense.description,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "₱${numberFormat.format(expense.amount)}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Category: ${expense.category}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showExpenseSelectionDialog = false
+                        currentExpenseItem = null
+                    }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showExpenseSelectionDialog = false
-                    currentExpenseItem = null
-                }) {
-                    Text("Cancel")
+            )
+        }
+
+        // Report display dialog
+        if (showReportDialog) {
+            AlertDialog(
+                onDismissRequest = { showReportDialog = false },
+                title = { Text("Liquidation Report: ${selectedBudget?.name}") },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = reportContent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showReportDialog = false }) {
+                        Text("Close")
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -3325,12 +3411,27 @@ fun FundRequest(
     var quantity by remember { mutableStateOf("") }
     var amountPerUnit by remember { mutableStateOf("") }
     var remarks by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
 
     // Number formatter for comma-separated amounts
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
     }
+
+    // Categories list (same as RecordExpensesScreen)
+    val categories = listOf(
+        "Utilities",
+        "Food",
+        "Transportation",
+        "Gas",
+        "Office Supplies",
+        "Rent",
+        "Parking",
+        "Electronic Supplies",
+        "Grocery",
+        "Other Expenses"
+    )
 
     // Calculate total expenses
     val totalExpenses = expenses.sumOf { it.quantity * it.amountPerUnit }
@@ -3567,19 +3668,45 @@ fun FundRequest(
                 },
                 text = {
                     Column {
-                        OutlinedTextField(
-                            value = category,
-                            onValueChange = { category = it },
-                            label = { Text("Expense Category") },
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp)),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                .padding(bottom = 8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = category,
+                                onValueChange = { },
+                                label = { Text("Expense Category") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp)),
+                                readOnly = true,
+                                trailingIcon = {
+                                    TextButton(onClick = { expanded = !expanded }) {
+                                        Text(if (expanded) "▲" else "▼")
+                                    }
+                                },
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                categories.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            category = option
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                         OutlinedTextField(
                             value = quantity,
                             onValueChange = { quantity = it.filter { c -> c.isDigit() } },
@@ -3851,93 +3978,139 @@ fun ExpenseListScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(horizontal = 16.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    if (expenses.isEmpty()) {
-                        Text(
-                            text = "No expenses recorded yet.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(expenses) { expense ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            selectedExpense = expense
-                                            showExpenseDialog = true
-                                        },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (expense in selectedExpenses)
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                        else
-                                            MaterialTheme.colorScheme.surface
-                                    ),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                                ) {
-                                    Row(
+                    // Content area with LazyColumn
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        if (expenses.isEmpty()) {
+                            Text(
+                                text = "No expenses recorded yet.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(expenses) { expense ->
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Checkbox(
-                                            checked = expense in selectedExpenses,
-                                            onCheckedChange = { checked ->
-                                                selectedExpenses = if (checked) {
-                                                    selectedExpenses + expense
-                                                } else {
-                                                    selectedExpenses - expense
-                                                }
+                                            .clickable {
+                                                selectedExpense = expense
+                                                showExpenseDialog = true
                                             },
-                                            colors = CheckboxDefaults.colors(
-                                                checkedColor = MaterialTheme.colorScheme.primary
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (expense in selectedExpenses)
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            else
+                                                MaterialTheme.colorScheme.surface
+                                        ),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Checkbox(
+                                                checked = expense in selectedExpenses,
+                                                onCheckedChange = { checked ->
+                                                    selectedExpenses = if (checked) {
+                                                        selectedExpenses + expense
+                                                    } else {
+                                                        selectedExpenses - expense
+                                                    }
+                                                },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = MaterialTheme.colorScheme.primary
+                                                )
                                             )
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = expense.description,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = "₱${String.format("%.2f", expense.amount)}",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = "Date of Transaction: ${expense.dateOfTransaction}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        expense.photoUri?.let {
-                                            AsyncImage(
-                                                model = it,
-                                                contentDescription = "Expense receipt",
-                                                modifier = Modifier
-                                                    .size(48.dp)
-                                                    .clip(RoundedCornerShape(8.dp)),
-                                                contentScale = ContentScale.Crop
-                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = expense.description,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "₱${String.format("%.2f", expense.amount)}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "Date of Transaction: ${expense.dateOfTransaction}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            expense.photoUri?.let {
+                                                AsyncImage(
+                                                    model = it,
+                                                    contentDescription = "Expense receipt",
+                                                    modifier = Modifier
+                                                        .size(48.dp)
+                                                        .clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
+                    // Button row at the bottom with new background color
+                    if (selectedExpenses.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp)
+                                .background(Color(0xFFE0F7FA).copy(alpha = 0.9f), shape = RoundedCornerShape(8.dp)) // Light blue with transparency
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                ExtendedFloatingActionButton(
+                                    onClick = { selectedExpenses = emptySet() },
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.weight(1f) // Equal weight for same size
+                                ) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Deselect all")
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Deselect All")
+                                }
+                                ExtendedFloatingActionButton(
+                                    onClick = { showDeleteDialog = true },
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError,
+                                    modifier = Modifier.weight(1f) // Equal weight for same size
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Delete (${selectedExpenses.size})")
+                                }
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(72.dp)) // Reserve space for potential buttons
+                    }
                 }
+
                 if (showDeleteDialog) {
                     AlertDialog(
                         onDismissRequest = { showDeleteDialog = false },
@@ -4145,34 +4318,6 @@ fun ExpenseListScreen(
                     )
                 }
             }
-            // Bottom FABs for Deselect and Delete
-            if (selectedExpenses.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    ExtendedFloatingActionButton(
-                        onClick = { selectedExpenses = emptySet() },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Icon(Icons.Default.Clear, contentDescription = "Deselect all")
-                        Spacer(Modifier.width(8.dp))
-                        Text("Deselect All")
-                    }
-                    ExtendedFloatingActionButton(
-                        onClick = { showDeleteDialog = true },
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                        Spacer(Modifier.width(8.dp))
-                        Text("Delete (${selectedExpenses.size})")
-                    }
-                }
-            }
         }
     }
 }
@@ -4264,6 +4409,7 @@ fun LoginScreenPreview() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreviewWithData() {
@@ -4306,4 +4452,3 @@ fun ExpenseListScreenPreview() {
         )
     }
 }
-
