@@ -56,6 +56,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -162,14 +163,24 @@ import java.io.File
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
+import java.util.Locale
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.material.icons.filled.*
+import java.time.LocalDate
 import java.util.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextOverflow
+import java.time.Instant
+import java.time.ZoneId
+
+import java.time.format.DateTimeParseException
+import java.time.format.DateTimeFormatter
+
 
 
 
@@ -968,6 +979,7 @@ fun ResetPassword(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordExpensesScreen(
     modifier: Modifier = Modifier,
@@ -1114,13 +1126,34 @@ fun RecordExpensesScreen(
                 showExpenseDialog = false
                 selectedExpense = null
             },
-            title = { Text("${selectedExpense!!.category} Receipt") },
-            text = {
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(16.dp)),
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.graphicsLayer {
+                    shadowElevation = 12.dp.toPx()
+                    spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                }
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
                 ) {
+                    Text(
+                        text = "${selectedExpense!!.category} Receipt",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
                     selectedExpense!!.photoUri?.let { uri ->
                         val bitmap = try {
                             BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
@@ -1134,12 +1167,17 @@ fun RecordExpensesScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(200.dp)
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .padding(bottom = 8.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(
+                                        1.5.dp,
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(12.dp)
+                                    )
                                     .clickable {
                                         expenseImageBitmap = it
                                         showFullScreenImage = true
-                                    }
+                                    },
+                                contentScale = ContentScale.Crop
                             )
                         } ?: Text(
                             text = "No receipt photo available",
@@ -1153,28 +1191,43 @@ fun RecordExpensesScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showExpenseDialog = false
-                        selectedExpense = null
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Description: ${selectedExpense!!.description}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(
+                            onClick = {
+                                showInfoDialog = true
+                            }
+                        ) {
+                            Text(
+                                text = "Info",
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                showExpenseDialog = false
+                                selectedExpense = null
+                            }
+                        ) {
+                            Text(
+                                text = "Close",
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                ) {
-                    Text("Close")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showInfoDialog = true
-                    }
-                ) {
-                    Text("Info")
                 }
             }
-        )
+        }
     }
 
     if (showInfoDialog && selectedExpense != null) {
@@ -1182,107 +1235,155 @@ fun RecordExpensesScreen(
             onDismissRequest = {
                 showInfoDialog = false
             },
-            title = { Text("Expense Details") },
-            text = {
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(16.dp)),
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.graphicsLayer {
+                    shadowElevation = 12.dp.toPx()
+                    spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                }
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
                 ) {
                     Text(
-                        text = "Category: ${selectedExpense!!.category}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        text = "Expense Details",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    Text(
-                        text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        text = "Date Added: ${selectedExpense!!.dateAdded}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        text = "Remarks: ${selectedExpense!!.description}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showInfoDialog = false
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Description: ${selectedExpense!!.description}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Category: ${selectedExpense!!.category}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Date Added: ${selectedExpense!!.dateAdded}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
-                ) {
-                    Text("Close")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(
+                        onClick = { showInfoDialog = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            text = "Close",
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
-        )
+        }
     }
 
     if (showFullScreenImage) {
         AlertDialog(
             onDismissRequest = { showFullScreenImage = false },
             modifier = Modifier.fillMaxSize(),
-            confirmButton = {
-                TextButton(onClick = { showFullScreenImage = false }) {
-                    Text("Close")
-                }
-            },
-            text = {
-                Box(
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
+                    .padding(
+                        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                expenseImageBitmap?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Full screen expense photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentScale = ContentScale.Fit
+                    )
+                } ?: selectedExpense?.photoUri?.let { uri ->
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = "Full screen expense photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentScale = ContentScale.Fit,
+                        onError = {
+                            Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                } ?: Text(
+                    text = "No image available",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
+                )
+                IconButton(
+                    onClick = { showFullScreenImage = false },
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(
-                            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                        ),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                            CircleShape
+                        )
                 ) {
-                    expenseImageBitmap?.let { bitmap ->
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Full screen expense photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    } ?: selectedExpense?.photoUri?.let { uri ->
-                        AsyncImage(
-                            model = uri,
-                            contentDescription = "Full screen expense photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentScale = ContentScale.Fit,
-                            onError = {
-                                Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    } ?: Text(
-                        text = "No image available",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp)
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close image",
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
-        )
+        }
     }
 
     ModalNavigationDrawer(
@@ -1591,52 +1692,17 @@ fun RecordExpensesScreen(
                         .fillMaxWidth()
                         .height(200.dp)
                         .padding(bottom = 16.dp)
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(
+                            1.5.dp,
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(12.dp)
+                        )
                         .clickable {
                             expenseImageBitmap = bitmap
                             showFullScreenImage = true
                         },
                     contentScale = ContentScale.Crop
-                )
-            }
-
-            if (showFullScreenImage) {
-                AlertDialog(
-                    onDismissRequest = { showFullScreenImage = false },
-                    modifier = Modifier.fillMaxSize(),
-                    confirmButton = {
-                        TextButton(onClick = { showFullScreenImage = false }) {
-                            Text("Close")
-                        }
-                    },
-                    text = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background)
-                                .padding(
-                                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            expenseImageBitmap?.let { bitmap ->
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "Full screen expense photo",
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                            } ?: Text(
-                                text = "No image available",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
                 )
             }
 
@@ -1695,7 +1761,8 @@ fun RecordExpensesScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                 items(expenses.sortedByDescending {
@@ -1708,37 +1775,49 @@ fun RecordExpensesScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
                             .clickable {
                                 selectedExpense = expense
                                 showExpenseDialog = true
                             },
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(
+                            defaultElevation = 4.dp
                         )
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            ) {
                                 Text(
                                     text = expense.description,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = expense.category,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            Spacer(modifier = Modifier.width(16.dp))
                             Text(
                                 text = "₱${String.format("%.2f", expense.amount)}",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.End
                             )
                         }
                     }
@@ -3804,6 +3883,8 @@ fun FundRequest(
 
 
 
+
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseListScreen(
@@ -3820,10 +3901,77 @@ fun ExpenseListScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showFullScreenImage by remember { mutableStateOf(false) }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Calendar state
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val filteredExpenses = expenses.filter { expense ->
+        try {
+            LocalDate.parse(expense.dateOfTransaction, dateFormatter) == selectedDate
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Category colors
+    val categories = listOf(
+        "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
+        "Rent", "Parking", "Electronic Supplies", "Other Expenses"
+    )
+    val categoryColors = categories.zip(
+        listOf(
+            Color(0xFFFF6B6B), // Utilities - Red
+            Color(0xFFFF0000), // Food - Red
+            Color(0xFF45B7D1), // Transportation - Blue
+            Color(0xFF96CEB4), // Gas - Green
+            Color(0xFFFFB6C1), // Office Supplies - Light Pink
+            Color(0xFFD4A5A5), // Rent - Dusty Rose
+            Color(0xFFA8DADC), // Parking - Light Cyan
+            Color(0xFFF4A261), // Electronic Supplies - Orange
+            Color(0xFFE76F51)  // Other Expenses - Coral
+        )
+    ).toMap()
+
+    // Category icons
+    val categoryIcons = categories.zip(
+        listOf(
+            Icons.Default.Bolt, // Utilities
+            Icons.Default.Restaurant, // Food
+            Icons.Default.DirectionsCar, // Transportation
+            Icons.Default.LocalGasStation, // Gas
+            Icons.Default.Work, // Office Supplies
+            Icons.Default.Home, // Rent
+            Icons.Default.LocalParking, // Parking
+            Icons.Default.Devices, // Electronic Supplies
+            Icons.Default.Category // Other Expenses
+        )
+    ).toMap()
+
+    // Function to generate shades of a base color
+    fun generateColorShades(baseColor: Color, count: Int): List<Color> {
+        if (count <= 0) return emptyList()
+        val hsl = baseColor.toHsl()
+        val shades = mutableListOf<Color>()
+        val lightnessStep = if (count == 1) 0f else 0.4f / (count - 1)
+        for (i in 0 until count) {
+            val newLightness = (0.3f + i * lightnessStep).coerceIn(0.3f, 0.7f)
+            shades.add(Color.hsl(hsl[0], hsl[1], newLightness))
+        }
+        return shades
+    }
+
+    // Generate shades for each category
+    val categoryShades = remember(selectedDate, filteredExpenses) {
+        categoryColors.mapValues { (category, baseColor) ->
+            val categoryExpenses = filteredExpenses.filter { it.category == category }
+            generateColorShades(baseColor, categoryExpenses.size)
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -3965,6 +4113,15 @@ fun ExpenseListScreen(
                                 }
                             }
                         },
+                        actions = {
+                            IconButton(onClick = { showDatePickerDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select date",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.surface,
                             titleContentColor = MaterialTheme.colorScheme.primary
@@ -3979,6 +4136,61 @@ fun ExpenseListScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
+                    // Mini one-row calendar for one month
+                    val lazyListState = rememberLazyListState()
+                    val startDate = selectedDate.withDayOfMonth(1)
+                    val daysInMonth = startDate.lengthOfMonth()
+                    val endDate = startDate.plusDays(daysInMonth.toLong() - 1)
+
+                    LaunchedEffect(selectedDate) {
+                        if (selectedDate < startDate || selectedDate > endDate) {
+                            selectedDate = LocalDate.now().coerceIn(startDate, endDate)
+                        }
+                        val index = (0 until daysInMonth).find { index ->
+                            startDate.plusDays(index.toLong()) == selectedDate
+                        } ?: LocalDate.now().dayOfMonth - 1
+                        lazyListState.animateScrollToItem(index)
+                    }
+
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        state = lazyListState,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(daysInMonth) { index ->
+                            val date = startDate.plusDays(index.toLong())
+                            val isSelected = date == selectedDate
+                            Surface(
+                                modifier = Modifier
+                                    .width(60.dp)
+                                    .height(60.dp)
+                                    .clickable { selectedDate = date },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = date.format(DateTimeFormatter.ofPattern("E")).take(3),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = date.format(DateTimeFormatter.ofPattern("d")),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Content area with LazyColumn
                     Box(
                         modifier = Modifier
@@ -3986,9 +4198,9 @@ fun ExpenseListScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                     ) {
-                        if (expenses.isEmpty()) {
+                        if (filteredExpenses.isEmpty()) {
                             Text(
-                                text = "No expenses recorded yet.",
+                                text = "No expenses recorded for ${selectedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -3999,70 +4211,180 @@ fun ExpenseListScreen(
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(expenses) { expense ->
+                                itemsIndexed(filteredExpenses) { index, expense ->
+                                    val categoryIndex = filteredExpenses
+                                        .filter { it.category == expense.category }
+                                        .indexOfFirst { it == expense }
+                                    val baseColor = categoryColors[expense.category]!!
+                                    val shade = categoryShades[expense.category]?.getOrNull(categoryIndex) ?: baseColor
+                                    val isSelected = expense in selectedExpenses
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isPressed by interactionSource.collectIsPressedAsState()
+                                    val scale by animateFloatAsState(
+                                        targetValue = if (isPressed || isSelected) 1.05f else 1f,
+                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                    )
+                                    val elevation by animateDpAsState(
+                                        targetValue = if (isPressed || isSelected) 12.dp else 6.dp,
+                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                    )
+
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable {
+                                            .scale(scale)
+                                            .clickable(
+                                                interactionSource = interactionSource,
+                                                indication = null
+                                            ) {
                                                 selectedExpense = expense
                                                 showExpenseDialog = true
+                                            }
+                                            .graphicsLayer {
+                                                shadowElevation = elevation.toPx()
+                                                spotShadowColor = shade.copy(alpha = 0.5f)
+                                                ambientShadowColor = shade.copy(alpha = 0.3f)
+                                                clip = true
+                                                shape = RoundedCornerShape(16.dp)
                                             },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = if (expense in selectedExpenses)
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            else
-                                                MaterialTheme.colorScheme.surface
+                                            containerColor = Color.Transparent
                                         ),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                        shape = RoundedCornerShape(16.dp)
                                     ) {
-                                        Row(
+                                        Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .background(
+                                                    brush = Brush.linearGradient(
+                                                        colors = listOf(
+                                                            shade.copy(alpha = 0.8f),
+                                                            shade.copy(alpha = 0.4f)
+                                                        ),
+                                                        start = Offset(0f, 0f),
+                                                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                                    )
+                                                )
+                                                .border(
+                                                    2.dp,
+                                                    brush = Brush.linearGradient(
+                                                        colors = listOf(
+                                                            shade,
+                                                            shade.copy(alpha = 0.5f)
+                                                        )
+                                                    ),
+                                                    shape = RoundedCornerShape(16.dp)
+                                                )
+                                                .then(
+                                                    if (isSelected) Modifier.background(
+                                                        color = Color.White.copy(alpha = 0.2f),
+                                                        shape = RoundedCornerShape(16.dp)
+                                                    ) else Modifier
+                                                )
                                         ) {
-                                            Checkbox(
-                                                checked = expense in selectedExpenses,
-                                                onCheckedChange = { checked ->
-                                                    selectedExpenses = if (checked) {
-                                                        selectedExpenses + expense
-                                                    } else {
-                                                        selectedExpenses - expense
-                                                    }
-                                                },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = MaterialTheme.colorScheme.primary
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Animated Checkbox
+                                                val checkboxScale by animateFloatAsState(
+                                                    targetValue = if (isSelected) 1.2f else 1f,
+                                                    animationSpec = tween(durationMillis = 200)
                                                 )
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = expense.description,
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                Text(
-                                                    text = "₱${String.format("%.2f", expense.amount)}",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                                Text(
-                                                    text = "Date of Transaction: ${expense.dateOfTransaction}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            expense.photoUri?.let {
-                                                AsyncImage(
-                                                    model = it,
-                                                    contentDescription = "Expense receipt",
+                                                Checkbox(
+                                                    checked = isSelected,
+                                                    onCheckedChange = { checked ->
+                                                        selectedExpenses = if (checked) {
+                                                            selectedExpenses + expense
+                                                        } else {
+                                                            selectedExpenses - expense
+                                                        }
+                                                    },
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = shade,
+                                                        uncheckedColor = shade.copy(alpha = 0.5f),
+                                                        checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                                                    ),
                                                     modifier = Modifier
-                                                        .size(48.dp)
-                                                        .clip(RoundedCornerShape(8.dp)),
-                                                    contentScale = ContentScale.Crop
+                                                        .scale(checkboxScale)
+                                                        .padding(4.dp)
                                                 )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = categoryIcons[expense.category]!!,
+                                                            contentDescription = null,
+                                                            tint = shade,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = expense.category,
+                                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                shadow = Shadow(
+                                                                    color = Color.Black.copy(alpha = 0.3f),
+                                                                    offset = Offset(2f, 2f),
+                                                                    blurRadius = 4f
+                                                                )
+                                                            ),
+                                                            color = shade
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = expense.description,
+                                                        style = MaterialTheme.typography.titleMedium.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            shadow = Shadow(
+                                                                color = Color.Black.copy(alpha = 0.3f),
+                                                                offset = Offset(2f, 2f),
+                                                                blurRadius = 4f
+                                                            )
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = "₱${String.format("%.2f", expense.amount)}",
+                                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                                            fontWeight = FontWeight.ExtraBold
+                                                        ),
+                                                        color = shade
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                expense.photoUri?.let { uri ->
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(56.dp)
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .border(
+                                                                2.dp,
+                                                                shade.copy(alpha = 0.7f),
+                                                                RoundedCornerShape(12.dp)
+                                                            )
+                                                    ) {
+                                                        AsyncImage(
+                                                            model = uri,
+                                                            contentDescription = "Expense receipt",
+                                                            modifier = Modifier
+                                                                .fillMaxSize()
+                                                                .scale(if (isPressed) 1.1f else 1f)
+                                                                .animateContentSize(
+                                                                    animationSpec = tween(200)
+                                                                ),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -4071,24 +4393,23 @@ fun ExpenseListScreen(
                         }
                     }
 
-                    // Button row at the bottom with new background color
+                    // Button row at the bottom
                     if (selectedExpenses.isNotEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 16.dp)
-                                .background(Color(0xFFE0F7FA).copy(alpha = 0.9f), shape = RoundedCornerShape(8.dp)) // Light blue with transparency
+                                .background(Color(0xFFE0F7FA).copy(alpha = 0.9f), shape = RoundedCornerShape(8.dp))
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 ExtendedFloatingActionButton(
                                     onClick = { selectedExpenses = emptySet() },
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.weight(1f) // Equal weight for same size
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.Clear, contentDescription = "Deselect all")
                                     Spacer(Modifier.width(8.dp))
@@ -4098,7 +4419,7 @@ fun ExpenseListScreen(
                                     onClick = { showDeleteDialog = true },
                                     containerColor = MaterialTheme.colorScheme.error,
                                     contentColor = MaterialTheme.colorScheme.onError,
-                                    modifier = Modifier.weight(1f) // Equal weight for same size
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Delete")
                                     Spacer(Modifier.width(8.dp))
@@ -4107,7 +4428,38 @@ fun ExpenseListScreen(
                             }
                         }
                     } else {
-                        Spacer(modifier = Modifier.height(72.dp)) // Reserve space for potential buttons
+                        Spacer(modifier = Modifier.height(72.dp))
+                    }
+                }
+
+                // Date Picker Dialog
+                if (showDatePickerDialog) {
+                    val datePickerState = rememberDatePickerState(
+                        initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    )
+                    DatePickerDialog(
+                        onDismissRequest = { showDatePickerDialog = false },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    datePickerState.selectedDateMillis?.let { millis ->
+                                        selectedDate = Instant.ofEpochMilli(millis)
+                                            .atZone(ZoneId.systemDefault())
+                                            .toLocalDate()
+                                    }
+                                    showDatePickerDialog = false
+                                }
+                            ) {
+                                Text("OK")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDatePickerDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    ) {
+                        DatePicker(state = datePickerState)
                     }
                 }
 
@@ -4146,13 +4498,34 @@ fun ExpenseListScreen(
                             showExpenseDialog = false
                             selectedExpense = null
                         },
-                        title = { Text("${selectedExpense!!.category} Receipt") },
-                        text = {
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.graphicsLayer {
+                                shadowElevation = 12.dp.toPx()
+                                spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                            }
+                        ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
+                                    .padding(16.dp)
                             ) {
+                                Text(
+                                    text = "${selectedExpense!!.category} Receipt",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = categoryColors[selectedExpense!!.category]!!,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
                                 selectedExpense!!.photoUri?.let { uri ->
                                     val bitmap = try {
                                         BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
@@ -4166,12 +4539,17 @@ fun ExpenseListScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(200.dp)
-                                                .clip(MaterialTheme.shapes.medium)
-                                                .padding(bottom = 8.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .border(
+                                                    1.5.dp,
+                                                    categoryColors[selectedExpense!!.category]!!,
+                                                    RoundedCornerShape(12.dp)
+                                                )
                                                 .clickable {
                                                     expenseImageBitmap = it
                                                     showFullScreenImage = true
-                                                }
+                                                },
+                                            contentScale = ContentScale.Crop
                                         )
                                     } ?: Text(
                                         text = "No receipt photo available",
@@ -4185,141 +4563,223 @@ fun ExpenseListScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    showExpenseDialog = false
-                                    selectedExpense = null
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Description: ${selectedExpense!!.description}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            showInfoDialog = true
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Info",
+                                            color = categoryColors[selectedExpense!!.category]!!
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            showExpenseDialog = false
+                                            selectedExpense = null
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Close",
+                                            color = categoryColors[selectedExpense!!.category]!!
+                                        )
+                                    }
                                 }
-                            ) {
-                                Text("Close")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = {
-                                    showInfoDialog = true
-                                }
-                            ) {
-                                Text("Info")
                             }
                         }
-                    )
+                    }
                 }
                 if (showInfoDialog && selectedExpense != null) {
                     AlertDialog(
                         onDismissRequest = {
                             showInfoDialog = false
                         },
-                        title = { Text("Expense Details") },
-                        text = {
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.graphicsLayer {
+                                shadowElevation = 12.dp.toPx()
+                                spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                            }
+                        ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
+                                    .padding(16.dp)
                             ) {
                                 Text(
-                                    text = "Description: ${selectedExpense!!.description}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    text = "Expense Details",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = categoryColors[selectedExpense!!.category]!!,
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Category: ${selectedExpense!!.category}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Date Added: ${selectedExpense!!.dateAdded}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                selectedExpense!!.photoUri?.let { uri ->
-                                    AsyncImage(
-                                        model = uri,
-                                        contentDescription = "Receipt photo",
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(150.dp)
-                                            .clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Fit
+                                Column(
+                                    modifier = Modifier.verticalScroll(rememberScrollState())
+                                ) {
+                                    Text(
+                                        text = "Description: ${selectedExpense!!.description}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Category: ${selectedExpense!!.category}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Date Added: ${selectedExpense!!.dateAdded}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                TextButton(
+                                    onClick = { showInfoDialog = false },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text(
+                                        text = "Close",
+                                        color = categoryColors[selectedExpense!!.category]!!
                                     )
                                 }
                             }
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    showInfoDialog = false
-                                }
-                            ) {
-                                Text("Close")
-                            }
                         }
-                    )
+                    }
                 }
                 if (showFullScreenImage) {
                     AlertDialog(
                         onDismissRequest = { showFullScreenImage = false },
                         modifier = Modifier.fillMaxSize(),
-                        confirmButton = {
-                            TextButton(onClick = { showFullScreenImage = false }) {
-                                Text("Close")
-                            }
-                        },
-                        text = {
-                            Box(
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
+                                .padding(
+                                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            expenseImageBitmap?.let { bitmap ->
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Full screen receipt photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            2.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } ?: selectedExpense?.photoUri?.let { uri ->
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Full screen receipt photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            2.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } ?: Text(
+                                text = "No image available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            IconButton(
+                                onClick = { showFullScreenImage = false },
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.background),
-                                contentAlignment = Alignment.Center
+                                    .align(Alignment.TopEnd)
+                                    .padding(16.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                        CircleShape
+                                    )
                             ) {
-                                expenseImageBitmap?.let { bitmap ->
-                                    Image(
-                                        bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = "Full screen receipt photo",
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(16.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                } ?: selectedExpense?.photoUri?.let { uri ->
-                                    AsyncImage(
-                                        model = uri,
-                                        contentDescription = "Full screen receipt photo",
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(16.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                } ?: Text(
-                                    text = "No image available",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close image",
+                                    tint = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
                         }
-                    )
+                    }
                 }
             }
         }
     }
+}
+
+// Extension function to convert Color to HSL
+fun Color.toHsl(): FloatArray {
+    val r = this.red
+    val g = this.green
+    val b = this.blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val l = (max + min) / 2f
+    val h: Float
+    val s: Float
+
+    if (max == min) {
+        h = 0f
+        s = 0f
+    } else {
+        val d = max - min
+        s = if (l > 0.5f) d / (2f - max - min) else d / (max + min)
+        h = when (max) {
+            r -> (g - b) / d + (if (g < b) 6f else 0f)
+            g -> (b - r) / d + 2f
+            else -> (r - g) / d + 4f
+        } * 60f
+    }
+    return floatArrayOf(h, s, l)
 }
 
 
@@ -4416,14 +4876,14 @@ fun HomeScreenPreviewWithData() {
     ExpenSEEsTheme {
         HomeScreen(
             expenses = listOf(
-                Expense("Electricity", 120.50, "Utilities", null, "2025-06-01 10:00:00"),
-                Expense("Groceries", 85.25, "Food", null, "2025-06-02 12:30:00")
+                Expense("Electricity", 120.50, "Utilities", null, "2025-06-01"),
+                Expense("Groceries", 85.25, "Food", null, "2025-06-02")
             ),
             onRecordExpensesClick = {},
             onListExpensesClick = {},
             onLogoutClick = {},
-            modifier = TODO(),
-            navController = TODO()
+            modifier = Modifier.fillMaxSize(), // Provide a valid Modifier
+            navController = rememberNavController() // Provide a valid NavController
         )
     }
 }
@@ -4439,12 +4899,13 @@ fun RecordExpensesScreenPreview() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun ExpenseListScreenPreview() {
     ExpenSEEsTheme {
         ExpenseListScreen(
-            navController = NavController(LocalContext.current),
+            navController = rememberNavController(), // Use rememberNavController
             expenses = listOf(), // Empty list
             onDeleteExpenses = { /* No-op for preview */ },
             onLogoutClick = { /* No-op for preview */ },

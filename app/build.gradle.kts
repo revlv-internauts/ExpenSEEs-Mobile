@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 
+
 }
 
 android {
@@ -85,6 +86,8 @@ dependencies {
     implementation("androidx.compose.animation:animation:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.0")
     implementation ("androidx.compose.material3:material3:1.2.0")
+    coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.1.2")
+    implementation ("androidx.compose.ui:ui-text-google-fonts:1.6.8")
 
 
 }
