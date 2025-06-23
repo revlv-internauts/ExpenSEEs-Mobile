@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose.android)
     implementation("androidx.core:core:1.13.1")
     implementation(libs.androidx.games.activity)
+    implementation(libs.androidx.tv.material)
+    implementation(libs.androidx.foundation.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -89,5 +91,5 @@ dependencies {
     coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.1.2")
     implementation ("androidx.compose.ui:ui-text-google-fonts:1.6.8")
 
-
+    implementation ("androidx.compose.runtime:runtime-saveable:1.3.0")
 }
