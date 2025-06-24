@@ -9,22 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.expensees.*
 import com.example.expensees.models.Expense
 import com.example.expensees.models.SubmittedBudget
-import com.example.expensees.screens.ExpenseListScreen
-import com.example.expensees.screens.ForgotPassword
-import com.example.expensees.screens.FundRequest
-import com.example.expensees.screens.HomeScreen
-import com.example.expensees.screens.LiquidationReport
-import com.example.expensees.screens.LoadingScreen
-import com.example.expensees.screens.LoginScreen
-import com.example.expensees.screens.RecordExpensesScreen
-import com.example.expensees.screens.ResetPassword
+import com.example.expensees.network.AuthRepository
+import com.example.expensees.screens.*
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
+fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository) {
     val navController = rememberNavController()
     val expenses = remember { mutableStateListOf<Expense>() }
     val submittedBudgets = remember { mutableStateListOf<SubmittedBudget>() }
@@ -42,27 +34,22 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
         composable("login") {
             LoginScreen(
-                modifier = modifier,
                 navController = navController,
-                onLoginClick = { _, _ ->
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
-                    }
-                }
+                authRepository = authRepository
             )
         }
         composable("home") {
             HomeScreen(
-                expenses = expenses,
+                expenses = expenses, // Ensure this is non-null
                 navController = navController,
-                onRecordExpensesClick = { navController.navigate("record_expenses") },
+                onRecordExpensesClick = { navController.navigate("record_expense") },
                 onListExpensesClick = { navController.navigate("list_expenses") },
                 onLogoutClick = {
+                    authRepository.logout()
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }
-                },
-                modifier = modifier
+                }
             )
         }
         composable("record_expenses") {

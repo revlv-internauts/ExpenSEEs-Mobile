@@ -1,6 +1,6 @@
 package com.example.expensees.screens
 
-import android.widget.Toast
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -27,28 +26,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import kotlinx.coroutines.delay
+import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    onLoginClick: (String, String) -> Unit = { _, _ -> }
+    authRepository: AuthRepository
 ) {
-    var email by remember { mutableStateOf("") }
+    var usernameOrEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var isLoginComplete by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
     // Animations
     val alpha by animateFloatAsState(
-        targetValue = if (isPressed && !isLoading && !isLoginComplete) 0.85f else 1f,
+        targetValue = if (isPressed && !isLoading) 0.85f else 1f,
         animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
         label = "button_alpha"
     )
@@ -58,7 +55,7 @@ fun LoginScreen(
         label = "form_fade"
     )
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && !isLoading && !isLoginComplete) 0.98f else 1f,
+        targetValue = if (isPressed && !isLoading) 0.98f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
         label = "button_scale"
     )
@@ -109,7 +106,6 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // App Title
                 Text(
                     text = "ExpenSEEs",
                     style = MaterialTheme.typography.headlineLarge.copy(
@@ -118,8 +114,6 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
-
-                // Subtitle
                 Text(
                     text = "Securely access your financial dashboard",
                     style = MaterialTheme.typography.titleMedium.copy(
@@ -129,12 +123,10 @@ fun LoginScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-
-                // Email Field
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email or Username") },
+                    value = usernameOrEmail,
+                    onValueChange = { usernameOrEmail = it.trim() },
+                    label = { Text("Username or Email") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     shape = RoundedCornerShape(8.dp),
@@ -151,13 +143,12 @@ fun LoginScreen(
                     ),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Medium
-                    )
+                    ),
+                    isError = errorMessage != null && usernameOrEmail.isBlank()
                 )
-
-                // Password Field
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { password = it.trim() },
                     label = { Text("Password") },
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = PasswordVisualTransformation(),
@@ -176,10 +167,9 @@ fun LoginScreen(
                     ),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Medium
-                    )
+                    ),
+                    isError = errorMessage != null && password.isBlank()
                 )
-
-                // Error Message
                 errorMessage?.let {
                     Text(
                         text = it,
@@ -189,11 +179,9 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .alpha(formAlpha),
-                        textAlign = TextAlign.Start
+                        textAlign = TextAlign.Left
                     )
                 }
-
-                // Sign In Button
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,27 +195,33 @@ fun LoginScreen(
                                 )
                             )
                         )
-                        .alpha(if (isLoginComplete) 0.5f else alpha)
+                        .alpha(alpha)
                         .scale(scale)
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null,
-                            enabled = !isLoading && !isLoginComplete
+                            enabled = !isLoading
                         ) {
-                            if (email.isEmpty() || password.isEmpty()) {
-                                errorMessage = "Please enter a valid email and password"
-                            } else {
-                                coroutineScope.launch {
-                                    if (email == "andrew@gmail.com" && password == "123") {
-                                        isLoading = true
-                                        delay(1000L)
+                            when {
+                                usernameOrEmail.isBlank() -> errorMessage = "Please enter a username or email"
+                                password.isBlank() -> errorMessage = "Please enter a password"
+                                password.length < 6 -> errorMessage = "Password must be at least 6 characters"
+                                else -> {
+                                    isLoading = true
+                                    errorMessage = null
+                                    coroutineScope.launch {
+                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail', password: [hidden]")
+                                        val result = authRepository.login(usernameOrEmail, password)
                                         isLoading = false
-                                        isLoginComplete = true
-                                        onLoginClick(email, password)
-                                        Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        errorMessage = "Invalid email or password"
-                                        Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
+                                        result.onSuccess {
+                                            Log.d("LoginScreen", "Login successful, navigating to home")
+                                            navController.navigate("home") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }.onFailure { e ->
+                                            Log.e("LoginScreen", "Login failed: ${e.message}")
+                                            errorMessage = e.message ?: "Invalid username or password"
+                                        }
                                     }
                                 }
                             }
@@ -240,7 +234,7 @@ fun LoginScreen(
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp
                         )
-                    } else if (!isLoginComplete) {
+                    } else {
                         Text(
                             text = "Sign In",
                             fontSize = 18.sp,
@@ -251,7 +245,6 @@ fun LoginScreen(
                         )
                     }
                 }
-                // Forgot Password
                 TextButton(
                     onClick = { navController.navigate("forgot_password") },
                     modifier = Modifier.fillMaxWidth()

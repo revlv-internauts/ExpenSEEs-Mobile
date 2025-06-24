@@ -4,13 +4,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.view.ViewGroup
-import android.widget.HorizontalScrollView
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import android.widget.Toast
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,17 +16,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,26 +42,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.expensees.models.Expense
 import kotlinx.coroutines.launch
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.RequestQuote
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color.Companion.Transparent
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.graphics.toArgb
-import coil.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -77,16 +63,8 @@ fun HomeScreen(
         maximumFractionDigits = 2
     }
     val categories = listOf(
-        "Utilities",
-        "Food",
-        "Transportation",
-        "Gas",
-        "Office Supplies",
-        "Rent",
-        "Parking",
-        "Electronic Supplies",
-        "Other Expenses",
-        "Grocery"
+        "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
+        "Rent", "Parking", "Electronic Supplies", "Other Expenses", "Grocery"
     )
 
     val totalExpenses = expenses.sumOf { it.amount }
@@ -114,16 +92,9 @@ fun HomeScreen(
 
     val categoryColors = categories.zip(
         listOf(
-            Color(0xFFEF476F), // Utilities - Vibrant Pink
-            Color(0xFF06D6A0), // Food - Bright Teal
-            Color(0xFF118AB2), // Transportation - Deep Blue
-            Color(0xFFFFD166), // Gas - Warm Yellow
-            Color(0xFFF4A261), // Office Supplies - Soft Orange
-            Color(0xFF8D5524), // Rent - Rich Brown
-            Color(0xFFC9CBA3), // Parking - Light Olive
-            Color(0xFF6B7280), // Electronic Supplies - Slate Gray
-            Color(0xFFFFA400), // Other Expenses - Bright Orange
-            Color(0xFF2E7D32)  // Grocery - Forest Green
+            Color(0xFFEF476F), Color(0xFF06D6A0), Color(0xFF118AB2), Color(0xFFFFD166),
+            Color(0xFFF4A261), Color(0xFF8D5524), Color(0xFFC9CBA3), Color(0xFF6B7280),
+            Color(0xFFFFA400), Color(0xFF2E7D32)
         )
     ).toMap()
 
@@ -232,7 +203,12 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Button(
-                        onClick = onLogoutClick,
+                        onClick = {
+                            scope.launch {
+                                drawerState.close()
+                                onLogoutClick()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -355,7 +331,7 @@ fun HomeScreen(
                                         maintainAspectRatio: false,
                                         plugins: {
                                             legend: {
-                                                display: false // Disable legend to remove labels
+                                                display: false
                                             },
                                             title: {
                                                 display: true,
@@ -654,9 +630,7 @@ fun HomeScreen(
                         .padding(horizontal = 2.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = Color.Transparent,
-                    onClick = {
-                        scope.launch { drawerState.open() }
-                    }
+                    onClick = { scope.launch { drawerState.open() } }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -825,7 +799,7 @@ fun HomeScreen(
                                     scales: {
                                         x: {
                                             ticks: {
-                                                display: false // Hide x-axis labels
+                                                display: false
                                             }
                                         },
                                         y: {
@@ -897,7 +871,16 @@ fun HomeScreen(
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
-                                                showExpenseDialog = true
+                                                expense.photoUri?.let { uri ->
+                                                    try {
+                                                        expenseImageBitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                                    } catch (e: Exception) {
+                                                        expenseImageBitmap = null
+                                                        Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                                selectedImageUri = expense.photoUri
+                                                showFullScreenImage = true
                                             },
                                         colors = CardDefaults.cardColors(
                                             containerColor = MaterialTheme.colorScheme.surface
@@ -1083,40 +1066,47 @@ fun HomeScreen(
         }
         if (showFullScreenImage) {
             AlertDialog(
-                onDismissRequest = { showFullScreenImage = false },
+                onDismissRequest = {
+                    showFullScreenImage = false
+                    selectedTransaction = null
+                    expenseImageBitmap = null
+                    selectedImageUri = null
+                },
                 modifier = Modifier.fillMaxSize(),
                 confirmButton = {
-                    TextButton(onClick = { showFullScreenImage = false }) {
+                    TextButton(onClick = {
+                        showFullScreenImage = false
+                        selectedTransaction = null
+                        expenseImageBitmap = null
+                        selectedImageUri = null
+                    }) {
                         Text("Close")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showInfoDialog = true
+                    }) {
+                        Text("Info")
                     }
                 },
                 text = {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(
-                                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                            ),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         expenseImageBitmap?.let { bitmap ->
                             Image(
                                 bitmap = bitmap.asImageBitmap(),
                                 contentDescription = "Full screen expense photo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
+                                modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
-                        } ?: selectedTransaction?.photoUri?.let { uri ->
+                        } ?: selectedImageUri?.let { uri ->
                             AsyncImage(
                                 model = uri,
                                 contentDescription = "Full screen expense photo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
+                                modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
@@ -1125,8 +1115,7 @@ fun HomeScreen(
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
