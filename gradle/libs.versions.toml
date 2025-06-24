@@ -15,6 +15,7 @@ coil-compose = "2.7.0"
 gamesActivity = "4.0.0"
 tvMaterial = "1.0.0"
 foundationAndroid = "1.7.2"
+foundationLayoutAndroid = "1.7.2"
 
 
 [libraries]
@@ -39,6 +40,7 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil-compose
 androidx-games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
 androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 androidx-foundation-android = { group = "androidx.compose.foundation", name = "foundation-android", version.ref = "foundationAndroid" }
+androidx-foundation-layout-android = { group = "androidx.compose.foundation", name = "foundation-layout-android", version.ref = "foundationLayoutAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

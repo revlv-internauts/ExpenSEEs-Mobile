@@ -1,9 +1,8 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-
-
 }
 
 android {
@@ -55,6 +54,7 @@ dependencies {
     implementation(libs.androidx.games.activity)
     implementation(libs.androidx.tv.material)
     implementation(libs.androidx.foundation.android)
+    implementation(libs.androidx.foundation.layout.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -90,6 +90,6 @@ dependencies {
     implementation ("androidx.compose.material3:material3:1.2.0")
     coreLibraryDesugaring ("com.android.tools:desugar_jdk_libs:2.1.2")
     implementation ("androidx.compose.ui:ui-text-google-fonts:1.6.8")
-
     implementation ("androidx.compose.runtime:runtime-saveable:1.3.0")
+
 }
