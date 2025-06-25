@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
             .build()
         val apiService = retrofit.create(ApiService::class.java)
 
-        // Create AuthRepository
+        // Create AuthRepository with ApiService and applicationContext
         val authRepository = AuthRepository(apiService, applicationContext)
 
         setContent {

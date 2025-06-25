@@ -6,8 +6,11 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,42 +22,42 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.expensees.models.Expense
 import kotlinx.coroutines.launch
-import java.util.*
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
+import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
@@ -62,7 +65,7 @@ import java.time.format.DateTimeParseException
 fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    expenses: List<Expense>,
+    expenses: SnapshotStateList<Expense>, // Changed to SnapshotStateList
     onDeleteExpenses: (List<Expense>) -> Unit,
     onLogoutClick: () -> Unit
 ) {
@@ -77,6 +80,10 @@ fun ExpenseListScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
 
     // Calendar state
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -201,6 +208,13 @@ fun ExpenseListScreen(
                                 imageVector = Icons.Default.DateRange,
                                 contentDescription = "Select date",
                                 tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        TextButton(onClick = onLogoutClick) {
+                            Text(
+                                text = "Logout",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 16.sp
                             )
                         }
                     },
@@ -421,7 +435,7 @@ fun ExpenseListScreen(
                                                     )
                                                 }
                                                 Text(
-                                                    text = expense.description,
+                                                    text = expense.comments,
                                                     style = MaterialTheme.typography.titleMedium.copy(
                                                         fontWeight = FontWeight.Bold,
                                                         shadow = Shadow(
@@ -435,7 +449,7 @@ fun ExpenseListScreen(
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
-                                                    text = "₱${String.format("%.2f", expense.amount)}",
+                                                    text = "₱${numberFormat.format(expense.amount)}",
                                                     style = MaterialTheme.typography.headlineSmall.copy(
                                                         fontWeight = FontWeight.ExtraBold
                                                     ),
@@ -443,7 +457,7 @@ fun ExpenseListScreen(
                                                 )
                                             }
                                             Spacer(modifier = Modifier.width(12.dp))
-                                            expense.photoUri?.let { uri ->
+                                            expense.imagePath?.let { uri ->
                                                 Box(
                                                     modifier = Modifier
                                                         .size(56.dp)
@@ -463,7 +477,15 @@ fun ExpenseListScreen(
                                                             .animateContentSize(
                                                                 animationSpec = tween(200)
                                                             ),
-                                                        contentScale = ContentScale.Crop
+                                                        contentScale = ContentScale.Crop,
+                                                        onError = {
+                                                            scope.launch {
+                                                                snackbarHostState.showSnackbar(
+                                                                    message = "Failed to load receipt image",
+                                                                    duration = SnackbarDuration.Short
+                                                                )
+                                                            }
+                                                        }
                                                     )
                                                 }
                                             }
@@ -523,14 +545,21 @@ fun ExpenseListScreen(
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                onDeleteExpenses(selectedExpenses.toList())
-                                selectedExpenses = emptySet()
-                                showDeleteDialog = false
                                 scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Expenses deleted",
-                                        duration = SnackbarDuration.Short
-                                    )
+                                    try {
+                                        onDeleteExpenses(selectedExpenses.toList())
+                                        selectedExpenses = emptySet()
+                                        showDeleteDialog = false
+                                        snackbarHostState.showSnackbar(
+                                            message = "Expenses deleted",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Failed to delete expenses: ${e.message}",
+                                            duration = SnackbarDuration.Long
+                                        )
+                                    }
                                 }
                             }
                         ) {
@@ -550,6 +579,7 @@ fun ExpenseListScreen(
                     onDismissRequest = {
                         showExpenseDialog = false
                         selectedExpense = null
+                        expenseImageBitmap = null
                     },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
@@ -572,14 +602,14 @@ fun ExpenseListScreen(
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = "${selectedExpense!!.category} Receipt",
+                                text = "${selectedExpense?.category ?: "Expense"} Receipt",
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = categoryColors[selectedExpense!!.category] ?: Color.Gray,
+                                color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
-                            selectedExpense!!.photoUri?.let { uri ->
+                            selectedExpense?.imagePath?.let { uri ->
                                 val bitmap = try {
                                     BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                 } catch (e: Exception) {
@@ -588,14 +618,14 @@ fun ExpenseListScreen(
                                 bitmap?.let {
                                     Image(
                                         bitmap = it.asImageBitmap(),
-                                        contentDescription = "${selectedExpense!!.category} receipt",
+                                        contentDescription = "${selectedExpense?.category ?: "Expense"} receipt",
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(200.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
-                                                categoryColors[selectedExpense!!.category] ?: Color.Gray,
+                                                categoryColors[selectedExpense?.category] ?: Color.Gray,
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
@@ -618,7 +648,7 @@ fun ExpenseListScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Description: ${selectedExpense!!.description}",
+                                text = "Comments: ${selectedExpense?.comments ?: ""}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -635,18 +665,19 @@ fun ExpenseListScreen(
                                 ) {
                                     Text(
                                         text = "Info",
-                                        color = categoryColors[selectedExpense!!.category] ?: Color.Gray
+                                        color = categoryColors[selectedExpense?.category] ?: Color.Gray
                                     )
                                 }
                                 TextButton(
                                     onClick = {
                                         showExpenseDialog = false
                                         selectedExpense = null
+                                        expenseImageBitmap = null
                                     }
                                 ) {
                                     Text(
                                         text = "Close",
-                                        color = categoryColors[selectedExpense!!.category] ?: Color.Gray
+                                        color = categoryColors[selectedExpense?.category] ?: Color.Gray
                                     )
                                 }
                             }
@@ -657,7 +688,11 @@ fun ExpenseListScreen(
 
             if (showInfoDialog && selectedExpense != null) {
                 AlertDialog(
-                    onDismissRequest = { showInfoDialog = false },
+                    onDismissRequest = {
+                        showInfoDialog = false
+                        selectedExpense = null
+                        expenseImageBitmap = null
+                    },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .clip(RoundedCornerShape(16.dp)),
@@ -684,38 +719,38 @@ fun ExpenseListScreen(
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = categoryColors[selectedExpense!!.category] ?: Color.Gray,
+                                color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Column(
                                 modifier = Modifier.verticalScroll(rememberScrollState())
                             ) {
                                 Text(
-                                    text = "Description: ${selectedExpense!!.description}",
+                                    text = "Comments: ${selectedExpense?.comments ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                                 Text(
-                                    text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
+                                    text = "Amount: ₱${numberFormat.format(selectedExpense?.amount ?: 0.0)}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                                 Text(
-                                    text = "Category: ${selectedExpense!!.category}",
+                                    text = "Category: ${selectedExpense?.category ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                                 Text(
-                                    text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
+                                    text = "Date of Transaction: ${selectedExpense?.dateOfTransaction ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                                 Text(
-                                    text = "Date Added: ${selectedExpense!!.dateAdded}",
+                                    text = "Created At: ${selectedExpense?.createdAt ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -723,12 +758,16 @@ fun ExpenseListScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             TextButton(
-                                onClick = { showInfoDialog = false },
+                                onClick = {
+                                    showInfoDialog = false
+                                    selectedExpense = null
+                                    expenseImageBitmap = null
+                                },
                                 modifier = Modifier.align(Alignment.End)
                             ) {
                                 Text(
                                     text = "Close",
-                                    color = categoryColors[selectedExpense!!.category] ?: Color.Gray
+                                    color = categoryColors[selectedExpense?.category] ?: Color.Gray
                                 )
                             }
                         }
@@ -738,7 +777,10 @@ fun ExpenseListScreen(
 
             if (showFullScreenImage) {
                 AlertDialog(
-                    onDismissRequest = { showFullScreenImage = false },
+                    onDismissRequest = {
+                        showFullScreenImage = false
+                        expenseImageBitmap = null
+                    },
                     modifier = Modifier.fillMaxSize(),
                     properties = DialogProperties(usePlatformDefaultWidth = false)
                 ) {
@@ -767,7 +809,7 @@ fun ExpenseListScreen(
                                     ),
                                 contentScale = ContentScale.Fit
                             )
-                        } ?: selectedExpense?.photoUri?.let { uri ->
+                        } ?: selectedExpense?.imagePath?.let { uri ->
                             AsyncImage(
                                 model = uri,
                                 contentDescription = "Full screen receipt photo",
@@ -780,7 +822,15 @@ fun ExpenseListScreen(
                                         MaterialTheme.colorScheme.primary,
                                         RoundedCornerShape(12.dp)
                                     ),
-                                contentScale = ContentScale.Fit
+                                contentScale = ContentScale.Fit,
+                                onError = {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Failed to load full screen image",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
                             )
                         } ?: Text(
                             text = "No image available",
@@ -788,7 +838,10 @@ fun ExpenseListScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         IconButton(
-                            onClick = { showFullScreenImage = false },
+                            onClick = {
+                                showFullScreenImage = false
+                                expenseImageBitmap = null
+                            },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(16.dp)

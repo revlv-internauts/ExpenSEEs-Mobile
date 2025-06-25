@@ -1,8 +1,10 @@
 package com.example.expensees.screens
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,7 +35,10 @@ import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
 import java.text.NumberFormat
 import java.util.Locale
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
+@RequiresApi(Build.VERSION_CODES.O)
 @SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,17 +57,16 @@ fun LiquidationReport(
         minimumFractionDigits = 2
         maximumFractionDigits = 2
     }
-    // Store all generated reports
+    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     val generatedReports = remember { mutableStateListOf<String>() }
     var showReportDialog by remember { mutableStateOf(false) }
     var reportContent by remember { mutableStateOf("") }
     var showAllReportsDialog by remember { mutableStateOf(false) }
 
-    // Define status colors
     val statusColors = mapOf(
-        BudgetStatus.PENDING to Color(0xFFFFCA28), // Amber
-        BudgetStatus.APPROVED to Color(0xFF4CAF50), // Green
-        BudgetStatus.DENIED to Color(0xFFF44336) // Red
+        BudgetStatus.PENDING to Color(0xFFFFCA28),
+        BudgetStatus.APPROVED to Color(0xFF4CAF50),
+        BudgetStatus.DENIED to Color(0xFFF44336)
     )
 
     val textColors = mapOf(
@@ -75,11 +79,10 @@ fun LiquidationReport(
         return submittedBudgets.sumOf { budget ->
             budget.expenses.withIndex().sumOf { (index, expense) ->
                 val budgetedAmount = expense.quantity * expense.amountPerUnit
-                // Only apply selectedExpensesMap for the selected budget
                 val actualExpenseTotal = if (budget == selectedBudget) {
                     selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
                 } else {
-                    0.0 // No receipts selected for non-selected budgets
+                    0.0
                 }
                 budgetedAmount - actualExpenseTotal
             }
@@ -399,7 +402,7 @@ fun LiquidationReport(
                                                     horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
                                                     Text(
-                                                        text = selected.description,
+                                                        text = selected.comments ?: "No comments",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )
@@ -497,7 +500,7 @@ fun LiquidationReport(
                                         if (selectedExpenses.isNotEmpty()) {
                                             reportBuilder.append("- **Uploaded Receipts**:\n")
                                             selectedExpenses.forEach { selected ->
-                                                reportBuilder.append("  - ${selected.description}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction})\n")
+                                                reportBuilder.append("  - ${selected.comments ?: "No comments"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
                                             }
                                         }
                                     }
@@ -614,7 +617,7 @@ fun LiquidationReport(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = expense.description,
+                                                        text = expense.comments ?: "No comments",
                                                         style = MaterialTheme.typography.bodyLarge,
                                                         color = if (isUsed && !(checkedExpenses[expense] ?: false))
                                                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -699,7 +702,7 @@ fun LiquidationReport(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = reportContent,
+                            text = reportContent as String,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -742,7 +745,6 @@ fun LiquidationReport(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
-                                    // Extract budget name from report for title
                                     val budgetName = report.substringAfter("# Liquidation Report: ").substringBefore("\n").trim()
                                     Text(
                                         text = "Report: $budgetName",
@@ -753,7 +755,7 @@ fun LiquidationReport(
                                         modifier = Modifier.padding(bottom = 8.dp)
                                     )
                                     Text(
-                                        text = report,
+                                        text = report as String,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )

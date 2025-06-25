@@ -8,14 +8,17 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -51,7 +54,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    expenses: List<Expense>,
+    expenses: SnapshotStateList<Expense>,
     navController: NavController,
     onRecordExpensesClick: () -> Unit = {},
     onListExpensesClick: () -> Unit = {},
@@ -64,7 +67,7 @@ fun HomeScreen(
     }
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
-        "Rent", "Parking", "Electronic Supplies", "Other Expenses", "Grocery"
+        "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
 
     val totalExpenses = expenses.sumOf { it.amount }
@@ -82,8 +85,6 @@ fun HomeScreen(
     var showExpenseDialog by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    val transactionsForCategory = expenses.filter { it.category == selectedCategory }
-
     var showFullScreenImage by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
@@ -248,6 +249,15 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(
+                    onClick = { scope.launch { drawerState.open() } }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open drawer",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Text(
                 text = "Welcome to ExpenSEEs!",
@@ -701,6 +711,7 @@ fun HomeScreen(
                                 )
                             }
                         }
+                        val transactionsForCategory = expenses.filter { it.category == selectedCategory }
                         if (transactionsForCategory.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -739,7 +750,7 @@ fun HomeScreen(
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
                         <style>
                             html, body {
                                 margin: 0;
@@ -763,7 +774,7 @@ fun HomeScreen(
                                 type: 'bar',
                                 data: {
                                     labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                    "'${expense.description.replace("'", "\\'")}'"
+                                                    "'${expense.comments.replace("'", "\\'")}'"
                                                 }.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
@@ -871,7 +882,7 @@ fun HomeScreen(
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
-                                                expense.photoUri?.let { uri ->
+                                                expense.imagePath?.let { uri ->
                                                     try {
                                                         expenseImageBitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                                     } catch (e: Exception) {
@@ -879,8 +890,8 @@ fun HomeScreen(
                                                         Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
-                                                selectedImageUri = expense.photoUri
-                                                showFullScreenImage = true
+                                                selectedImageUri = expense.imagePath
+                                                showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
                                             containerColor = MaterialTheme.colorScheme.surface
@@ -896,7 +907,7 @@ fun HomeScreen(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = expense.description,
+                                                    text = expense.comments,
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     fontWeight = FontWeight.Medium
@@ -946,15 +957,17 @@ fun HomeScreen(
                 onDismissRequest = {
                     showExpenseDialog = false
                     selectedTransaction = null
+                    expenseImageBitmap = null
+                    selectedImageUri = null
                 },
-                title = { Text("${selectedTransaction!!.category} Receipt") },
+                title = { Text("${selectedTransaction?.category ?: ""} Receipt") },
                 text = {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                     ) {
-                        selectedTransaction!!.photoUri?.let { uri ->
+                        selectedImageUri?.let { uri ->
                             val bitmap = try {
                                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                             } catch (e: Exception) {
@@ -963,7 +976,7 @@ fun HomeScreen(
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
-                                    contentDescription = "${selectedTransaction!!.category} receipt",
+                                    contentDescription = "${selectedTransaction?.category ?: ""} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
@@ -976,13 +989,13 @@ fun HomeScreen(
                                 )
                             } ?: Text(
                                 text = "No receipt photo available",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         } ?: Text(
                             text = "No receipt photo available",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -993,6 +1006,8 @@ fun HomeScreen(
                         onClick = {
                             showExpenseDialog = false
                             selectedTransaction = null
+                            expenseImageBitmap = null
+                            selectedImageUri = null
                         }
                     ) {
                         Text("Close")
@@ -1022,33 +1037,33 @@ fun HomeScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "Category: ${selectedTransaction!!.category}",
+                            text = "Category: ${selectedTransaction?.category ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Amount: ₱${numberFormat.format(selectedTransaction!!.amount)}",
+                            text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0)}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Date of Transaction: ${selectedTransaction!!.dateOfTransaction}",
+                            text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Date Added: ${selectedTransaction!!.dateAdded}",
+                            text = "Created At: ${selectedTransaction?.createdAt ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Remarks: ${selectedTransaction!!.description}",
+                            text = "Comments: ${selectedTransaction?.comments ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
@@ -1121,32 +1136,5 @@ fun HomeScreen(
                 }
             )
         }
-    }
-}
-
-@Composable
-fun HomeButton(text: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clickable(onClick = onClick)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary
-                    )
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onPrimary,
-            style = MaterialTheme.typography.titleMedium
-        )
     }
 }

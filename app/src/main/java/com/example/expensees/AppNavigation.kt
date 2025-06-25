@@ -13,12 +13,13 @@ import com.example.expensees.models.Expense
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.screens.*
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository) {
     val navController = rememberNavController()
-    val expenses = remember { mutableStateListOf<Expense>() }
     val submittedBudgets = remember { mutableStateListOf<SubmittedBudget>() }
 
     NavHost(navController = navController, startDestination = "loading") {
@@ -40,9 +41,9 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         }
         composable("home") {
             HomeScreen(
-                expenses = expenses, // Ensure this is non-null
+                expenses = authRepository.userExpenses,
                 navController = navController,
-                onRecordExpensesClick = { navController.navigate("record_expense") },
+                onRecordExpensesClick = { navController.navigate("record_expenses") },
                 onListExpensesClick = { navController.navigate("list_expenses") },
                 onLogoutClick = {
                     authRepository.logout()
@@ -55,25 +56,34 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         composable("record_expenses") {
             RecordExpensesScreen(
                 navController = navController,
-                expenses = expenses,
+                authRepository = authRepository,
                 onLogoutClick = {
+                    authRepository.logout()
                     navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
+                        popUpTo("record_expenses") { inclusive = true }
                     }
                 },
                 modifier = modifier
             )
         }
         composable("list_expenses") {
+            val scope = rememberCoroutineScope()
             ExpenseListScreen(
                 navController = navController,
-                expenses = expenses,
+                expenses = authRepository.userExpenses,
                 onDeleteExpenses = { expensesToDelete ->
-                    expenses.removeAll(expensesToDelete)
+                    scope.launch {
+                        try {
+                            authRepository.deleteExpenses(expensesToDelete)
+                        } catch (e: Exception) {
+                            // Optionally, handle errors here (e.g., log or notify UI via Snackbar in ExpenseListScreen)
+                        }
+                    }
                 },
                 onLogoutClick = {
+                    authRepository.logout()
                     navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
+                        popUpTo("list_expenses") { inclusive = true }
                     }
                 },
                 modifier = modifier
@@ -89,7 +99,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         composable("liquidation_report") {
             LiquidationReport(
                 submittedBudgets = submittedBudgets,
-                expenses = expenses,
+                expenses = authRepository.userExpenses,
                 navController = navController,
                 modifier = modifier
             )

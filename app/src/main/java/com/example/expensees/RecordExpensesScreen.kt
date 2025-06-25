@@ -1,4 +1,3 @@
-
 package com.example.expensees.screens
 
 import android.Manifest
@@ -20,6 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,34 +43,27 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.expensees.models.Expense
+import com.example.expensees.network.AuthRepository
 import com.example.expensees.utils.createImageUri
 import java.text.SimpleDateFormat
 import java.util.*
 import android.app.DatePickerDialog
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordExpensesScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    expenses: MutableList<Expense>,
+    authRepository: AuthRepository,
     onLogoutClick: () -> Unit = {}
 ) {
-    var description by remember { mutableStateOf("") }
+    var comments by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var dateOfTransaction by remember { mutableStateOf("") }
@@ -95,6 +90,7 @@ fun RecordExpensesScreen(
         "Other Expenses"
     )
     val context = LocalContext.current
+    val scope = rememberCoroutineScope() // Added for coroutine handling
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
@@ -226,14 +222,14 @@ fun RecordExpensesScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "${selectedExpense!!.category} Receipt",
+                        text = "${selectedExpense?.category ?: ""} Receipt",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    selectedExpense!!.photoUri?.let { uri ->
+                    selectedExpense?.imagePath?.let { uri ->
                         val bitmap = try {
                             BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                         } catch (e: Exception) {
@@ -242,7 +238,7 @@ fun RecordExpensesScreen(
                         bitmap?.let {
                             Image(
                                 bitmap = it.asImageBitmap(),
-                                contentDescription = "${selectedExpense!!.category} receipt",
+                                contentDescription = "${selectedExpense?.category ?: ""} receipt",
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(200.dp)
@@ -272,7 +268,7 @@ fun RecordExpensesScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Description: ${selectedExpense!!.description}",
+                        text = "Comments: ${selectedExpense?.comments ?: ""}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -346,31 +342,31 @@ fun RecordExpensesScreen(
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "Description: ${selectedExpense!!.description}",
+                            text = "Comments: ${selectedExpense?.comments ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Amount: ₱${String.format("%.2f", selectedExpense!!.amount)}",
+                            text = "Amount: ₱${String.format("%.2f", selectedExpense?.amount ?: 0.0)}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Category: ${selectedExpense!!.category}",
+                            text = "Category: ${selectedExpense?.category ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Date of Transaction: ${selectedExpense!!.dateOfTransaction}",
+                            text = "Date of Transaction: ${selectedExpense?.dateOfTransaction ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Date Added: ${selectedExpense!!.dateAdded}",
+                            text = "Created At: ${selectedExpense?.createdAt ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -421,7 +417,7 @@ fun RecordExpensesScreen(
                             ),
                         contentScale = ContentScale.Fit
                     )
-                } ?: selectedExpense?.photoUri?.let { uri ->
+                } ?: selectedExpense?.imagePath?.let { uri ->
                     AsyncImage(
                         model = uri,
                         contentDescription = "Full screen expense photo",
@@ -537,7 +533,6 @@ fun RecordExpensesScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
-        val interactionSource = remember { MutableInteractionSource() }
         OutlinedTextField(
             value = dateOfTransaction,
             onValueChange = { },
@@ -546,7 +541,6 @@ fun RecordExpensesScreen(
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
             readOnly = true,
-            interactionSource = interactionSource,
             trailingIcon = {
                 IconButton(onClick = { datePickerDialog.show() }) {
                     Icon(
@@ -557,18 +551,11 @@ fun RecordExpensesScreen(
                 }
             }
         )
-        LaunchedEffect(interactionSource) {
-            interactionSource.interactions.collect { interaction ->
-                if (interaction is PressInteraction.Release) {
-                    datePickerDialog.show()
-                }
-            }
-        }
 
         OutlinedTextField(
-            value = description,
-            onValueChange = { description = it },
-            label = { Text("Remarks") },
+            value = comments,
+            onValueChange = { comments = it },
+            label = { Text("Comments") },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
@@ -678,27 +665,33 @@ fun RecordExpensesScreen(
 
         Button(
             onClick = {
-                if (description.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
+                if (comments.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
                     val amountValue = amount.toDoubleOrNull()
                     if (amountValue != null) {
                         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-                        expenses.add(
-                            Expense(
-                                description = description,
-                                amount = amountValue,
-                                category = category,
-                                photoUri = selectedImageUri,
-                                dateOfTransaction = dateOfTransaction,
-                                dateAdded = timestamp
-                            )
+                        val newExpense = Expense(
+                            id = null,
+                            category = category,
+                            amount = amountValue,
+                            dateOfTransaction = dateOfTransaction,
+                            comments = comments,
+                            imagePath = selectedImageUri,
+                            createdAt = timestamp
                         )
-                        description = ""
-                        amount = ""
-                        category = ""
-                        dateOfTransaction = ""
-                        selectedImageBitmap = null
-                        selectedImageUri = null
-                        Toast.makeText(context, "Expense added", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            try {
+                                authRepository.addExpense(newExpense)
+                                comments = ""
+                                amount = ""
+                                category = ""
+                                dateOfTransaction = ""
+                                selectedImageBitmap = null
+                                selectedImageUri = null
+                                Toast.makeText(context, "Expense added", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     } else {
                         Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
                     }
@@ -735,9 +728,9 @@ fun RecordExpensesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-            items(expenses.sortedByDescending {
+            items(authRepository.userExpenses.sortedByDescending {
                 try {
-                    dateFormat.parse(it.dateAdded) ?: Date(0)
+                    dateFormat.parse(it.createdAt) ?: Date(0)
                 } catch (e: Exception) {
                     Date(0)
                 }
@@ -769,7 +762,7 @@ fun RecordExpensesScreen(
                                 .fillMaxWidth()
                         ) {
                             Text(
-                                text = expense.description,
+                                text = expense.comments,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,

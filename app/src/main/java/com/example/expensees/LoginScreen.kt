@@ -206,11 +206,13 @@ fun LoginScreen(
                                 usernameOrEmail.isBlank() -> errorMessage = "Please enter a username or email"
                                 password.isBlank() -> errorMessage = "Please enter a password"
                                 password.length < 6 -> errorMessage = "Password must be at least 6 characters"
+                                !usernameOrEmail.contains("@") && usernameOrEmail.length < 3 -> errorMessage = "Username must be at least 3 characters"
+                                usernameOrEmail.contains("@") && !usernameOrEmail.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) -> errorMessage = "Please enter a valid email"
                                 else -> {
                                     isLoading = true
                                     errorMessage = null
                                     coroutineScope.launch {
-                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail', password: [hidden]")
+                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail'")
                                         val result = authRepository.login(usernameOrEmail, password)
                                         isLoading = false
                                         result.onSuccess {
@@ -219,8 +221,12 @@ fun LoginScreen(
                                                 popUpTo("login") { inclusive = true }
                                             }
                                         }.onFailure { e ->
-                                            Log.e("LoginScreen", "Login failed: ${e.message}")
-                                            errorMessage = e.message ?: "Invalid username or password"
+                                            Log.e("LoginScreen", "Login failed: ${e.message}", e)
+                                            errorMessage = when (e.message) {
+                                                "Invalid credentials" -> "Incorrect username/email or password"
+                                                "No internet connection" -> "No internet connection. Please check your network"
+                                                else -> e.message ?: "Login failed. Please try again"
+                                            }
                                         }
                                     }
                                 }
