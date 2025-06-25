@@ -12,7 +12,7 @@ interface ApiService {
     suspend fun signIn(@Body credentials: SignInRequest): Response<SignInResponse>
 
     @Multipart
-    @POST("expenses")
+    @POST("api/expenses")
     suspend fun addExpense(
         @Header("Authorization") token: String,
         @Part("category") category: RequestBody,

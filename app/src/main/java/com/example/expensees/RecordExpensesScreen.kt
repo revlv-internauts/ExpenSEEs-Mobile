@@ -48,11 +48,14 @@ import com.example.expensees.utils.createImageUri
 import java.text.SimpleDateFormat
 import java.util.*
 import android.app.DatePickerDialog
+import android.util.Log
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.google.gson.Gson
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -668,34 +671,68 @@ fun RecordExpensesScreen(
                 if (comments.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
                     val amountValue = amount.toDoubleOrNull()
                     if (amountValue != null) {
-                        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                        if (!authRepository.isAuthenticated()) {
+                            Log.d("RecordExpensesScreen", "Not authenticated, navigating to login")
+                            Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
+                            authRepository.logout()
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            }
+                            return@Button
+                        }
+                        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                            timeZone = TimeZone.getTimeZone("UTC")
+                        }.format(Date())
                         val newExpense = Expense(
                             id = null,
                             category = category,
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
                             comments = comments,
-                            imagePath = selectedImageUri,
+                            imagePath = null, // Temporarily disable image to test
                             createdAt = timestamp
                         )
                         scope.launch {
                             try {
-                                authRepository.addExpense(newExpense)
-                                comments = ""
-                                amount = ""
-                                category = ""
-                                dateOfTransaction = ""
-                                selectedImageBitmap = null
-                                selectedImageUri = null
-                                Toast.makeText(context, "Expense added", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                if (e.message?.contains("Unauthorized") == true) {
-                                    Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
-                                    authRepository.logout()
-                                    onLogoutClick()
-                                } else {
-                                    Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}")
+                                val result = authRepository.addExpense(newExpense)
+                                result.onSuccess { returnedExpense ->
+                                    Log.d("RecordExpensesScreen", "Expense added: id=${returnedExpense.id}, expense=${Gson().toJson(returnedExpense)}")
+                                    comments = ""
+                                    amount = ""
+                                    category = ""
+                                    dateOfTransaction = ""
+                                    selectedImageBitmap = null
+                                    selectedImageUri = null
+                                    Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
+                                }.onFailure { e ->
+                                    Log.e("RecordExpensesScreen", "Failed to add expense: ${e.message}", e)
+                                    when {
+                                        e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
+                                            Log.d("RecordExpensesScreen", "Authentication error, logging out")
+                                            Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
+                                            authRepository.logout()
+                                            navController.navigate("login") {
+                                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                            }
+                                        }
+                                        e.message?.contains("Invalid expense data") == true || e.message?.contains("Validation error") == true -> {
+                                            Toast.makeText(context, "Invalid data: check fields (e.g., date format) and try again", Toast.LENGTH_LONG).show()
+                                        }
+                                        e.message?.contains("missing ID") == true -> {
+                                            Toast.makeText(context, "Expense not saved on server, please try again", Toast.LENGTH_LONG).show()
+                                        }
+                                        e.message?.contains("No internet connection") == true -> {
+                                            Toast.makeText(context, "No internet connection, please check your network", Toast.LENGTH_LONG).show()
+                                        }
+                                        else -> {
+                                            Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
                                 }
+                            } catch (e: Exception) {
+                                Log.e("RecordExpensesScreen", "Unexpected error: ${e.message}", e)
+                                Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
                     } else {
