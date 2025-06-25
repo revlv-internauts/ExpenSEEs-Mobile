@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -742,7 +743,7 @@ fun HomeScreen(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
                                         settings.javaScriptEnabled = true
-                                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                        setBackgroundColor(Color.Transparent.toArgb())
                                         try {
                                             loadDataWithBaseURL(
                                                 null,
@@ -774,11 +775,11 @@ fun HomeScreen(
                                 type: 'bar',
                                 data: {
                                     labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                    "'${expense.comments.replace("'", "\\'")}'"
+                                                    "'${(expense.comments ?: "").replace("'", "\\'")}'"
                                                 }.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
-                                        backgroundColor: [${transactionColors.joinToString { "'$it'" }}],
+                                        backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
                                         borderColor: '#FFFFFF',
                                         borderWidth: 1
                                     }]
@@ -907,14 +908,16 @@ fun HomeScreen(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = expense.comments,
+                                                    text = expense.comments ?: "",
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     color = MaterialTheme.colorScheme.onSurface,
-                                                    fontWeight = FontWeight.Medium
+                                                    fontWeight = FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                                 Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
-                                                    text = expense.dateOfTransaction,
+                                                    text = expense.dateOfTransaction ?: "",
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )

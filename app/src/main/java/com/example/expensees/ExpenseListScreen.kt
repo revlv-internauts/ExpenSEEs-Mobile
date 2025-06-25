@@ -248,247 +248,192 @@ fun ExpenseListScreen(
                     lazyListState.animateScrollToItem(index)
                 }
 
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    state = lazyListState,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsIndexed((0 until daysInMonth).toList()) { _, index ->
-                        val date = startDate.plusDays(index.toLong())
-                        val isSelected = date == selectedDate
-                        Surface(
-                            modifier = Modifier
-                                .width(60.dp)
-                                .height(60.dp)
-                                .clickable { selectedDate = date },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = date.format(DateTimeFormatter.ofPattern("E")).take(3),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = date.format(DateTimeFormatter.ofPattern("d")),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
+                    itemsIndexed(filteredExpenses) { index, expense ->
+                        val categoryIndex = filteredExpenses
+                            .filter { it.category == expense.category }
+                            .indexOfFirst { it == expense }
+                        val baseColor = categoryColors[expense.category] ?: Color.Gray
+                        val shade = categoryShades[expense.category]?.getOrNull(categoryIndex) ?: baseColor
+                        val isSelected = expense in selectedExpenses
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val scale by animateFloatAsState(
+                            targetValue = if (isPressed || isSelected) 1.05f else 1f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        )
+                        val elevation by animateDpAsState(
+                            targetValue = if (isPressed || isSelected) 12.dp else 6.dp,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        )
 
-                // Content area with LazyColumn
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    if (filteredExpenses.isEmpty()) {
-                        Text(
-                            text = "No expenses recorded for ${selectedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                .scale(scale)
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null
+                                ) {
+                                    selectedExpense = expense
+                                    showExpenseDialog = true
+                                }
+                                .graphicsLayer {
+                                    shadowElevation = elevation.toPx()
+                                    spotShadowColor = shade.copy(alpha = 0.5f)
+                                    ambientShadowColor = shade.copy(alpha = 0.3f)
+                                    clip = true
+                                    shape = RoundedCornerShape(16.dp)
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            itemsIndexed(filteredExpenses) { index, expense ->
-                                val categoryIndex = filteredExpenses
-                                    .filter { it.category == expense.category }
-                                    .indexOfFirst { it == expense }
-                                val baseColor = categoryColors[expense.category] ?: Color.Gray
-                                val shade = categoryShades[expense.category]?.getOrNull(categoryIndex) ?: baseColor
-                                val isSelected = expense in selectedExpenses
-                                val interactionSource = remember { MutableInteractionSource() }
-                                val isPressed by interactionSource.collectIsPressedAsState()
-                                val scale by animateFloatAsState(
-                                    targetValue = if (isPressed || isSelected) 1.05f else 1f,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                                val elevation by animateDpAsState(
-                                    targetValue = if (isPressed || isSelected) 12.dp else 6.dp,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-
-                                Card(
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                shade.copy(alpha = 0.8f),
+                                                shade.copy(alpha = 0.4f)
+                                            ),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                        )
+                                    )
+                                    .border(
+                                        2.dp,
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                shade,
+                                                shade.copy(alpha = 0.5f)
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .then(
+                                        if (isSelected) Modifier.background(
+                                            color = Color.White.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(16.dp)
+                                        ) else Modifier
+                                    )
+                            ) {
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .scale(scale)
-                                        .clickable(
-                                            interactionSource = interactionSource,
-                                            indication = null
-                                        ) {
-                                            selectedExpense = expense
-                                            showExpenseDialog = true
-                                        }
-                                        .graphicsLayer {
-                                            shadowElevation = elevation.toPx()
-                                            spotShadowColor = shade.copy(alpha = 0.5f)
-                                            ambientShadowColor = shade.copy(alpha = 0.3f)
-                                            clip = true
-                                            shape = RoundedCornerShape(16.dp)
-                                        },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = Color.Transparent
-                                    ),
-                                    shape = RoundedCornerShape(16.dp)
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
+                                    // Animated Checkbox
+                                    val checkboxScale by animateFloatAsState(
+                                        targetValue = if (isSelected) 1.2f else 1f,
+                                        animationSpec = tween(durationMillis = 200)
+                                    )
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            selectedExpenses = if (checked) {
+                                                selectedExpenses + expense
+                                            } else {
+                                                selectedExpenses - expense
+                                            }
+                                        },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = shade,
+                                            uncheckedColor = shade.copy(alpha = 0.5f),
+                                            checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        shade.copy(alpha = 0.8f),
-                                                        shade.copy(alpha = 0.4f)
-                                                    ),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                                )
-                                            )
-                                            .border(
-                                                2.dp,
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        shade,
-                                                        shade.copy(alpha = 0.5f)
-                                                    )
-                                                ),
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                            .then(
-                                                if (isSelected) Modifier.background(
-                                                    color = Color.White.copy(alpha = 0.2f),
-                                                    shape = RoundedCornerShape(16.dp)
-                                                ) else Modifier
-                                            )
-                                    ) {
+                                            .scale(checkboxScale)
+                                            .padding(4.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Animated Checkbox
-                                            val checkboxScale by animateFloatAsState(
-                                                targetValue = if (isSelected) 1.2f else 1f,
-                                                animationSpec = tween(durationMillis = 200)
+                                            Icon(
+                                                imageVector = categoryIcons[expense.category] ?: Icons.Default.Category,
+                                                contentDescription = null,
+                                                tint = shade,
+                                                modifier = Modifier.size(20.dp)
                                             )
-                                            Checkbox(
-                                                checked = isSelected,
-                                                onCheckedChange = { checked ->
-                                                    selectedExpenses = if (checked) {
-                                                        selectedExpenses + expense
-                                                    } else {
-                                                        selectedExpenses - expense
-                                                    }
-                                                },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = shade,
-                                                    uncheckedColor = shade.copy(alpha = 0.5f),
-                                                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = expense.category,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = FontWeight.SemiBold
                                                 ),
                                                 modifier = Modifier
-                                                    .scale(checkboxScale)
-                                                    .padding(4.dp)
+                                                    .graphicsLayer {
+                                                        shadowElevation = 4f
+                                                        spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                                                        translationX = 2f
+                                                        translationY = 2f
+                                                    },
+                                                color = shade
                                             )
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = categoryIcons[expense.category] ?: Icons.Default.Category,
-                                                        contentDescription = null,
-                                                        tint = shade,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(
-                                                        text = expense.category,
-                                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            shadow = Shadow(
-                                                                color = Color.Black.copy(alpha = 0.3f),
-                                                                offset = Offset(2f, 2f),
-                                                                blurRadius = 4f
-                                                            )
-                                                        ),
-                                                        color = shade
-                                                    )
-                                                }
-                                                Text(
-                                                    text = expense.comments,
-                                                    style = MaterialTheme.typography.titleMedium.copy(
-                                                        fontWeight = FontWeight.Bold,
-                                                        shadow = Shadow(
-                                                            color = Color.Black.copy(alpha = 0.3f),
-                                                            offset = Offset(2f, 2f),
-                                                            blurRadius = 4f
-                                                        )
-                                                    ),
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                        }
+                                        Text(
+                                            text = expense.comments ?: "",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            modifier = Modifier
+                                                .graphicsLayer {
+                                                    shadowElevation = 4f
+                                                    spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                                                    translationX = 2f
+                                                    translationY = 2f
+                                                },
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "₱${numberFormat.format(expense.amount)}",
+                                            style = MaterialTheme.typography.headlineSmall.copy(
+                                                fontWeight = FontWeight.ExtraBold
+                                            ),
+                                            color = shade
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    expense.imagePath?.let { uri ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .border(
+                                                    2.dp,
+                                                    shade.copy(alpha = 0.7f),
+                                                    RoundedCornerShape(12.dp)
                                                 )
-                                                Text(
-                                                    text = "₱${numberFormat.format(expense.amount)}",
-                                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                                        fontWeight = FontWeight.ExtraBold
+                                        ) {
+                                            AsyncImage(
+                                                model = uri,
+                                                contentDescription = "Expense receipt",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .scale(if (isPressed) 1.1f else 1f)
+                                                    .animateContentSize(
+                                                        animationSpec = tween(200)
                                                     ),
-                                                    color = shade
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            expense.imagePath?.let { uri ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(56.dp)
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .border(
-                                                            2.dp,
-                                                            shade.copy(alpha = 0.7f),
-                                                            RoundedCornerShape(12.dp)
+                                                contentScale = ContentScale.Crop,
+                                                onError = {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            message = "Failed to load receipt image",
+                                                            duration = SnackbarDuration.Short
                                                         )
-                                                ) {
-                                                    AsyncImage(
-                                                        model = uri,
-                                                        contentDescription = "Expense receipt",
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .scale(if (isPressed) 1.1f else 1f)
-                                                            .animateContentSize(
-                                                                animationSpec = tween(200)
-                                                            ),
-                                                        contentScale = ContentScale.Crop,
-                                                        onError = {
-                                                            scope.launch {
-                                                                snackbarHostState.showSnackbar(
-                                                                    message = "Failed to load receipt image",
-                                                                    duration = SnackbarDuration.Short
-                                                                )
-                                                            }
-                                                        }
-                                                    )
+                                                    }
                                                 }
-                                            }
+                                            )
                                         }
                                     }
                                 }

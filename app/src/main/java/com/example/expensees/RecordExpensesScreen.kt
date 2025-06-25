@@ -90,7 +90,7 @@ fun RecordExpensesScreen(
         "Other Expenses"
     )
     val context = LocalContext.current
-    val scope = rememberCoroutineScope() // Added for coroutine handling
+    val scope = rememberCoroutineScope()
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
@@ -689,7 +689,13 @@ fun RecordExpensesScreen(
                                 selectedImageUri = null
                                 Toast.makeText(context, "Expense added", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                if (e.message?.contains("Unauthorized") == true) {
+                                    Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
+                                    authRepository.logout()
+                                    onLogoutClick()
+                                } else {
+                                    Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     } else {
@@ -762,7 +768,7 @@ fun RecordExpensesScreen(
                                 .fillMaxWidth()
                         ) {
                             Text(
-                                text = expense.comments,
+                                text = expense.comments ?: "",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
