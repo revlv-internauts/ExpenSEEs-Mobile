@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 
 @Composable
@@ -42,8 +45,8 @@ fun LoginScreen(
     val coroutineScope = rememberCoroutineScope()
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val context = LocalContext.current
 
-    // Animations
     val alpha by animateFloatAsState(
         targetValue = if (isPressed && !isLoading) 0.85f else 1f,
         animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
@@ -70,7 +73,6 @@ fun LoginScreen(
         label = "gradient_offset"
     )
 
-    // Gradient background
     val gradientBrush = Brush.linearGradient(
         colors = listOf(
             MaterialTheme.colorScheme.primary,
@@ -212,11 +214,16 @@ fun LoginScreen(
                                     isLoading = true
                                     errorMessage = null
                                     coroutineScope.launch {
-                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail'")
+                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail', coroutineContext=${currentCoroutineContext()}")
                                         val result = authRepository.login(usernameOrEmail, password)
                                         isLoading = false
                                         result.onSuccess {
-                                            Log.d("LoginScreen", "Login successful, navigating to home")
+                                            val refreshToken = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                                                .getString("refresh_token", null)
+                                            Log.d(
+                                                "LoginScreen",
+                                                "Login successful, refreshToken=${refreshToken?.take(10) ?: "null"}... (length=${refreshToken?.length ?: 0})"
+                                            )
                                             navController.navigate("home") {
                                                 popUpTo("login") { inclusive = true }
                                             }
@@ -225,6 +232,7 @@ fun LoginScreen(
                                             errorMessage = when (e.message) {
                                                 "Invalid credentials" -> "Incorrect username/email or password"
                                                 "No internet connection" -> "No internet connection. Please check your network"
+                                                "Invalid login response: token or userId is missing" -> "Server error: Invalid response. Please try again."
                                                 else -> e.message ?: "Login failed. Please try again"
                                             }
                                         }

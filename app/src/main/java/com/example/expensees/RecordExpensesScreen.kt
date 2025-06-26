@@ -54,6 +54,7 @@ import com.example.expensees.models.Expense
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.utils.createImageUri
 import com.google.gson.Gson
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -80,6 +81,8 @@ fun RecordExpensesScreen(
     var showFullScreenImage by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var showAuthErrorDialog by remember { mutableStateOf(false) }
+    var pendingExpense by remember { mutableStateOf<Expense?>(null) }
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
@@ -105,6 +108,7 @@ fun RecordExpensesScreen(
             selectedImageBitmap = try {
                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(selectedImageUri!!))
             } catch (e: Exception) {
+                Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
                 null
             }
         }
@@ -116,6 +120,7 @@ fun RecordExpensesScreen(
             selectedImageBitmap = try {
                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
             } catch (e: Exception) {
+                Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
                 null
             }
         }
@@ -190,6 +195,32 @@ fun RecordExpensesScreen(
         )
     }
 
+    if (showAuthErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthErrorDialog = false },
+            title = { Text("Authentication Error") },
+            text = { Text("Your session has expired or is invalid. The expense has been saved locally. Please log in again to sync it with the server.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAuthErrorDialog = false
+                        authRepository.logout()
+                        navController.navigate("login") {
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Log In")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthErrorDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showExpenseDialog && selectedExpense != null) {
         AlertDialog(
             onDismissRequest = {
@@ -226,6 +257,7 @@ fun RecordExpensesScreen(
                         val bitmap = try {
                             BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                         } catch (e: Exception) {
+                            Log.e("RecordExpensesScreen", "Failed to load receipt image: ${e.message}", e)
                             null
                         }
                         bitmap?.let {
@@ -257,10 +289,12 @@ fun RecordExpensesScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "remarks: ${selectedExpense?.remarks ?: ""}",
+                        text = "Remarks: ${selectedExpense?.remarks ?: ""}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -310,9 +344,11 @@ fun RecordExpensesScreen(
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         Text(
-                            text = "remarks: ${selectedExpense?.remarks ?: ""}",
+                            text = "Remarks: ${selectedExpense?.remarks ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -412,6 +448,47 @@ fun RecordExpensesScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (authRepository.isAuthenticated()) {
+            scope.launch {
+                Log.d("RecordExpensesScreen", "Checking for local expenses to sync in coroutineContext=${currentCoroutineContext()}")
+                val syncResult = authRepository.syncLocalExpenses()
+                syncResult.onSuccess {
+                    Log.d("RecordExpensesScreen", "Local expenses synced successfully")
+                    if (pendingExpense != null) {
+                        Log.d("RecordExpensesScreen", "Retrying pending expense: ${Gson().toJson(pendingExpense)}")
+                        val result = authRepository.addExpense(pendingExpense!!)
+                        result.onSuccess { returnedExpense ->
+                            Log.d("RecordExpensesScreen", "Pending expense added: expenseId=${returnedExpense.expenseId}")
+                            if (returnedExpense.expenseId?.startsWith("local_") == true) {
+                                pendingExpense = null
+                            }
+                            Toast.makeText(context, "Expense synced successfully", Toast.LENGTH_SHORT).show()
+                        }.onFailure { e ->
+                            Log.e("RecordExpensesScreen", "Failed to sync pending expense: ${e.message}", e)
+                            when {
+                                e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
+                                    showAuthErrorDialog = true
+                                }
+                                e.message?.contains("No internet connection") == true -> {
+                                    Toast.makeText(context, "No internet connection, expense saved locally", Toast.LENGTH_LONG).show()
+                                }
+                                else -> {
+                                    Toast.makeText(context, "Failed to sync expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }.onFailure { e ->
+                    Log.e("RecordExpensesScreen", "Failed to sync local expenses: ${e.message}", e)
+                    Toast.makeText(context, "Failed to sync local expenses: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        } else {
+            Log.d("RecordExpensesScreen", "Not authenticated, skipping sync")
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -506,10 +583,11 @@ fun RecordExpensesScreen(
         OutlinedTextField(
             value = remarks,
             onValueChange = { remarks = it },
-            label = { Text("remarks") },
+            label = { Text("Remarks") },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
+                .padding(bottom = 8.dp),
+            maxLines = 3
         )
 
         Row(
@@ -615,9 +693,24 @@ fun RecordExpensesScreen(
                             imagePath = selectedImageUri,
                             createdAt = timestamp
                         )
+                        if (!authRepository.isAuthenticated()) {
+                            Log.d("RecordExpensesScreen", "Not authenticated, saving locally: ${Gson().toJson(newExpense)}")
+                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                            authRepository.userExpenses.add(localExpense)
+                            pendingExpense = newExpense
+                            Toast.makeText(context, "Expense saved locally. Please log in to sync.", Toast.LENGTH_LONG).show()
+                            showAuthErrorDialog = true
+                            remarks = ""
+                            amount = ""
+                            category = ""
+                            dateOfTransaction = ""
+                            selectedImageBitmap = null
+                            selectedImageUri = null
+                            return@Button
+                        }
                         scope.launch {
                             try {
-                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}")
+                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}, coroutineContext=${currentCoroutineContext()}")
                                 val result = authRepository.addExpense(newExpense)
                                 result.onSuccess { returnedExpense ->
                                     Log.d("RecordExpensesScreen", "Expense added: expenseId=${returnedExpense.expenseId}, expense=${Gson().toJson(returnedExpense)}")
@@ -627,10 +720,25 @@ fun RecordExpensesScreen(
                                     dateOfTransaction = ""
                                     selectedImageBitmap = null
                                     selectedImageUri = null
+                                    pendingExpense = null
                                     Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
                                 }.onFailure { e ->
                                     Log.e("RecordExpensesScreen", "Failed to add expense: ${e.message}", e)
                                     when {
+                                        e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
+                                            Log.d("RecordExpensesScreen", "Authentication error, saving locally: ${Gson().toJson(newExpense)}")
+                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                            authRepository.userExpenses.add(localExpense)
+                                            pendingExpense = newExpense
+                                            Toast.makeText(context, "Expense saved locally. Please log in to sync.", Toast.LENGTH_LONG).show()
+                                            showAuthErrorDialog = true
+                                            remarks = ""
+                                            amount = ""
+                                            category = ""
+                                            dateOfTransaction = ""
+                                            selectedImageBitmap = null
+                                            selectedImageUri = null
+                                        }
                                         e.message?.contains("Invalid expense data") == true || e.message?.contains("Validation error") == true -> {
                                             Toast.makeText(context, "Invalid data: check fields (e.g., date format) and try again", Toast.LENGTH_LONG).show()
                                         }
@@ -638,7 +746,10 @@ fun RecordExpensesScreen(
                                             Toast.makeText(context, "Expense not saved on server, please try again", Toast.LENGTH_LONG).show()
                                         }
                                         e.message?.contains("No internet connection") == true -> {
-                                            Toast.makeText(context, "No internet connection, please check your network", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "No internet connection, expense saved locally", Toast.LENGTH_LONG).show()
+                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                            authRepository.userExpenses.add(localExpense)
+                                            pendingExpense = newExpense
                                         }
                                         else -> {
                                             Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
@@ -684,6 +795,7 @@ fun RecordExpensesScreen(
                 try {
                     dateFormat.parse(it.createdAt) ?: Date(0)
                 } catch (e: Exception) {
+                    Log.e("RecordExpensesScreen", "Failed to parse date: ${it.createdAt}, error: ${e.message}")
                     Date(0)
                 }
             }) { expense ->
@@ -718,9 +830,11 @@ fun RecordExpensesScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = expense.category ?: "", // Added null check
+                                text = "${expense.category ?: ""}${if (expense.expenseId?.startsWith("local_") == true) " (Not Synced)" else ""}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         Spacer(modifier = Modifier.width(16.dp))
@@ -728,7 +842,8 @@ fun RecordExpensesScreen(
                             text = "₱${String.format("%.2f", expense.amount)}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.End,
+                            maxLines = 1
                         )
                     }
                 }
