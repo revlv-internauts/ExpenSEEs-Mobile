@@ -3,6 +3,7 @@ package com.example.expensees.screens
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -34,7 +35,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +52,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -87,7 +88,7 @@ fun HomeScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showFullScreenImage by remember { mutableStateOf(false) }
-    var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var selectedImagePath by remember { mutableStateOf<String?>(null) }
 
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
@@ -884,15 +885,7 @@ fun HomeScreen(
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
-                                                expense.imagePath?.let { uri ->
-                                                    try {
-                                                        expenseImageBitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                                                    } catch (e: Exception) {
-                                                        expenseImageBitmap = null
-                                                        Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                                selectedImageUri = expense.imagePath
+                                                selectedImagePath = expense.imagePath
                                                 showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
@@ -962,121 +955,220 @@ fun HomeScreen(
                     showExpenseDialog = false
                     selectedTransaction = null
                     expenseImageBitmap = null
-                    selectedImageUri = null
+                    selectedImagePath = null
                 },
-                title = { Text(selectedTransaction?.category ?: "Receipt") },
-                text = {
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(12.dp)),
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        selectedImageUri?.let { uri ->
-                            val bitmap = try {
-                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                            } catch (e: Exception) {
-                                null
-                            }
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
+                        Text(
+                            text = "${selectedTransaction?.category ?: "Receipt"}",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        selectedImagePath?.let { imagePath ->
+                            var imageLoadFailed by remember { mutableStateOf(false) }
+                            if (imageLoadFailed) {
+                                Text(
+                                    text = "No receipt photo available",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
+                                val bitmap = try {
+                                    val uri = Uri.parse(imagePath)
+                                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                bitmap?.let {
+                                    Image(
+                                        bitmap = it.asImageBitmap(),
+                                        contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                1.5.dp,
+                                                categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable {
+                                                expenseImageBitmap = it
+                                                showFullScreenImage = true
+                                            },
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } ?: run {
+                                    imageLoadFailed = true
+                                    Text(
+                                        text = "No receipt photo available",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
+                            } else {
+                                AsyncImage(
+                                    model = imagePath,
                                     contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .padding(bottom = 8.dp)
-                                        .clickable {
-                                            expenseImageBitmap = it
-                                            showFullScreenImage = true
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            1.5.dp,
+                                            categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable { showFullScreenImage = true },
+                                    contentScale = ContentScale.Crop,
+                                    onError = {
+                                        imageLoadFailed = true
+                                        scope.launch {
+                                            Toast.makeText(context, "Failed to load receipt image", Toast.LENGTH_SHORT).show()
                                         }
+                                    }
                                 )
-                            } ?: Text(
-                                text = "No receipt photo available",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
+                            }
                         } ?: Text(
                             text = "No receipt photo available",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showExpenseDialog = false
-                            selectedTransaction = null
-                            expenseImageBitmap = null
-                            selectedImageUri = null
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(onClick = { showInfoDialog = true }) {
+                                Text(
+                                    text = "Info",
+                                    color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            TextButton(onClick = {
+                                showExpenseDialog = false
+                                selectedTransaction = null
+                                expenseImageBitmap = null
+                                selectedImagePath = null
+                            }) {
+                                Text(
+                                    text = "Close",
+                                    color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                    ) {
-                        Text("Close")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showInfoDialog = true }
-                    ) {
-                        Text("Info")
                     }
                 }
-            )
+            }
         }
 
         if (showInfoDialog && selectedTransaction != null) {
             AlertDialog(
-                onDismissRequest = { showInfoDialog = false },
-                title = { Text("Expense Details") },
-                text = {
+                onDismissRequest = {
+                    showInfoDialog = false
+                    selectedTransaction = null
+                    expenseImageBitmap = null
+                    selectedImagePath = null
+                },
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(12.dp)),
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
                     ) {
                         Text(
-                            text = "Category: ${selectedTransaction?.category ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            text = "Expense Details",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        Text(
-                            text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0.0)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { showInfoDialog = false }
-                    ) {
-                        Text("Close")
+                        Column(
+                            modifier = Modifier.verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = "Category: ${selectedTransaction?.category ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0.0)}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = {
+                                showInfoDialog = false
+                                selectedTransaction = null
+                                expenseImageBitmap = null
+                                selectedImagePath = null
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text(
+                                text = "Close",
+                                color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
-            )
+            }
         }
         if (showFullScreenImage) {
             AlertDialog(
@@ -1084,56 +1176,112 @@ fun HomeScreen(
                     showFullScreenImage = false
                     selectedTransaction = null
                     expenseImageBitmap = null
-                    selectedImageUri = null
+                    selectedImagePath = null
                 },
                 modifier = Modifier.fillMaxSize(),
-                confirmButton = {
-                    TextButton(onClick = {
-                        showFullScreenImage = false
-                        selectedTransaction = null
-                        expenseImageBitmap = null
-                        selectedImageUri = null
-                    }) {
-                        Text("Close")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showInfoDialog = true
-                    }) {
-                        Text("Info")
-                    }
-                },
-                text = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        expenseImageBitmap?.let { bitmap ->
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "Full screen expense photo",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
+                        .padding(
+                            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    selectedImagePath?.let { imagePath ->
+                        var imageLoadFailed by remember { mutableStateOf(false) }
+                        if (imageLoadFailed) {
+                            Text(
+                                text = "No image available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
                             )
-                        } ?: selectedImageUri?.let { uri ->
+                        } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
+                            val bitmap = try {
+                                val uri = Uri.parse(imagePath)
+                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                            } catch (e: Exception) {
+                                null
+                            }
+                            bitmap?.let {
+                                Image(
+                                    bitmap = it.asImageBitmap(),
+                                    contentDescription = "Full screen expense photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            2.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } ?: run {
+                                imageLoadFailed = true
+                                Text(
+                                    text = "No image available",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        } else {
                             AsyncImage(
-                                model = uri,
+                                model = imagePath,
                                 contentDescription = "Full screen expense photo",
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(12.dp)
+                                    ),
                                 contentScale = ContentScale.Fit,
                                 onError = {
-                                    Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                    imageLoadFailed = true
+                                    scope.launch {
+                                        Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             )
-                        } ?: Text(
-                            text = "No image available",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    } ?: Text(
+                        text = "No image available",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            showFullScreenImage = false
+                            selectedTransaction = null
+                            expenseImageBitmap = null
+                            selectedImagePath = null
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close image",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
-            )
+            }
         }
     }
 }

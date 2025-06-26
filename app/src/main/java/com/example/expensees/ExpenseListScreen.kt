@@ -2,6 +2,7 @@ package com.example.expensees.screens
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateContentSize
@@ -464,28 +465,91 @@ fun ExpenseListScreen(
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    expense.imagePath?.let { uri ->
-                                        Box(
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .border(
-                                                    2.dp,
-                                                    shade.copy(alpha = 0.7f),
-                                                    RoundedCornerShape(12.dp)
+                                    expense.imagePath?.let { imagePath ->
+                                        var imageLoadFailed by remember { mutableStateOf(false) }
+                                        if (imageLoadFailed) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(56.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .border(
+                                                        2.dp,
+                                                        shade.copy(alpha = 0.7f),
+                                                        RoundedCornerShape(12.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "No Image",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = shade,
+                                                    textAlign = TextAlign.Center
                                                 )
-                                        ) {
+                                            }
+                                        } else if (expense.expenseId?.startsWith("local_") == true) {
+                                            val bitmap = try {
+                                                val uri = Uri.parse(imagePath)
+                                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                            if (bitmap != null) {
+                                                Image(
+                                                    bitmap = bitmap.asImageBitmap(),
+                                                    contentDescription = "Expense receipt",
+                                                    modifier = Modifier
+                                                        .size(56.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(
+                                                            2.dp,
+                                                            shade.copy(alpha = 0.7f),
+                                                            RoundedCornerShape(12.dp)
+                                                        )
+                                                        .scale(if (isPressed) 1.1f else 1f)
+                                                        .animateContentSize(
+                                                            animationSpec = tween(200)
+                                                        ),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(56.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(
+                                                            2.dp,
+                                                            shade.copy(alpha = 0.7f),
+                                                            RoundedCornerShape(12.dp)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "No Image",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = shade,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        } else {
                                             AsyncImage(
-                                                model = uri,
+                                                model = imagePath,
                                                 contentDescription = "Expense receipt",
                                                 modifier = Modifier
-                                                    .fillMaxSize()
+                                                    .size(56.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .border(
+                                                        2.dp,
+                                                        shade.copy(alpha = 0.7f),
+                                                        RoundedCornerShape(12.dp)
+                                                    )
                                                     .scale(if (isPressed) 1.1f else 1f)
                                                     .animateContentSize(
                                                         animationSpec = tween(200)
                                                     ),
                                                 contentScale = ContentScale.Crop,
                                                 onError = {
+                                                    imageLoadFailed = true
                                                     scope.launch {
                                                         snackbarHostState.showSnackbar(
                                                             message = "Failed to load receipt image",
@@ -616,15 +680,53 @@ fun ExpenseListScreen(
                                 color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
-                            selectedExpense?.imagePath?.let { uri ->
-                                val bitmap = try {
-                                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                bitmap?.let {
-                                    Image(
-                                        bitmap = it.asImageBitmap(),
+                            selectedExpense?.imagePath?.let { imagePath ->
+                                var imageLoadFailed by remember { mutableStateOf(false) }
+                                if (imageLoadFailed) {
+                                    Text(
+                                        text = "No receipt photo available",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                                    val bitmap = try {
+                                        val uri = Uri.parse(imagePath)
+                                        BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                    bitmap?.let {
+                                        Image(
+                                            bitmap = it.asImageBitmap(),
+                                            contentDescription = "${selectedExpense?.category ?: "Expense"} receipt",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .border(
+                                                    1.5.dp,
+                                                    categoryColors[selectedExpense?.category] ?: Color.Gray,
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .clickable {
+                                                    expenseImageBitmap = it
+                                                    showFullScreenImage = true
+                                                },
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } ?: run {
+                                        imageLoadFailed = true
+                                        Text(
+                                            text = "No receipt photo available",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                    }
+                                } else {
+                                    AsyncImage(
+                                        model = imagePath,
                                         contentDescription = "${selectedExpense?.category ?: "Expense"} receipt",
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -635,18 +737,19 @@ fun ExpenseListScreen(
                                                 categoryColors[selectedExpense?.category] ?: Color.Gray,
                                                 RoundedCornerShape(12.dp)
                                             )
-                                            .clickable {
-                                                expenseImageBitmap = it
-                                                showFullScreenImage = true
-                                            },
-                                        contentScale = ContentScale.Crop
+                                            .clickable { showFullScreenImage = true },
+                                        contentScale = ContentScale.Crop,
+                                        onError = {
+                                            imageLoadFailed = true
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Failed to load receipt image",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                        }
                                     )
-                                } ?: Text(
-                                    text = "No receipt photo available",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
+                                }
                             } ?: Text(
                                 text = "No receipt photo available",
                                 style = MaterialTheme.typography.bodyLarge,
@@ -725,7 +828,7 @@ fun ExpenseListScreen(
                             )
                             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                                 Text(
-                                    text = "remarks: ${selectedExpense?.remarks ?: ""}",
+                                    text = "Remarks: ${selectedExpense?.remarks ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -794,48 +897,76 @@ fun ExpenseListScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        expenseImageBitmap?.let { bitmap ->
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "Full screen receipt photo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(12.dp)
-                                    ),
-                                contentScale = ContentScale.Fit
-                            )
-                        } ?: selectedExpense?.imagePath?.let { uri ->
-                            AsyncImage(
-                                model = uri,
-                                contentDescription = "Full screen receipt photo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(12.dp)
-                                    ),
-                                contentScale = ContentScale.Fit,
-                                onError = {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Failed to load full screen image",
-                                            duration = SnackbarDuration.Short
-                                        )
-                                    }
+                        selectedExpense?.imagePath?.let { imagePath ->
+                            var imageLoadFailed by remember { mutableStateOf(false) }
+                            if (imageLoadFailed) {
+                                Text(
+                                    text = "No image available",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                                val bitmap = try {
+                                    val uri = Uri.parse(imagePath)
+                                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                } catch (e: Exception) {
+                                    null
                                 }
-                            )
+                                bitmap?.let {
+                                    Image(
+                                        bitmap = it.asImageBitmap(),
+                                        contentDescription = "Full screen receipt photo",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(16.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                2.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                RoundedCornerShape(12.dp)
+                                            ),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } ?: run {
+                                    imageLoadFailed = true
+                                    Text(
+                                        text = "No image available",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(16.dp)
+                                    )
+                                }
+                            } else {
+                                AsyncImage(
+                                    model = imagePath,
+                                    contentDescription = "Full screen receipt photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            2.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentScale = ContentScale.Fit,
+                                    onError = {
+                                        imageLoadFailed = true
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Failed to load full screen image",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
+                                    }
+                                )
+                            }
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
                         )
                         IconButton(
                             onClick = {

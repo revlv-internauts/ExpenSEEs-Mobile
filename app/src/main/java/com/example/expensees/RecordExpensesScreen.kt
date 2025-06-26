@@ -253,34 +253,63 @@ fun RecordExpensesScreen(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    selectedExpense?.imagePath?.let { uri ->
-                        val bitmap = try {
-                            BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                        } catch (e: Exception) {
-                            Log.e("RecordExpensesScreen", "Failed to load receipt image: ${e.message}", e)
-                            null
-                        }
-                        bitmap?.let {
-                            Image(
-                                bitmap = it.asImageBitmap(),
-                                contentDescription = "${selectedExpense?.category ?: ""} receipt",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        expenseImageBitmap = it
-                                        showFullScreenImage = true
-                                    },
-                                contentScale = ContentScale.Crop
+                    selectedExpense?.imagePath?.let { imagePath ->
+                        if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                            val bitmap = try {
+                                val uri = Uri.parse(imagePath)
+                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                            } catch (e: Exception) {
+                                Log.e("RecordExpensesScreen", "Failed to load receipt image: ${e.message}, imagePath: $imagePath", e)
+                                null
+                            }
+                            bitmap?.let {
+                                Image(
+                                    bitmap = it.asImageBitmap(),
+                                    contentDescription = "${selectedExpense?.category ?: ""} receipt",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            expenseImageBitmap = it
+                                            showFullScreenImage = true
+                                        },
+                                    contentScale = ContentScale.Crop
+                                )
+                            } ?: Text(
+                                text = "No receipt photo available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
-                        } ?: Text(
-                            text = "No receipt photo available",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        } else {
+                            var imageLoadFailed by remember { mutableStateOf(false) }
+                            if (imageLoadFailed) {
+                                Text(
+                                    text = "No receipt photo available",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = imagePath,
+                                    contentDescription = "${selectedExpense?.category ?: ""} receipt",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                                        .clickable { showFullScreenImage = true },
+                                    contentScale = ContentScale.Crop,
+                                    onError = {
+                                        Log.e("RecordExpensesScreen", "Failed to load server image: ${it.result.throwable.message}")
+                                        imageLoadFailed = true
+                                    }
+                                )
+                            }
+                        }
                     } ?: Text(
                         text = "No receipt photo available",
                         style = MaterialTheme.typography.bodyLarge,
@@ -400,31 +429,72 @@ fun RecordExpensesScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                expenseImageBitmap?.let { bitmap ->
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Full screen expense photo",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                } ?: selectedExpense?.imagePath?.let { uri ->
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = "Full screen expense photo",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit,
-                        onError = {
-                            Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                selectedExpense?.let { expense ->
+                    if (expense.expenseId?.startsWith("local_") == true) {
+                        expense.imagePath?.let { imagePath ->
+                            val bitmap = try {
+                                val uri = Uri.parse(imagePath)
+                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                            } catch (e: Exception) {
+                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePath: $imagePath", e)
+                                null
+                            }
+                            bitmap?.let {
+                                Image(
+                                    bitmap = it.asImageBitmap(),
+                                    contentDescription = "Full screen expense photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } ?: Text(
+                                text = "No image available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        } ?: Text(
+                            text = "No image available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        expense.imagePath?.let { imagePath ->
+                            var imageLoadFailed by remember { mutableStateOf(false) }
+                            if (imageLoadFailed) {
+                                Text(
+                                    text = "No image available",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = imagePath,
+                                    contentDescription = "Full screen expense photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Fit,
+                                    onError = {
+                                        Log.e("RecordExpensesScreen", "Failed to load server full screen image: ${it.result.throwable.message}")
+                                        imageLoadFailed = true
+                                    }
+                                )
+                            }
+                        } ?: Text(
+                            text = "No image available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 } ?: Text(
                     text = "No image available",
                     style = MaterialTheme.typography.bodyLarge,
@@ -451,10 +521,10 @@ fun RecordExpensesScreen(
     LaunchedEffect(Unit) {
         if (authRepository.isAuthenticated()) {
             scope.launch {
-                Log.d("RecordExpensesScreen", "Checking for local expenses to sync in coroutineContext=${currentCoroutineContext()}")
-                val syncResult = authRepository.syncLocalExpenses()
-                syncResult.onSuccess {
-                    Log.d("RecordExpensesScreen", "Local expenses synced successfully")
+                Log.d("RecordExpensesScreen", "Fetching expenses in coroutineContext=${currentCoroutineContext()}")
+                val fetchResult = authRepository.getExpenses()
+                fetchResult.onSuccess {
+                    Log.d("RecordExpensesScreen", "Expenses fetched successfully")
                     if (pendingExpense != null) {
                         Log.d("RecordExpensesScreen", "Retrying pending expense: ${Gson().toJson(pendingExpense)}")
                         val result = authRepository.addExpense(pendingExpense!!)
@@ -480,12 +550,23 @@ fun RecordExpensesScreen(
                         }
                     }
                 }.onFailure { e ->
-                    Log.e("RecordExpensesScreen", "Failed to sync local expenses: ${e.message}", e)
-                    Toast.makeText(context, "Failed to sync local expenses: ${e.message}", Toast.LENGTH_LONG).show()
+                    Log.e("RecordExpensesScreen", "Failed to fetch expenses: ${e.message}", e)
+                    when {
+                        e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
+                            showAuthErrorDialog = true
+                        }
+                        e.message?.contains("No internet connection") == true -> {
+                            Toast.makeText(context, "No internet connection, showing local expenses", Toast.LENGTH_LONG).show()
+                        }
+                        else -> {
+                            Toast.makeText(context, "Failed to fetch expenses: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
             }
         } else {
-            Log.d("RecordExpensesScreen", "Not authenticated, skipping sync")
+            Log.d("RecordExpensesScreen", "Not authenticated, showing local expenses")
+            Toast.makeText(context, "Not logged in, showing local expenses", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -690,7 +771,7 @@ fun RecordExpensesScreen(
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
                             remarks = remarks,
-                            imagePath = selectedImageUri,
+                            imagePath = selectedImageUri?.toString(),
                             createdAt = timestamp
                         )
                         if (!authRepository.isAuthenticated()) {
@@ -793,14 +874,15 @@ fun RecordExpensesScreen(
             val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
             }
-            items(authRepository.userExpenses.sortedByDescending {
+            val sortedExpenses = authRepository.userExpenses.sortedByDescending {
                 try {
                     it.createdAt?.let { createdAt -> dateFormat.parse(createdAt) } ?: Date(0)
                 } catch (e: Exception) {
                     Log.e("RecordExpensesScreen", "Failed to parse date: ${it.createdAt}, error: ${e.message}")
                     Date(0)
                 }
-            }) { expense ->
+            }.take(10)
+            items(sortedExpenses) { expense ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

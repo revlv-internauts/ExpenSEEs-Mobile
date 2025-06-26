@@ -24,11 +24,18 @@ data class SubmittedBudget(
 )
 
 data class Expense(
-    @SerializedName("expenseId") val expenseId: String?,
-    @SerializedName("category") val category: String?,
-    @SerializedName("amount") val amount: Double,
-    @SerializedName("dateOfTransaction") val dateOfTransaction: String?,
-    @SerializedName("remarks") val remarks: String?, // Maps to server’s "remarks"
-    @SerializedName("imagePath") val imagePath: Uri?,
-    @SerializedName("createdAt") val createdAt: String?
+    @SerializedName("expense_id")
+    val expenseId: String?,
+    @SerializedName("category")
+    val category: String?,
+    @SerializedName("amount")
+    val amount: Double,
+    @SerializedName("date_of_transaction")
+    val dateOfTransaction: String?,
+    @SerializedName("remarks")
+    val remarks: String?,
+    @SerializedName("image_path")
+    val imagePath: String?,
+    @SerializedName("created_at")
+    val createdAt: String?
 )

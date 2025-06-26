@@ -26,6 +26,11 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("expenseId") expenseId: String
     ): Response<Unit>
+
+    @GET("api/expenses")
+    suspend fun getExpenses(
+        @Header("Authorization") token: String
+    ): Response<List<Expense>>
 }
 
 data class SignInRequest(
@@ -48,12 +53,11 @@ data class RefreshTokenRequest(
     @SerializedName("refresh_token") val refreshToken: String
 )
 
-// New DTO for JSON request body
 data class ExpenseRequest(
     @SerializedName("category") val category: String,
     @SerializedName("amount") val amount: Double,
     @SerializedName("dateOfTransaction") val dateOfTransaction: String,
     @SerializedName("remarks") val remarks: String?,
     @SerializedName("createdAt") val createdAt: String,
-    @SerializedName("image") val image: String? = null // Base64 string if server supports images
+    @SerializedName("image") val image: String? = null
 )
