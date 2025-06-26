@@ -2,8 +2,6 @@ package com.example.expensees.network
 
 import com.example.expensees.models.Expense
 import com.google.gson.annotations.SerializedName
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -14,25 +12,18 @@ interface ApiService {
     @POST("api/auth/refresh-token")
     suspend fun refreshToken(
         @Body refreshRequest: RefreshTokenRequest,
-        @Header("refresh_token") authHeader: String? = null // Add if required
+        @Header("refresh_token") authHeader: String? = null
     ): Response<SignInResponse>
 
-
-    @Multipart
     @POST("api/expenses")
     suspend fun addExpense(
-        @Header("refresh_token") token: String,
-        @Part("category") category: RequestBody,
-        @Part("amount") amount: RequestBody,
-        @Part("dateOfTransaction") dateOfTransaction: RequestBody,
-        @Part("remarks") remarks: RequestBody?,
-        @Part("createdAt") createdAt: RequestBody,
-        @Part image: MultipartBody.Part?
+        @Header("Authorization") token: String,
+        @Body expense: ExpenseRequest
     ): Response<Expense>
 
     @DELETE("expenses/{expenseId}")
     suspend fun deleteExpense(
-        @Header("refresh_token") token: String,
+        @Header("Authorization") token: String,
         @Path("expenseId") expenseId: String
     ): Response<Unit>
 }
@@ -54,5 +45,15 @@ data class ErrorResponse(
 )
 
 data class RefreshTokenRequest(
-    @SerializedName("refresh_token") val refreshToken: String // Changed from "refreshToken"
+    @SerializedName("refresh_token") val refreshToken: String
+)
+
+// New DTO for JSON request body
+data class ExpenseRequest(
+    @SerializedName("category") val category: String,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("dateOfTransaction") val dateOfTransaction: String,
+    @SerializedName("remarks") val remarks: String?,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("image") val image: String? = null // Base64 string if server supports images
 )
