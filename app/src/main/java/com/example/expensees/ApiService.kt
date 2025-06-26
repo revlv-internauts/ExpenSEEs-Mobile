@@ -7,6 +7,8 @@ import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
+
+
 interface ApiService {
     @POST("api/auth/sign-in")
     suspend fun signIn(@Body credentials: SignInRequest): Response<SignInResponse>
@@ -15,21 +17,20 @@ interface ApiService {
     suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<SignInResponse>
 
     @Multipart
-    @POST("api/expenses")
+    @POST("api/expense")
     suspend fun addExpense(
-        @Header("Authorization") token: String, // Changed from expenseId to Authorization
         @Part("category") category: RequestBody,
         @Part("amount") amount: RequestBody,
         @Part("dateOfTransaction") dateOfTransaction: RequestBody,
-        @Part("remarks") comments: RequestBody?,
+        @Part("remarks") remarks: RequestBody?,
         @Part("createdAt") createdAt: RequestBody,
         @Part image: MultipartBody.Part?
     ): Response<Expense>
 
-    @DELETE("expenses/{expenseId}") // Changed from {id} to {expenseId}
+    @DELETE("expenses/{expenseId}")
     suspend fun deleteExpense(
         @Header("Authorization") token: String,
-        @Path("expenseId") expenseId: String // Changed from id to expenseId
+        @Path("expenseId") expenseId: String
     ): Response<Unit>
 }
 

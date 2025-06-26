@@ -20,6 +20,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -65,7 +66,7 @@ import java.util.*
 fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
-    expenses: SnapshotStateList<Expense>, // Changed to SnapshotStateList
+    expenses: SnapshotStateList<Expense>,
     onDeleteExpenses: (List<Expense>) -> Unit,
     onLogoutClick: () -> Unit
 ) {
@@ -90,29 +91,31 @@ fun ExpenseListScreen(
     val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     val filteredExpenses = expenses.filter { expense ->
         try {
-            LocalDate.parse(expense.dateOfTransaction, dateFormatter) == selectedDate
+            expense.dateOfTransaction?.let {
+                LocalDate.parse(it, dateFormatter) == selectedDate
+            } ?: false
         } catch (e: DateTimeParseException) {
             false
         }
     }
 
-    // Category colors matching HomeScreen
+    // Category colors
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
     val categoryColors = categories.zip(
         listOf(
-            Color(0xFFEF476F), // Utilities - Vibrant Pink
-            Color(0xFF06D6A0), // Food - Bright Teal
-            Color(0xFF118AB2), // Transportation - Deep Blue
-            Color(0xFFFFD166), // Gas - Warm Yellow
-            Color(0xFFF4A261), // Office Supplies - Soft Orange
-            Color(0xFF8D5524), // Rent - Rich Brown
-            Color(0xFFC9CBA3), // Parking - Light Olive
-            Color(0xFF6B7280), // Electronic Supplies - Slate Gray
-            Color(0xFF2E7D32), // Grocery - Forest Green
-            Color(0xFFFFA400)  // Other Expenses - Bright Orange
+            Color(0xFFEF476F), // Utilities
+            Color(0xFF06D6A0), // Food
+            Color(0xFF118AB2), // Transportation
+            Color(0xFFFFD166), // Gas
+            Color(0xFFF4A261), // Office Supplies
+            Color(0xFF8D5524), // Rent
+            Color(0xFFC9CBA3), // Parking
+            Color(0xFF6B7280), // Electronic Supplies
+            Color(0xFF2E7D32), // Grocery
+            Color(0xFFFFA400)  // Other Expenses
         )
     ).toMap()
 
@@ -153,7 +156,7 @@ fun ExpenseListScreen(
         }
     }
 
-    // Custom DatePickerDialog using Android's native date picker
+    // Custom DatePickerDialog
     val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
         android.app.DatePickerDialog(
@@ -174,6 +177,17 @@ fun ExpenseListScreen(
         } else {
             datePickerDialog.dismiss()
         }
+    }
+
+    // Mini calendar for one month
+    val startDate = selectedDate.withDayOfMonth(1)
+    val daysInMonth = startDate.lengthOfMonth()
+    val days = (0 until daysInMonth).map { startDate.plusDays(it.toLong()) }
+    val lazyListState = rememberLazyListState()
+
+    LaunchedEffect(selectedDate) {
+        val index = days.indexOf(selectedDate).coerceAtLeast(0)
+        lazyListState.animateScrollToItem(index)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -231,26 +245,72 @@ fun ExpenseListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
             ) {
-                // Mini one-row calendar for one month
-                val lazyListState = rememberLazyListState()
-                val startDate = selectedDate.withDayOfMonth(1)
-                val daysInMonth = startDate.lengthOfMonth()
-                val endDate = startDate.plusDays(daysInMonth.toLong() - 1)
-
-                LaunchedEffect(selectedDate) {
-                    if (selectedDate < startDate || selectedDate > endDate) {
-                        selectedDate = LocalDate.now().coerceIn(startDate, endDate)
+                // Mini calendar
+                LazyRow(
+                    state = lazyListState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(days) { day ->
+                        val isSelected = day == selectedDate
+                        Card(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clickable { selectedDate = day },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) {
+                                    categoryColors["Utilities"] ?: Color.Gray
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                }
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = if (!isSelected) {
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                            } else {
+                                null
+                            }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = day.dayOfMonth.toString(),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = day.dayOfWeek.toString().substring(0, 3),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    }
+                                )
+                            }
+                        }
                     }
-                    val index = (0 until daysInMonth).find { index ->
-                        startDate.plusDays(index.toLong()) == selectedDate
-                    } ?: LocalDate.now().dayOfMonth - 1
-                    lazyListState.animateScrollToItem(index)
                 }
 
+                // Expenses list
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = if (selectedExpenses.isNotEmpty()) 80.dp else 16.dp)
                 ) {
                     itemsIndexed(filteredExpenses) { index, expense ->
                         val categoryIndex = filteredExpenses
@@ -365,7 +425,7 @@ fun ExpenseListScreen(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = expense.category,
+                                                text = expense.category ?: "",
                                                 style = MaterialTheme.typography.bodyMedium.copy(
                                                     fontWeight = FontWeight.SemiBold
                                                 ),
@@ -380,7 +440,7 @@ fun ExpenseListScreen(
                                             )
                                         }
                                         Text(
-                                            text = expense.comments ?: "",
+                                            text = expense.remarks ?: "",
                                             style = MaterialTheme.typography.titleMedium.copy(
                                                 fontWeight = FontWeight.Bold
                                             ),
@@ -442,7 +502,7 @@ fun ExpenseListScreen(
                     }
                 }
 
-                // Button row at the bottom, shown only when expenses are selected
+                // Button row at the bottom
                 if (selectedExpenses.isNotEmpty()) {
                     Box(
                         modifier = Modifier
@@ -482,6 +542,7 @@ fun ExpenseListScreen(
                 }
             }
 
+            // Delete confirmation dialog
             if (showDeleteDialog) {
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
@@ -519,6 +580,7 @@ fun ExpenseListScreen(
                 )
             }
 
+            // Expense details dialog
             if (showExpenseDialog && selectedExpense != null) {
                 AlertDialog(
                     onDismissRequest = {
@@ -593,7 +655,7 @@ fun ExpenseListScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Comments: ${selectedExpense?.comments ?: ""}",
+                                text = "Remarks: ${selectedExpense?.remarks ?: ""}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -603,23 +665,17 @@ fun ExpenseListScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                TextButton(
-                                    onClick = {
-                                        showInfoDialog = true
-                                    }
-                                ) {
+                                TextButton(onClick = { showInfoDialog = true }) {
                                     Text(
                                         text = "Info",
                                         color = categoryColors[selectedExpense?.category] ?: Color.Gray
                                     )
                                 }
-                                TextButton(
-                                    onClick = {
-                                        showExpenseDialog = false
-                                        selectedExpense = null
-                                        expenseImageBitmap = null
-                                    }
-                                ) {
+                                TextButton(onClick = {
+                                    showExpenseDialog = false
+                                    selectedExpense = null
+                                    expenseImageBitmap = null
+                                }) {
                                     Text(
                                         text = "Close",
                                         color = categoryColors[selectedExpense?.category] ?: Color.Gray
@@ -631,6 +687,7 @@ fun ExpenseListScreen(
                 }
             }
 
+            // Expense info dialog
             if (showInfoDialog && selectedExpense != null) {
                 AlertDialog(
                     onDismissRequest = {
@@ -648,11 +705,10 @@ fun ExpenseListScreen(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
                         ),
                         shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .graphicsLayer {
-                                shadowElevation = 12.dp.toPx()
-                                spotShadowColor = Color.Black.copy(alpha = 0.3f)
-                            }
+                        modifier = Modifier.graphicsLayer {
+                            shadowElevation = 12.dp.toPx()
+                            spotShadowColor = Color.Black.copy(alpha = 0.3f)
+                        }
                     ) {
                         Column(
                             modifier = Modifier
@@ -667,11 +723,9 @@ fun ExpenseListScreen(
                                 color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
-                            Column(
-                                modifier = Modifier.verticalScroll(rememberScrollState())
-                            ) {
+                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                                 Text(
-                                    text = "Comments: ${selectedExpense?.comments ?: ""}",
+                                    text = "remarks: ${selectedExpense?.remarks ?: ""}",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -720,6 +774,7 @@ fun ExpenseListScreen(
                 }
             }
 
+            // Full-screen image dialog
             if (showFullScreenImage) {
                 AlertDialog(
                     onDismissRequest = {

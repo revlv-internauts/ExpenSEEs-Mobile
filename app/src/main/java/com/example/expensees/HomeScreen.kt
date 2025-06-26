@@ -446,6 +446,7 @@ fun HomeScreen(
                         ) {
                             categoryTotals.forEachIndexed { index, (category, amount) ->
                                 val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                                val categoryColor = categoryColors[category] ?: MaterialTheme.colorScheme.primary
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -461,8 +462,8 @@ fun HomeScreen(
                                             .background(
                                                 brush = Brush.linearGradient(
                                                     colors = listOf(
-                                                        categoryColors[category]!!.copy(alpha = 0.2f),
-                                                        categoryColors[category]!!.copy(alpha = 0.05f)
+                                                        categoryColor.copy(alpha = 0.2f),
+                                                        categoryColor.copy(alpha = 0.05f)
                                                     ),
                                                     start = Offset(0f, 0f),
                                                     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
@@ -470,7 +471,7 @@ fun HomeScreen(
                                             )
                                             .border(
                                                 1.dp,
-                                                categoryColors[category]!!,
+                                                categoryColor,
                                                 RoundedCornerShape(8.dp)
                                             )
                                             .padding(8.dp)
@@ -481,7 +482,7 @@ fun HomeScreen(
                                         ) {
                                             Surface(
                                                 shape = CircleShape,
-                                                color = categoryColors[category]!!,
+                                                color = categoryColor,
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
@@ -496,13 +497,13 @@ fun HomeScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
                                                 Text(
-                                                    text = category,
+                                                    text = category ?: "Unknown",
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                                 Text(
-                                                    text = "₱${numberFormat.format(amount)}",
+                                                    text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -515,7 +516,7 @@ fun HomeScreen(
                                                     "0.00%"
                                                 },
                                                 style = MaterialTheme.typography.bodyMedium,
-                                                color = categoryColors[category]!!,
+                                                color = categoryColor,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -775,7 +776,7 @@ fun HomeScreen(
                                 type: 'bar',
                                 data: {
                                     labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                    "'${(expense.comments ?: "").replace("'", "\\'")}'"
+                                                    "'${(expense.remarks ?: "").replace("'", "\\'")}'"
                                                 }.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
@@ -908,7 +909,7 @@ fun HomeScreen(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = expense.comments ?: "",
+                                                    text = expense.remarks ?: "",
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     fontWeight = FontWeight.Medium,
@@ -963,7 +964,7 @@ fun HomeScreen(
                     expenseImageBitmap = null
                     selectedImageUri = null
                 },
-                title = { Text("${selectedTransaction?.category ?: ""} Receipt") },
+                title = { Text(selectedTransaction?.category ?: "Receipt") },
                 text = {
                     Column(
                         modifier = Modifier
@@ -979,7 +980,7 @@ fun HomeScreen(
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
-                                    contentDescription = "${selectedTransaction?.category ?: ""} receipt",
+                                    contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
@@ -1018,20 +1019,17 @@ fun HomeScreen(
                 },
                 dismissButton = {
                     TextButton(
-                        onClick = {
-                            showInfoDialog = true
-                        }
+                        onClick = { showInfoDialog = true }
                     ) {
                         Text("Info")
                     }
                 }
             )
         }
+
         if (showInfoDialog && selectedTransaction != null) {
             AlertDialog(
-                onDismissRequest = {
-                    showInfoDialog = false
-                },
+                onDismissRequest = { showInfoDialog = false },
                 title = { Text("Expense Details") },
                 text = {
                     Column(
@@ -1040,31 +1038,31 @@ fun HomeScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "Category: ${selectedTransaction?.category ?: ""}",
+                            text = "Category: ${selectedTransaction?.category ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0)}",
+                            text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0.0)}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: ""}",
+                            text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Created At: ${selectedTransaction?.createdAt ?: ""}",
+                            text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Comments: ${selectedTransaction?.comments ?: ""}",
+                            text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -1073,9 +1071,7 @@ fun HomeScreen(
                 },
                 confirmButton = {
                     TextButton(
-                        onClick = {
-                            showInfoDialog = false
-                        }
+                        onClick = { showInfoDialog = false }
                     ) {
                         Text("Close")
                     }

@@ -402,7 +402,7 @@ fun LiquidationReport(
                                                     horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
                                                     Text(
-                                                        text = selected.comments ?: "No comments",
+                                                        text = selected.remarks ?: "No remarks",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )
@@ -500,7 +500,7 @@ fun LiquidationReport(
                                         if (selectedExpenses.isNotEmpty()) {
                                             reportBuilder.append("- **Uploaded Receipts**:\n")
                                             selectedExpenses.forEach { selected ->
-                                                reportBuilder.append("  - ${selected.comments ?: "No comments"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
+                                                reportBuilder.append("  - ${selected.remarks ?: "No remarks"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
                                             }
                                         }
                                     }
@@ -617,7 +617,7 @@ fun LiquidationReport(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = expense.comments ?: "No comments",
+                                                        text = expense.remarks ?: "No remarks",
                                                         style = MaterialTheme.typography.bodyLarge,
                                                         color = if (isUsed && !(checkedExpenses[expense] ?: false))
                                                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

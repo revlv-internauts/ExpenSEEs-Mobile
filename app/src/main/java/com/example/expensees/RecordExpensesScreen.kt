@@ -2,11 +2,13 @@ package com.example.expensees.screens
 
 import android.Manifest
 import android.app.Activity
+import android.app.DatePickerDialog
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,9 +18,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -30,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,22 +48,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
 import com.example.expensees.models.Expense
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.utils.createImageUri
-import java.text.SimpleDateFormat
-import java.util.*
-import android.app.DatePickerDialog
-import android.util.Log
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +66,7 @@ fun RecordExpensesScreen(
     authRepository: AuthRepository,
     onLogoutClick: () -> Unit = {}
 ) {
-    var comments by remember { mutableStateOf("") }
+    var remarks by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var dateOfTransaction by remember { mutableStateOf("") }
@@ -81,16 +81,8 @@ fun RecordExpensesScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val categories = listOf(
-        "Utilities",
-        "Food",
-        "Transportation",
-        "Gas",
-        "Office Supplies",
-        "Rent",
-        "Parking",
-        "Electronic Supplies",
-        "Grocery",
-        "Other Expenses"
+        "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
+        "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -226,9 +218,7 @@ fun RecordExpensesScreen(
                 ) {
                     Text(
                         text = "${selectedExpense?.category ?: ""} Receipt",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -246,11 +236,7 @@ fun RecordExpensesScreen(
                                     .fillMaxWidth()
                                     .height(200.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        1.5.dp,
-                                        MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(12.dp)
-                                    )
+                                    .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                                     .clickable {
                                         expenseImageBitmap = it
                                         showFullScreenImage = true
@@ -271,7 +257,7 @@ fun RecordExpensesScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Comments: ${selectedExpense?.comments ?: ""}",
+                        text = "remarks: ${selectedExpense?.remarks ?: ""}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -281,26 +267,11 @@ fun RecordExpensesScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        TextButton(
-                            onClick = {
-                                showInfoDialog = true
-                            }
-                        ) {
-                            Text(
-                                text = "Info",
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        TextButton(onClick = { showInfoDialog = true }) {
+                            Text(text = "Info", color = MaterialTheme.colorScheme.primary)
                         }
-                        TextButton(
-                            onClick = {
-                                showExpenseDialog = false
-                                selectedExpense = null
-                            }
-                        ) {
-                            Text(
-                                text = "Close",
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        TextButton(onClick = { showExpenseDialog = false; selectedExpense = null }) {
+                            Text(text = "Close", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -310,9 +281,7 @@ fun RecordExpensesScreen(
 
     if (showInfoDialog && selectedExpense != null) {
         AlertDialog(
-            onDismissRequest = {
-                showInfoDialog = false
-            },
+            onDismissRequest = { showInfoDialog = false },
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .clip(RoundedCornerShape(16.dp)),
@@ -335,17 +304,13 @@ fun RecordExpensesScreen(
                 ) {
                     Text(
                         text = "Expense Details",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState())
-                    ) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         Text(
-                            text = "Comments: ${selectedExpense?.comments ?: ""}",
+                            text = "remarks: ${selectedExpense?.remarks ?: ""}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -375,14 +340,8 @@ fun RecordExpensesScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(
-                        onClick = { showInfoDialog = false },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text(
-                            text = "Close",
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                    TextButton(onClick = { showInfoDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text(text = "Close", color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -413,11 +372,7 @@ fun RecordExpensesScreen(
                             .fillMaxSize()
                             .padding(16.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                2.dp,
-                                MaterialTheme.colorScheme.primary,
-                                RoundedCornerShape(12.dp)
-                            ),
+                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                         contentScale = ContentScale.Fit
                     )
                 } ?: selectedExpense?.imagePath?.let { uri ->
@@ -428,11 +383,7 @@ fun RecordExpensesScreen(
                             .fillMaxSize()
                             .padding(16.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                2.dp,
-                                MaterialTheme.colorScheme.primary,
-                                RoundedCornerShape(12.dp)
-                            ),
+                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                         contentScale = ContentScale.Fit,
                         onError = {
                             Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
@@ -449,10 +400,7 @@ fun RecordExpensesScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                            CircleShape
-                        )
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f), CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -500,11 +448,10 @@ fun RecordExpensesScreen(
                 value = category,
                 onValueChange = { },
                 label = { Text("Category") },
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
-                    TextButton(onClick = { expanded = !expanded }) {
+                    IconButton(onClick = { expanded = !expanded }) {
                         Text(if (expanded) "▲" else "▼")
                     }
                 }
@@ -520,7 +467,8 @@ fun RecordExpensesScreen(
                         onClick = {
                             category = option
                             expanded = false
-                        }
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
@@ -556,9 +504,9 @@ fun RecordExpensesScreen(
         )
 
         OutlinedTextField(
-            value = comments,
-            onValueChange = { comments = it },
-            label = { Text("Comments") },
+            value = remarks,
+            onValueChange = { remarks = it },
+            label = { Text("remarks") },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
@@ -595,15 +543,9 @@ fun RecordExpensesScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             ) {
-                Text(
-                    text = "Take Photo",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSecondary
-                )
+                Text(text = "Take Photo", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSecondary)
             }
             Button(
                 onClick = {
@@ -632,15 +574,9 @@ fun RecordExpensesScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             ) {
-                Text(
-                    text = "Pick from Gallery",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSecondary
-                )
+                Text(text = "Pick from Gallery", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
 
@@ -653,11 +589,7 @@ fun RecordExpensesScreen(
                     .height(200.dp)
                     .padding(bottom = 16.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .border(
-                        1.5.dp,
-                        MaterialTheme.colorScheme.primary,
-                        RoundedCornerShape(12.dp)
-                    )
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                     .clickable {
                         expenseImageBitmap = bitmap
                         showFullScreenImage = true
@@ -668,28 +600,19 @@ fun RecordExpensesScreen(
 
         Button(
             onClick = {
-                if (comments.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
+                if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
                     val amountValue = amount.toDoubleOrNull()
                     if (amountValue != null) {
-                        if (!authRepository.isAuthenticated()) {
-                            Log.d("RecordExpensesScreen", "Not authenticated, navigating to login")
-                            Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
-                            authRepository.logout()
-                            navController.navigate("login") {
-                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
-                            }
-                            return@Button
-                        }
                         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
                             timeZone = TimeZone.getTimeZone("UTC")
                         }.format(Date())
                         val newExpense = Expense(
-                            id = null,
+                            expenseId = null,
                             category = category,
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
-                            comments = comments,
-                            imagePath = null, // Temporarily disable image to test
+                            remarks = remarks,
+                            imagePath = selectedImageUri,
                             createdAt = timestamp
                         )
                         scope.launch {
@@ -697,8 +620,8 @@ fun RecordExpensesScreen(
                                 Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}")
                                 val result = authRepository.addExpense(newExpense)
                                 result.onSuccess { returnedExpense ->
-                                    Log.d("RecordExpensesScreen", "Expense added: id=${returnedExpense.id}, expense=${Gson().toJson(returnedExpense)}")
-                                    comments = ""
+                                    Log.d("RecordExpensesScreen", "Expense added: expenseId=${returnedExpense.expenseId}, expense=${Gson().toJson(returnedExpense)}")
+                                    remarks = ""
                                     amount = ""
                                     category = ""
                                     dateOfTransaction = ""
@@ -708,18 +631,10 @@ fun RecordExpensesScreen(
                                 }.onFailure { e ->
                                     Log.e("RecordExpensesScreen", "Failed to add expense: ${e.message}", e)
                                     when {
-                                        e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
-                                            Log.d("RecordExpensesScreen", "Authentication error, logging out")
-                                            Toast.makeText(context, "Session expired. Please log in again.", Toast.LENGTH_LONG).show()
-                                            authRepository.logout()
-                                            navController.navigate("login") {
-                                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
-                                            }
-                                        }
                                         e.message?.contains("Invalid expense data") == true || e.message?.contains("Validation error") == true -> {
                                             Toast.makeText(context, "Invalid data: check fields (e.g., date format) and try again", Toast.LENGTH_LONG).show()
                                         }
-                                        e.message?.contains("missing ID") == true -> {
+                                        e.message?.contains("missing expenseId") == true -> {
                                             Toast.makeText(context, "Expense not saved on server, please try again", Toast.LENGTH_LONG).show()
                                         }
                                         e.message?.contains("No internet connection") == true -> {
@@ -745,15 +660,9 @@ fun RecordExpensesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
-            Text(
-                text = "Add Expense",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+            Text(text = "Add Expense", fontSize = 18.sp, color = MaterialTheme.colorScheme.onPrimary)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -785,13 +694,9 @@ fun RecordExpensesScreen(
                             selectedExpense = expense
                             showExpenseDialog = true
                         },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
                     shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 4.dp
-                    )
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier
@@ -805,7 +710,7 @@ fun RecordExpensesScreen(
                                 .fillMaxWidth()
                         ) {
                             Text(
-                                text = expense.comments ?: "",
+                                text = expense.remarks ?: "",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
@@ -813,7 +718,7 @@ fun RecordExpensesScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = expense.category,
+                                text = expense.category ?: "", // Added null check
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
