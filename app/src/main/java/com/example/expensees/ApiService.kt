@@ -11,22 +11,25 @@ interface ApiService {
     @POST("api/auth/sign-in")
     suspend fun signIn(@Body credentials: SignInRequest): Response<SignInResponse>
 
+    @POST("api/auth/refresh")
+    suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<SignInResponse>
+
     @Multipart
     @POST("api/expenses")
     suspend fun addExpense(
-        @Header("Authorization") token: String,
+        @Header("Authorization") token: String, // Changed from expenseId to Authorization
         @Part("category") category: RequestBody,
         @Part("amount") amount: RequestBody,
         @Part("dateOfTransaction") dateOfTransaction: RequestBody,
-        @Part("comments") comments: RequestBody?,
+        @Part("remarks") comments: RequestBody?,
         @Part("createdAt") createdAt: RequestBody,
         @Part image: MultipartBody.Part?
     ): Response<Expense>
 
-    @DELETE("expenses/{id}")
+    @DELETE("expenses/{expenseId}") // Changed from {id} to {expenseId}
     suspend fun deleteExpense(
         @Header("Authorization") token: String,
-        @Path("id") id: String
+        @Path("expenseId") expenseId: String // Changed from id to expenseId
     ): Response<Unit>
 }
 
@@ -36,11 +39,16 @@ data class SignInRequest(
 )
 
 data class SignInResponse(
-    @SerializedName("token") val token: String,
-    @SerializedName("userId") val userId: String
+    @SerializedName("jwt") val token: String?,
+    @SerializedName("user_id") val user_Id: String?,
+    @SerializedName("refreshToken") val refreshToken: String?
 )
 
 data class ErrorResponse(
     @SerializedName("message") val message: String?,
     @SerializedName("error") val error: String?
+)
+
+data class RefreshTokenRequest(
+    @SerializedName("refreshToken") val refreshToken: String
 )

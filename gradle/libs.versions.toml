@@ -16,6 +16,7 @@ gamesActivity = "4.0.0"
 tvMaterial = "1.0.0"
 foundationAndroid = "1.7.2"
 foundationLayoutAndroid = "1.7.2"
+firebaseAppdistributionGradle = "5.1.1"
 
 
 [libraries]
@@ -41,6 +42,7 @@ androidx-games-activity = { group = "androidx.games", name = "games-activity", v
 androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 androidx-foundation-android = { group = "androidx.compose.foundation", name = "foundation-android", version.ref = "foundationAndroid" }
 androidx-foundation-layout-android = { group = "androidx.compose.foundation", name = "foundation-layout-android", version.ref = "foundationLayoutAndroid" }
+firebase-appdistribution-gradle = { group = "com.google.firebase", name = "firebase-appdistribution-gradle", version.ref = "firebaseAppdistributionGradle" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
