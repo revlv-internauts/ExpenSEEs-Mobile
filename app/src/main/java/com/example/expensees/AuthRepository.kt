@@ -1,3 +1,4 @@
+
 package com.example.expensees.network
 
 import android.content.Context
@@ -22,6 +23,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 
 class AuthRepository(
     private val apiService: ApiService,
@@ -95,16 +98,35 @@ class AuthRepository(
         }
     }
 
+
+
+    fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+    }
+
     suspend fun addExpense(expense: Expense): Result<Expense> {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d("AuthRepository", "Adding expense in coroutineContext=${currentCoroutineContext()}")
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection, saving locally")
+                    val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                    userExpenses.add(localExpense)
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+
                 val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                 val token = prefs.getString("auth_token", null)
                 val refreshToken = prefs.getString("refresh_token", null)
                 Log.d("AuthRepository", "Stored auth_token: ${token?.take(10) ?: "null"}..., refresh_token: ${refreshToken?.take(10) ?: "null"}...")
                 if (token.isNullOrEmpty()) {
                     Log.e("AuthRepository", "No token found in SharedPreferences")
+                    val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                    userExpenses.add(localExpense)
                     return@withContext Result.failure(Exception("Not authenticated. Please log in."))
                 }
 
@@ -112,26 +134,31 @@ class AuthRepository(
                     val decodedJWT = JWT.decode(token)
                     val expiry = decodedJWT.expiresAt
                     val currentTime = Date()
+                    val fiveMinutes = 5 * 60 * 1000L
                     Log.d("AuthRepository", "Token expiry: $expiry, currentTime: $currentTime, raw exp: ${decodedJWT.getClaim("exp").asLong()}, timezone: ${TimeZone.getDefault().id}, claims: ${decodedJWT.claims}")
-                    if (expiry != null && expiry.before(currentTime)) {
-                        Log.w("AuthRepository", "Token expired: expiry=$expiry, currentTime=$currentTime")
+                    if (expiry != null && expiry.time - currentTime.time < fiveMinutes) {
+                        Log.d("AuthRepository", "Token nearing expiry, refreshing proactively")
                         if (refreshToken != null) {
-                            Log.d("AuthRepository", "Attempting token refresh with refreshToken: ${refreshToken.take(10)}...")
                             val refreshResult = refreshToken(refreshToken)
                             if (refreshResult.isSuccess) {
-                                Log.d("AuthRepository", "Token refreshed successfully, retrying addExpense")
                                 return@withContext addExpenseWithToken(expense, retryCount = 0)
                             } else {
-                                Log.e("AuthRepository", "Failed to refresh token: ${refreshResult.exceptionOrNull()?.message}")
+                                Log.e("AuthRepository", "Proactive refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                                val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                userExpenses.add(localExpense)
                                 return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
                             }
                         } else {
                             Log.e("AuthRepository", "No refresh token available")
+                            val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                            userExpenses.add(localExpense)
                             return@withContext Result.failure(Exception("Unauthorized: No refresh token available. Please log in again."))
                         }
                     }
                 } catch (e: JWTDecodeException) {
                     Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
+                    val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                    userExpenses.add(localExpense)
                     return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
                 }
 
@@ -164,13 +191,17 @@ class AuthRepository(
                             return@withContext addExpenseWithToken(expense, retryCount = 0)
                         }
                     }
-                    Log.e("AuthRepository", "No refresh token available for retry")
+                    Log.e("AuthRepository", "No refresh token available for retry or refresh failed")
+                    val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                    userExpenses.add(localExpense)
                     return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
                 } else {
                     return@withContext Result.failure(Exception("Network error: ${e.message()}"))
                 }
             } catch (e: IOException) {
                 Log.e("AuthRepository", "IO error in addExpense: ${e.message}", e)
+                val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                userExpenses.add(localExpense)
                 return@withContext Result.failure(Exception("No internet connection"))
             } catch (e: Exception) {
                 Log.e("AuthRepository", "Add expense error: ${e.message}", e)
@@ -325,23 +356,43 @@ class AuthRepository(
                 } else {
                     val errorBody = response.errorBody()?.string()
                     Log.e("AuthRepository", "Refresh token failed: HTTP ${response.code()}, body=$errorBody")
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
+                    }
+                    val errorMessage = errorResponse?.message
+                        ?: errorResponse?.error
+                        ?: when (response.code()) {
+                            401 -> "Invalid or expired refresh token"
+                            403 -> "Forbidden: Refresh token not allowed"
+                            else -> "Refresh token error: HTTP ${response.code()}"
+                        }
                     if (response.code() == 401 || response.code() == 403) {
                         context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                             .edit()
                             .clear()
                             .apply()
                     }
-                    Result.failure(Exception("Failed to refresh token: HTTP ${response.code()}"))
+                    Result.failure(Exception(errorMessage))
                 }
             } catch (e: HttpException) {
                 Log.e("AuthRepository", "HTTP error refreshing token: ${e.message()}, code=${e.code()}", e)
+                val errorMessage = when (e.code()) {
+                    401 -> "Invalid or expired refresh token"
+                    403 -> "Forbidden: Refresh token not allowed"
+                    else -> "Network error: ${e.message()}"
+                }
                 if (e.code() == 401 || e.code() == 403) {
                     context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                         .edit()
                         .clear()
                         .apply()
                 }
-                Result.failure(Exception("Network error: ${e.message()}"))
+                Result.failure(Exception(errorMessage))
             } catch (e: IOException) {
                 Log.e("AuthRepository", "IO error refreshing token: ${e.message}", e)
                 Result.failure(Exception("No internet connection"))
@@ -389,29 +440,30 @@ class AuthRepository(
         }
     }
 
-    suspend fun syncLocalExpenses(): Result<Unit> {
+    suspend fun syncLocalExpenses(maxRetries: Int = 3): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("AuthRepository", "Syncing local expenses in coroutineContext=${currentCoroutineContext()}")
+                Log.d("AuthRepository", "Syncing local expenses")
                 val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }.toList()
                 Log.d("AuthRepository", "Syncing ${localExpenses.size} local expenses")
                 var allSynced = true
                 localExpenses.forEach { expense ->
-                    val result = addExpense(expense.copy(expenseId = null))
-                    result.onSuccess { syncedExpense ->
-                        userExpenses.remove(expense)
-                        userExpenses.add(syncedExpense)
-                        Log.d("AuthRepository", "Synced local expense: expenseId=${syncedExpense.expenseId}")
-                    }.onFailure { e ->
-                        Log.e("AuthRepository", "Failed to sync local expense: ${e.message}")
-                        allSynced = false
-                    }
+                    var retryCount = 0
+                    var result: Result<Expense>
+                    do {
+                        result = addExpense(expense.copy(expenseId = null))
+                        result.onSuccess { syncedExpense ->
+                            userExpenses.remove(expense)
+                            userExpenses.add(syncedExpense)
+                            Log.d("AuthRepository", "Synced local expense: expenseId=${syncedExpense.expenseId}")
+                        }.onFailure { e ->
+                            Log.e("AuthRepository", "Failed to sync local expense (attempt ${retryCount + 1}): ${e.message}")
+                            allSynced = false
+                            retryCount++
+                        }
+                    } while (result.isFailure && retryCount < maxRetries)
                 }
-                if (allSynced) {
-                    Result.success(Unit)
-                } else {
-                    Result.failure(Exception("Some local expenses failed to sync"))
-                }
+                if (allSynced) Result.success(Unit) else Result.failure(Exception("Some local expenses failed to sync"))
             } catch (e: Exception) {
                 Log.e("AuthRepository", "Sync local expenses error: ${e.message}", e)
                 Result.failure(Exception("Failed to sync local expenses: ${e.message}"))

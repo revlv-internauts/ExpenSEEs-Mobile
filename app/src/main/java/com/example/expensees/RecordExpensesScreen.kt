@@ -790,10 +790,12 @@ fun RecordExpensesScreen(
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
             items(authRepository.userExpenses.sortedByDescending {
                 try {
-                    dateFormat.parse(it.createdAt) ?: Date(0)
+                    it.createdAt?.let { createdAt -> dateFormat.parse(createdAt) } ?: Date(0)
                 } catch (e: Exception) {
                     Log.e("RecordExpensesScreen", "Failed to parse date: ${it.createdAt}, error: ${e.message}")
                     Date(0)

@@ -11,13 +11,17 @@ interface ApiService {
     @POST("api/auth/sign-in")
     suspend fun signIn(@Body credentials: SignInRequest): Response<SignInResponse>
 
-    @POST("api/auth/refresh")
-    suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<SignInResponse>
+    @POST("api/auth/refresh-token")
+    suspend fun refreshToken(
+        @Body refreshRequest: RefreshTokenRequest,
+        @Header("refresh_token") authHeader: String? = null // Add if required
+    ): Response<SignInResponse>
+
 
     @Multipart
-    @POST("api/expense")
+    @POST("api/expenses")
     suspend fun addExpense(
-        @Header("Authorization") token: String,
+        @Header("refresh_token") token: String,
         @Part("category") category: RequestBody,
         @Part("amount") amount: RequestBody,
         @Part("dateOfTransaction") dateOfTransaction: RequestBody,
@@ -28,7 +32,7 @@ interface ApiService {
 
     @DELETE("expenses/{expenseId}")
     suspend fun deleteExpense(
-        @Header("Authorization") token: String,
+        @Header("refresh_token") token: String,
         @Path("expenseId") expenseId: String
     ): Response<Unit>
 }
@@ -50,5 +54,5 @@ data class ErrorResponse(
 )
 
 data class RefreshTokenRequest(
-    @SerializedName("refreshToken") val refreshToken: String
+    @SerializedName("refresh_token") val refreshToken: String // Changed from "refreshToken"
 )
