@@ -103,5 +103,7 @@ dependencies {
     implementation ("io.insert-koin:koin-androidx-compose:3.5.0")
     implementation ("io.insert-koin:koin-core:3.5.0")
     implementation ("com.auth0:java-jwt:4.4.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
 }
