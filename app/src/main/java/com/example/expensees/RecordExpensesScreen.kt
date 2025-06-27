@@ -811,20 +811,17 @@ fun RecordExpensesScreen(
                                             val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
                                             authRepository.userExpenses.add(localExpense)
                                             pendingExpense = newExpense
-                                            Toast.makeText(context, "Expense saved locally. Please log in to sync.", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Session expired. Expense saved locally, please log in to sync.", Toast.LENGTH_LONG).show()
                                             showAuthErrorDialog = true
-                                            remarks = ""
-                                            amount = ""
-                                            category = ""
-                                            dateOfTransaction = ""
-                                            selectedImageBitmap = null
-                                            selectedImageUri = null
                                         }
                                         e.message?.contains("Invalid expense data") == true || e.message?.contains("Validation error") == true -> {
                                             Toast.makeText(context, "Invalid data: check fields (e.g., date format) and try again", Toast.LENGTH_LONG).show()
                                         }
                                         e.message?.contains("missing expenseId") == true -> {
-                                            Toast.makeText(context, "Expense not saved on server, please try again", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Expense saved locally due to server issue. Try syncing later.", Toast.LENGTH_LONG).show()
+                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                            authRepository.userExpenses.add(localExpense)
+                                            pendingExpense = newExpense
                                         }
                                         e.message?.contains("No internet connection") == true -> {
                                             Toast.makeText(context, "No internet connection, expense saved locally", Toast.LENGTH_LONG).show()
@@ -871,7 +868,7 @@ fun RecordExpensesScreen(
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
             }
             val sortedExpenses = authRepository.userExpenses.sortedByDescending {
@@ -879,7 +876,15 @@ fun RecordExpensesScreen(
                     it.createdAt?.let { createdAt -> dateFormat.parse(createdAt) } ?: Date(0)
                 } catch (e: Exception) {
                     Log.e("RecordExpensesScreen", "Failed to parse date: ${it.createdAt}, error: ${e.message}")
-                    Date(0)
+                    // Fallback to dateOfTransaction for sorting
+                    try {
+                        it.dateOfTransaction?.let { dateOfTransaction ->
+                            SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateOfTransaction)
+                        } ?: Date(0)
+                    } catch (e: Exception) {
+                        Log.e("RecordExpensesScreen", "Failed to parse dateOfTransaction: ${it.dateOfTransaction}, error: ${e.message}")
+                        Date(0)
+                    }
                 }
             }.take(10)
             items(sortedExpenses) { expense ->
@@ -915,6 +920,22 @@ fun RecordExpensesScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "${expense.category ?: ""}${if (expense.expenseId?.startsWith("local_") == true) " (Not Synced)" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = try {
+                                    expense.createdAt?.let { createdAt ->
+                                        val parsedDate = dateFormat.parse(createdAt)
+                                        SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(parsedDate)
+                                    } ?: expense.dateOfTransaction ?: "Unknown date"
+                                } catch (e: Exception) {
+                                    Log.e("RecordExpensesScreen", "Failed to format date: ${expense.createdAt}, error: ${e.message}")
+                                    expense.dateOfTransaction ?: "Unknown date"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,

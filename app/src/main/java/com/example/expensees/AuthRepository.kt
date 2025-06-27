@@ -308,12 +308,13 @@ class AuthRepository(
                 )
 
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
-
                 if (response.isSuccessful) {
                     response.body()?.let { returnedExpense ->
                         if (returnedExpense.expenseId.isNullOrEmpty()) {
                             Log.e("AuthRepository", "Expense returned but has no expenseId: ${Gson().toJson(returnedExpense)}")
-                            Result.failure(Exception("Expense not saved in database (missing expenseId)"))
+                            val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                            userExpenses.add(localExpense)
+                            Result.failure(Exception("Expense not saved on server (missing expenseId), saved locally"))
                         } else {
                             userExpenses.add(returnedExpense)
                             Log.d("AuthRepository", "Expense added: expenseId=${returnedExpense.expenseId}")
