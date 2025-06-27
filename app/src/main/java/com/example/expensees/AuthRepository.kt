@@ -321,7 +321,7 @@ class AuthRepository(
                             Result.success(returnedExpense)
                         }
                     } ?: Result.failure(Exception("Empty response body"))
-                } else {
+                }else {
                     val errorBody = response.errorBody()?.string()
                     Log.e("AuthRepository", "Add expense failed: HTTP ${response.code()}, body=$errorBody, headers=${response.headers()}")
                     val errorResponse = errorBody?.let {
