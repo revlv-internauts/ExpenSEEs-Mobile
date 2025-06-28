@@ -95,9 +95,16 @@ fun HomeScreen(
 
     val categoryColors = categories.zip(
         listOf(
-            Color(0xFFEF476F), Color(0xFF06D6A0), Color(0xFF118AB2), Color(0xFFFFD166),
-            Color(0xFFF4A261), Color(0xFF8D5524), Color(0xFFC9CBA3), Color(0xFF6B7280),
-            Color(0xFFFFA400), Color(0xFF2E7D32)
+            Color(0xFF6B7280), // Muted Slate Gray
+            Color(0xFF9CA3AF), // Soft Gray-Blue
+            Color(0xFF8B9DC3), // Muted Blue
+            Color(0xFF7F9E9F), // Muted Teal
+            Color(0xFFA7B4C5), // Pale Blue-Gray
+            Color(0xFFB7C1C3), // Light Cyan
+            Color(0xFF9E9E9E), // Neutral Gray
+            Color(0xFFB0BEC5), // Light Slate
+            Color(0xFFA5B4B6), // Muted Aqua
+            Color(0xFFBCC1C5)  // Pale Gray
         )
     ).toMap()
 
@@ -113,7 +120,7 @@ fun HomeScreen(
                 animatable.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = 300,
+                        durationMillis = 400,
                         delayMillis = index * 100,
                         easing = FastOutSlowInEasing
                     )
@@ -125,7 +132,10 @@ fun HomeScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                drawerContainerColor = Color(0xFFF5F5F5), // Matte off-white
+                drawerContentColor = Color(0xFF1F2937) // Dark gray
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -139,43 +149,50 @@ fun HomeScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            modifier = Modifier.size(48.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            modifier = Modifier.size(56.dp),
+                            color = Color(0xFFD6D8DA) // Matte silver-gray
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = "A",
                                     style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = Color(0xFF1F2937), // Dark gray
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
                                 text = "User Profile",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFF1F2937) // Dark gray
                             )
                             Text(
                                 text = "user@example.com",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color(0xFF6B7280) // Gray
                             )
                         }
                     }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = Color(0xFFE5E7EB) // Light gray
+                    )
                     TextButton(
                         onClick = {
                             navController.navigate("reset_password")
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
                         Text(
                             text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF4B5EAA), // Soft blue
+                            fontSize = 16.sp
                         )
                     }
                     TextButton(
@@ -183,12 +200,15 @@ fun HomeScreen(
                             Toast.makeText(context, "Theme clicked", Toast.LENGTH_SHORT).show()
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
                         Text(
                             text = "Theme",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF4B5EAA), // Soft blue
+                            fontSize = 16.sp
                         )
                     }
                     TextButton(
@@ -196,12 +216,15 @@ fun HomeScreen(
                             Toast.makeText(context, "About clicked", Toast.LENGTH_SHORT).show()
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
                         Text(
                             text = "About",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF4B5EAA), // Soft blue
+                            fontSize = 16.sp
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
@@ -214,18 +237,20 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
+                            .height(50.dp)
+                            .padding(vertical = 8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
+                            containerColor = Color(0xFF6B7280) // Gray
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = "Logout",
                             fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.onSecondary
+                            color = Color(0xFFFFFFFF), // White
+                            fontWeight = FontWeight.Medium
                         )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
@@ -233,68 +258,73 @@ fun HomeScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFF9FAFB), // Light gray
+                            Color(0xFFE5E7EB) // Slightly darker gray
+                        )
+                    )
+                )
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp, top = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ExpenSEEs",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = { scope.launch { drawerState.open() } }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Open drawer",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
             Text(
                 text = "Welcome to ExpenSEEs!",
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 ),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 12.dp)
+                color = Color(0xFF1F2937), // Dark gray
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp, top = 50.dp),
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(8.dp))
-
             if (expenses.isEmpty()) {
-                Text(
-                    text = "No expenses recorded yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    textAlign = TextAlign.Center
-                )
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF5F5F5) // Matte off-white
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "No expenses recorded yet.",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        color = Color(0xFF6B7280), // Gray
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             } else {
-                AndroidView(
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            try {
-                                loadDataWithBaseURL(
-                                    null,
-                                    """
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF5F5F5) // Matte off-white
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                                try {
+                                    loadDataWithBaseURL(
+                                        null,
+                                        """
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -303,7 +333,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: transparent;
+                                background: #E6E8EA; /* Matte pale gray */
                                 width: 100%;
                                 height: 100%;
                             }
@@ -348,8 +378,8 @@ fun HomeScreen(
                                             title: {
                                                 display: true,
                                                 text: 'Expense Distribution by Category',
-                                                color: '#333333',
-                                                font: { size: 18 },
+                                                color: '#1F2937',
+                                                font: { size: 18, weight: 'bold' },
                                                 align: 'center'
                                             },
                                             tooltip: {
@@ -383,30 +413,31 @@ fun HomeScreen(
                     </body>
                     </html>
                     """.trimIndent(),
-                                    "text/html",
-                                    "UTF-8",
-                                    null
-                                )
-                            } catch (e: Exception) {
-                                Toast.makeText(ctx, "Failed to load chart: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                            addJavascriptInterface(object : Any() {
-                                @JavascriptInterface
-                                fun onCategorySelected(category: String, amount: Double) {
-                                    scope.launch {
-                                        selectedChartCategory = if (category.isEmpty()) null else category
-                                        selectedCategoryAmount = amount
-                                    }
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+                                } catch (e: Exception) {
+                                    Toast.makeText(ctx, "Failed to load chart: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
-                            }, "android")
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .padding(vertical = 4.dp)
-                        .background(Color.Transparent)
-                )
+                                addJavascriptInterface(object : Any() {
+                                    @JavascriptInterface
+                                    fun onCategorySelected(category: String, amount: Double) {
+                                        scope.launch {
+                                            selectedChartCategory = if (category.isEmpty()) null else category
+                                            selectedCategoryAmount = amount
+                                        }
+                                    }
+                                }, "android")
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .padding(12.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                }
                 Text(
                     text = if (selectedChartCategory != null) {
                         "${selectedChartCategory} Expenses: ₱${numberFormat.format(selectedCategoryAmount)}"
@@ -414,32 +445,36 @@ fun HomeScreen(
                         "Total Expenses: ₱${numberFormat.format(totalExpenses)}"
                     },
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp
                     ),
-                    color = selectedChartCategory?.let { categoryColors[it] } ?: MaterialTheme.colorScheme.primary,
+                    color = selectedChartCategory?.let { categoryColors[it] } ?: Color(0xFF1F2937), // Dark gray
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 8.dp),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = Color(0xFFF5F5F5) // Matte off-white
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(8.dp)
                     ) {
                         Text(
                             text = "Your Top 5 Expenses",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Medium
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
                             ),
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                         Column(
@@ -447,7 +482,7 @@ fun HomeScreen(
                         ) {
                             categoryTotals.forEachIndexed { index, (category, amount) ->
                                 val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                val categoryColor = categoryColors[category] ?: MaterialTheme.colorScheme.primary
+                                val categoryColor = categoryColors[category] ?: Color(0xFF4B5EAA) // Fallback to soft blue
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -463,7 +498,7 @@ fun HomeScreen(
                                             .background(
                                                 brush = Brush.linearGradient(
                                                     colors = listOf(
-                                                        categoryColor.copy(alpha = 0.2f),
+                                                        categoryColor.copy(alpha = 0.15f),
                                                         categoryColor.copy(alpha = 0.05f)
                                                     ),
                                                     start = Offset(0f, 0f),
@@ -472,7 +507,7 @@ fun HomeScreen(
                                             )
                                             .border(
                                                 1.dp,
-                                                categoryColor,
+                                                categoryColor.copy(alpha = 0.5f),
                                                 RoundedCornerShape(8.dp)
                                             )
                                             .padding(8.dp)
@@ -484,29 +519,31 @@ fun HomeScreen(
                                             Surface(
                                                 shape = CircleShape,
                                                 color = categoryColor,
-                                                modifier = Modifier.size(28.dp)
+                                                modifier = Modifier.size(24.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Text(
                                                         text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = MaterialTheme.colorScheme.onPrimary,
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = Color(0xFFFFFFFF), // White
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(12.dp))
                                             Column {
                                                 Text(
                                                     text = category ?: "Unknown",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    fontWeight = FontWeight.SemiBold
+                                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 14.sp
+                                                    ),
+                                                    color = Color(0xFF1F2937) // Dark gray
                                                 )
                                                 Text(
                                                     text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = Color(0xFF6B7280) // Gray
                                                 )
                                             }
                                             Spacer(modifier = Modifier.weight(1f))
@@ -516,9 +553,11 @@ fun HomeScreen(
                                                 } else {
                                                     "0.00%"
                                                 },
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = categoryColor,
-                                                fontWeight = FontWeight.Bold
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                ),
+                                                color = categoryColor
                                             )
                                         }
                                     }
@@ -529,137 +568,52 @@ fun HomeScreen(
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            Row(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF5F5F5) // Matte off-white
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Surface(
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Transparent,
-                    onClick = onRecordExpensesClick
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Record New Expense",
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Record",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Transparent,
-                    onClick = onListExpensesClick
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.List,
-                                contentDescription = "View List of Expenses",
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "List",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Transparent,
-                    onClick = { navController.navigate("fund_request") }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.RequestQuote,
-                                contentDescription = "Request Fund",
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Request",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Transparent,
-                    onClick = { navController.navigate("liquidation_report") }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Assignment,
-                                contentDescription = "View Liquidation Report",
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Report",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.Transparent,
-                    onClick = { scope.launch { drawerState.open() } }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Profile",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                    NavigationButton(
+                        icon = Icons.Default.Add,
+                        label = "Record",
+                        onClick = onRecordExpensesClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavigationButton(
+                        icon = Icons.Default.List,
+                        label = "List",
+                        onClick = onListExpensesClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavigationButton(
+                        icon = Icons.Default.RequestQuote,
+                        label = "Request",
+                        onClick = { navController.navigate("fund_request") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavigationButton(
+                        icon = Icons.Default.Assignment,
+                        label = "Report",
+                        onClick = { navController.navigate("liquidation_report") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavigationButton(
+                        icon = Icons.Default.Person,
+                        label = "Profile",
+                        onClick = { scope.launch { drawerState.open() } },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -670,7 +624,7 @@ fun HomeScreen(
             ) {
                 val dialogAlpha by animateFloatAsState(
                     targetValue = if (selectedCategory != null) 1f else 0f,
-                    animationSpec = tween(200, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(300, easing = LinearOutSlowInEasing)
                 )
                 Card(
                     modifier = Modifier
@@ -679,9 +633,9 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .alpha(dialogAlpha),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = Color(0xFFECEFF1) // Matte light gray
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -699,18 +653,24 @@ fun HomeScreen(
                             Text(
                                 text = "${selectedCategory} Transactions",
                                 style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 20.sp
                                 ),
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = Color(0xFF1F2937) // Dark gray
                             )
                             IconButton(
                                 onClick = { selectedCategory = null },
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(
+                                        Color(0xFFCED4DA), // Matte cool gray
+                                        CircleShape
+                                    )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close dialog",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = Color(0xFF6B7280) // Gray
                                 )
                             }
                         }
@@ -724,21 +684,15 @@ fun HomeScreen(
                             ) {
                                 Text(
                                     text = "No transactions recorded for this category.",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                    color = Color(0xFF6B7280) // Gray
                                 )
                             }
                         } else {
                             val baseColor = categoryColors[selectedCategory]!!
                             val transactionColors = transactionsForCategory.indices.map { index ->
-                                val factor = 1f - (index * 0.1f).coerceAtMost(0.5f)
-                                val red = (baseColor.red * factor).coerceIn(0f, 1f) * 255
-                                val green = (baseColor.green * factor).coerceIn(0f, 1f) * 255
-                                val blue = (baseColor.blue * factor).coerceIn(0f, 1f) * 255
-                                val r = red.toInt().coerceIn(0, 255)
-                                val g = green.toInt().coerceIn(0, 255)
-                                val b = blue.toInt().coerceIn(0, 255)
-                                "#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}"
+                                val factor = 0.8f - (index * 0.1f).coerceAtMost(0.5f)
+                                "#${baseColor.copy(alpha = factor).toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}"
                             }
 
                             AndroidView(
@@ -758,7 +712,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: transparent;
+                                background: #E6E8EA; /* Matte pale gray */
                                 height: 100%;
                                 width: 100%;
                             }
@@ -777,12 +731,12 @@ fun HomeScreen(
                                 type: 'bar',
                                 data: {
                                     labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                    "'${(expense.remarks ?: "").replace("'", "\\'")}'"
-                                                }.joinToString()}],
+                                                                            "'${(expense.remarks ?: "").replace("'", "\\'")}'"
+                                                                        }.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
                                         backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
-                                        borderColor: '#FFFFFF',
+                                        borderColor: '#D1D5DB', // Light gray border for subtle contrast
                                         borderWidth: 1
                                     }]
                                 },
@@ -790,13 +744,11 @@ fun HomeScreen(
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: {
-                                            display: false
-                                        },
+                                        legend: { display: false },
                                         title: {
                                             display: true,
                                             text: 'Transaction Amounts',
-                                            color: '#333333',
+                                            color: '#1F2937',
                                             font: { size: 16, weight: 'bold' },
                                             align: 'center'
                                         },
@@ -812,9 +764,7 @@ fun HomeScreen(
                                     },
                                     scales: {
                                         x: {
-                                            ticks: {
-                                                display: false
-                                            }
+                                            ticks: { display: false }
                                         },
                                         y: {
                                             beginAtZero: true,
@@ -822,13 +772,19 @@ fun HomeScreen(
                                                 callback: function(value) {
                                                     return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                                 },
-                                                font: { size: 12 }
+                                                font: { size: 12 },
+                                                color: '#1F2937' // Dark gray for tick labels
                                             }
                                         }
                                     },
                                     animation: {
                                         duration: 800,
                                         easing: 'easeOutCubic'
+                                    },
+                                    hover: {
+                                        mode: 'nearest',
+                                        intersect: true,
+                                        animationDuration: 400
                                     }
                                 }
                             });
@@ -847,27 +803,30 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(180.dp)
+                                    .height(200.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(
                                         1.dp,
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                        Color(0xFFE5E7EB), // Light gray
                                         RoundedCornerShape(8.dp)
                                     )
+                                    .padding(8.dp)
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "Transaction Details",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 18.sp
                                 ),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(1f)
+                                    .weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 itemsIndexed(transactionsForCategory) { index, expense ->
                                     val alpha by animateFloatAsState(
@@ -881,7 +840,6 @@ fun HomeScreen(
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 4.dp)
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
@@ -889,9 +847,9 @@ fun HomeScreen(
                                                 showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surface
+                                            containerColor = Color(0xFFF5F5F5) // Matte off-white
                                         ),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Row(
@@ -903,9 +861,11 @@ fun HomeScreen(
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = expense.remarks ?: "",
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    fontWeight = FontWeight.Medium,
+                                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                                        fontWeight = FontWeight.Medium,
+                                                        fontSize = 16.sp
+                                                    ),
+                                                    color = Color(0xFF1F2937), // Dark gray
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -913,14 +873,16 @@ fun HomeScreen(
                                                 Text(
                                                     text = expense.dateOfTransaction ?: "",
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = Color(0xFF6B7280) // Gray
                                                 )
                                             }
                                             Text(
                                                 text = "₱${numberFormat.format(expense.amount)}",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.SemiBold
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 16.sp
+                                                ),
+                                                color = categoryColors[expense.category] ?: Color(0xFF4B5EAA) // Fallback to soft blue
                                             )
                                         }
                                     }
@@ -933,15 +895,15 @@ fun HomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = Color(0xFF4B5EAA) // Soft blue
                             )
                         ) {
                             Text(
                                 text = "Close",
                                 fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = Color(0xFFFFFFFF), // White
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -958,16 +920,16 @@ fun HomeScreen(
                     selectedImagePath = null
                 },
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
+                    .fillMaxWidth(0.95f)
                     .clip(RoundedCornerShape(12.dp)),
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        containerColor = Color(0xFFECEFF1) // Matte light gray
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -978,9 +940,10 @@ fun HomeScreen(
                         Text(
                             text = "${selectedTransaction?.category ?: "Receipt"}",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 20.sp
                             ),
-                            color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                            color = Color(0xFF4B5EAA), // Soft blue
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         selectedImagePath?.let { imagePath ->
@@ -989,8 +952,8 @@ fun HomeScreen(
                                 Text(
                                     text = "No receipt photo available",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
+                                    color = Color(0xFF6B7280), // Gray
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
                                 val bitmap = try {
@@ -1005,11 +968,11 @@ fun HomeScreen(
                                         contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(200.dp)
+                                            .height(220.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
-                                                categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                                                Color(0xFF4B5EAA), // Soft blue
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
@@ -1023,8 +986,8 @@ fun HomeScreen(
                                     Text(
                                         text = "No receipt photo available",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(bottom = 8.dp)
+                                        color = Color(0xFF6B7280), // Gray
+                                        modifier = Modifier.padding(bottom = 12.dp)
                                     )
                                 }
                             } else {
@@ -1033,11 +996,11 @@ fun HomeScreen(
                                     contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(200.dp)
+                                        .height(220.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             1.5.dp,
-                                            categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
+                                            Color(0xFF4B5EAA), // Soft blue
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable { showFullScreenImage = true },
@@ -1053,8 +1016,8 @@ fun HomeScreen(
                         } ?: Text(
                             text = "No receipt photo available",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            color = Color(0xFF6B7280), // Gray
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
@@ -1064,7 +1027,8 @@ fun HomeScreen(
                             TextButton(onClick = { showInfoDialog = true }) {
                                 Text(
                                     text = "Info",
-                                    color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                                    color = Color(0xFF4B5EAA), // Soft blue
+                                    fontSize = 16.sp
                                 )
                             }
                             TextButton(onClick = {
@@ -1075,7 +1039,8 @@ fun HomeScreen(
                             }) {
                                 Text(
                                     text = "Close",
-                                    color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                                    color = Color(0xFF4B5EAA), // Soft blue
+                                    fontSize = 16.sp
                                 )
                             }
                         }
@@ -1083,7 +1048,6 @@ fun HomeScreen(
                 }
             }
         }
-
         if (showInfoDialog && selectedTransaction != null) {
             AlertDialog(
                 onDismissRequest = {
@@ -1093,16 +1057,16 @@ fun HomeScreen(
                     selectedImagePath = null
                 },
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
+                    .fillMaxWidth(0.95f)
                     .clip(RoundedCornerShape(12.dp)),
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                        containerColor = Color(0xFFECEFF1) // Matte light gray
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -1112,46 +1076,47 @@ fun HomeScreen(
                         Text(
                             text = "Expense Details",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 20.sp
                             ),
-                            color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            color = Color(0xFF4B5EAA), // Soft blue
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Column(
                             modifier = Modifier.verticalScroll(rememberScrollState())
                         ) {
                             Text(
                                 text = "Category: ${selectedTransaction?.category ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0.0)}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         TextButton(
                             onClick = {
                                 showInfoDialog = false
@@ -1163,7 +1128,8 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "Close",
-                                color = categoryColors[selectedTransaction?.category] ?: MaterialTheme.colorScheme.primary
+                                color = Color(0xFF4B5EAA), // Soft blue
+                                fontSize = 16.sp
                             )
                         }
                     }
@@ -1184,10 +1150,12 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
+                        .background(Color(0xFFECEFF1)) // Matte light gray
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                            start = 16.dp,
+                            end = 16.dp
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1196,8 +1164,8 @@ fun HomeScreen(
                         if (imageLoadFailed) {
                             Text(
                                 text = "No image available",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                color = Color(0xFF6B7280), // Gray
                                 modifier = Modifier.padding(16.dp)
                             )
                         } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -1213,11 +1181,10 @@ fun HomeScreen(
                                     contentDescription = "Full screen expense photo",
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            MaterialTheme.colorScheme.primary,
+                                            Color(0xFF4B5EAA), // Soft blue
                                             RoundedCornerShape(12.dp)
                                         ),
                                     contentScale = ContentScale.Fit
@@ -1226,8 +1193,8 @@ fun HomeScreen(
                                 imageLoadFailed = true
                                 Text(
                                     text = "No image available",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                    color = Color(0xFF6B7280), // Gray
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
@@ -1237,11 +1204,10 @@ fun HomeScreen(
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(16.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         2.dp,
-                                        MaterialTheme.colorScheme.primary,
+                                        Color(0xFF4B5EAA), // Soft blue
                                         RoundedCornerShape(12.dp)
                                     ),
                                 contentScale = ContentScale.Fit,
@@ -1255,8 +1221,8 @@ fun HomeScreen(
                         }
                     } ?: Text(
                         text = "No image available",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        color = Color(0xFF6B7280), // Gray
                         modifier = Modifier.padding(16.dp)
                     )
                     IconButton(
@@ -1270,18 +1236,62 @@ fun HomeScreen(
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
                             .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                Color(0xFFCED4DA), // Matte cool gray
                                 CircleShape
                             )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close image",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = Color(0xFF1F2937) // Dark gray
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun NavigationButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+    )
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .scale(scale),
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFD6D8DA), // Matte silver-gray
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(28.dp),
+                tint = Color(0xFF4B5EAA) // Soft blue
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = Color(0xFF4B5EAA), // Soft blue
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
