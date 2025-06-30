@@ -131,6 +131,7 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = false, // Disable swipe gesture to open drawer
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = Color(0xFFF5F5F5), // Matte off-white
@@ -605,12 +606,6 @@ fun HomeScreen(
                         icon = Icons.Default.Add,
                         label = "Record",
                         onClick = onRecordExpensesClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                    NavigationButton(
-                        icon = Icons.Default.List,
-                        label = "List",
-                        onClick = onListExpensesClick,
                         modifier = Modifier.weight(1f)
                     )
                     NavigationButton(

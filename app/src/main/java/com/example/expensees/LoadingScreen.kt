@@ -15,11 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -35,153 +37,101 @@ fun LoadingScreen(
     onLoadingComplete: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
-        delay(3500L)
+        delay(3000L)
         onLoadingComplete()
     }
 
-    val logoScale by animateFloatAsState(
-        targetValue = 1.1f,
+    val scale by animateFloatAsState(
+        targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        ), label = "logoScale"
+        ), label = "scale"
     )
 
-    val pulse by animateFloatAsState(
-        targetValue = 1.07f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900),
-            repeatMode = RepeatMode.Reverse
-        ), label = "pulse"
-    )
+    val pulseAnim = remember { Animatable(1f) }
 
-    val haloRotation by animateFloatAsState(
+    LaunchedEffect(Unit) {
+        pulseAnim.animateTo(
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            )
+        )
+    }
+
+    val rotation by animateFloatAsState(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(5000),
+            animation = tween(4000),
             repeatMode = RepeatMode.Restart
-        ), label = "haloRotation"
-    )
-
-    val shimmerColors = listOf(
-        Color(0xFFB3E5FC),
-        Color(0xFF81D4FA),
-        Color(0xFF29B6F6),
-        Color(0xFF0288D1)
+        ), label = "rotation"
     )
 
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFF0D47A1),
-            Color(0xFF1565C0),
-            Color(0xFF1E88E5)
-        ),
-        startY = 0f,
-        endY = Float.POSITIVE_INFINITY
+            Color(0xFF1976D2)
+        )
     )
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(brush = backgroundGradient)
+            .background(brush = backgroundGradient),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
-            // ✨ Gradient Logo Text with glow
+            // Logo
             Text(
                 text = "ExpenSEEs",
                 style = MaterialTheme.typography.displaySmall.copy(
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    shadow = Shadow(
-                        color = Color.Cyan.copy(alpha = 0.6f),
-                        offset = Offset(2f, 8f),
-                        blurRadius = 25f
-                    )
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 ),
-                modifier = Modifier
-                    .scale(logoScale)
-                    .padding(bottom = 10.dp),
-                color = Color.Unspecified,
-                softWrap = false
+                modifier = Modifier.scale(scale)
             )
 
-            Box(
-                modifier = Modifier
-                    .height(2.dp)
-                    .width(200.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(Color.Transparent, Color.White, Color.Transparent)
-                        )
-                    )
-            )
+            Spacer(modifier = Modifier.height(28.dp))
 
-            Spacer(modifier = Modifier.height(40.dp))
+            // 🔵 Glowing Pulsing Orb + Spinner
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
 
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
-                // 🔄 Rotating outer gradient ring
+                // Outer spinner
+                CircularProgressIndicator(
+                    strokeWidth = 4.dp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(120.dp)
+                        .rotate(rotation)
+                )
+
+                // Glowing pulsing orb in center
                 Box(
                     modifier = Modifier
-                        .size(160.dp)
-                        .rotate(haloRotation)
-                        .background(
-                            brush = Brush.sweepGradient(shimmerColors),
-                            shape = CircleShape
+                        .size((36 * pulseAnim.value).dp)
+                        .background(Color.Cyan.copy(alpha = 0.8f), shape = CircleShape)
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = CircleShape,
+                            ambientColor = Color.Cyan,
+                            spotColor = Color.Cyan
                         )
-                        .alpha(0.3f)
-                )
-
-                // 🌟 Inner glowing aura
-                // 🚀 Enhanced dual-ring loading spinner (no background circle)
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
-
-                    // Outer thin ring rotating clockwise
-                    CircularProgressIndicator(
-                        strokeWidth = 3.dp,
-                        color = Color.Cyan.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .size(100.dp)
-                            .rotate(haloRotation)
-                    )
-
-                    // Inner thicker ring rotating counter-clockwise
-                    CircularProgressIndicator(
-                        strokeWidth = 5.dp,
-                        color = Color.White,
-                        modifier = Modifier
-                            .size(70.dp)
-                            .rotate(-haloRotation)
-                            .scale(pulse)
-                    )
-                }
-
-
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // 📝 Dynamic Tagline
-                Text(
-                    text = "Loading your financial power...",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            offset = Offset(1f, 2f),
-                            blurRadius = 8f
-                        )
-                    ),
-                    color = Color.White.copy(alpha = 0.95f),
-                    modifier = Modifier.alpha(0.97f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(36.dp))
+
+            Text(
+                text = "Powering your budget brilliance...",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 16.sp
+                )
+            )
         }
     }
 }

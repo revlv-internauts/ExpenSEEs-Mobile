@@ -787,21 +787,36 @@ fun RecordExpensesScreen(
                     .width(120.dp)
                     .padding(end = 8.dp)
             )
-            OutlinedTextField(
-                value = dateOfTransaction,
-                onValueChange = { },
-                modifier = Modifier.weight(1f),
-                readOnly = true,
-                trailingIcon = {
-                    IconButton(onClick = { datePickerDialog.show() }) {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "Select date",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { datePickerDialog.show() }
+            ) {
+                OutlinedTextField(
+                    value = dateOfTransaction,
+                    onValueChange = { },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false,
+                    readOnly = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = { datePickerDialog.show() }) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Select date",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
         }
 
         Row(
@@ -1020,6 +1035,23 @@ fun RecordExpensesScreen(
         ) {
             Text(
                 text = "Add Expense",
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Button(
+            onClick = { navController.navigate("list_expenses") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .padding(bottom = 12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = "View Expenses",
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Medium

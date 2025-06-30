@@ -170,46 +170,34 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header with "Login" and Notification Bell
-            Card(
+
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .shadow(6.dp, RectangleShape),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1E3A8A)
-                ),
-                shape = RectangleShape
+                    .padding(top = 48.dp, start = 24.dp, end = 24.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 40.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Login",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 32.sp,
+                        color = Color.White
+                    ),
+                    textAlign = TextAlign.Center
+                )
+                IconButton(
+                    onClick = { navController.navigate("notifications") },
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Text(
-                        text = "      Login",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 32.sp,
-                            color = Color.White
-                        ),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f)
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "View notifications",
+                        tint = Color(0xFFB0C4DE)
                     )
-                    IconButton(
-                        onClick = { navController.navigate("notifications") },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = "View notifications",
-                            tint = Color(0xFFB0C4DE)
-                        )
-                    }
                 }
             }
-
             // Welcome Message, App Name, and Logo
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -225,7 +213,7 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp // Increased font size for larger welcome message
                     ),
-                    color = Color(0xFF4FC3F7).copy(alpha = 0.95f), // Light vibrant blue
+                    color = Color.White,
                     textAlign = TextAlign.Center
                 )
                 Image(
