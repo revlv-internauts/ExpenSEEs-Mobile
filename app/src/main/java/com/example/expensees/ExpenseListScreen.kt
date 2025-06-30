@@ -68,8 +68,7 @@ fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
     expenses: SnapshotStateList<Expense>,
-    onDeleteExpenses: (List<Expense>) -> Unit,
-    onLogoutClick: () -> Unit
+    onDeleteExpenses: (List<Expense>) -> Unit
 ) {
     var selectedExpenses by remember { mutableStateOf(setOf<Expense>()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -223,13 +222,6 @@ fun ExpenseListScreen(
                                 imageVector = Icons.Default.DateRange,
                                 contentDescription = "Select date",
                                 tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        TextButton(onClick = onLogoutClick) {
-                            Text(
-                                text = "Logout",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 16.sp
                             )
                         }
                     },
@@ -754,13 +746,6 @@ fun ExpenseListScreen(
                                 text = "No receipt photo available",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Remarks: ${selectedExpense?.remarks ?: ""}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Spacer(modifier = Modifier.height(12.dp))

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,90 +30,158 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 @Composable
-fun LoadingScreen(modifier: Modifier = Modifier, onLoadingComplete: () -> Unit = {}) {
+fun LoadingScreen(
+    modifier: Modifier = Modifier,
+    onLoadingComplete: () -> Unit = {}
+) {
     LaunchedEffect(Unit) {
-        delay(3000L)
+        delay(3500L)
         onLoadingComplete()
     }
 
-    val textScale by animateFloatAsState(
-        targetValue = 1.2f,
+    val logoScale by animateFloatAsState(
+        targetValue = 1.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        ), label = "textScale"
-    )
-
-    val rotation by animateFloatAsState(
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ), label = "rotation"
+        ), label = "logoScale"
     )
 
     val pulse by animateFloatAsState(
-        targetValue = 1.1f,
+        targetValue = 1.07f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+            animation = tween(900),
             repeatMode = RepeatMode.Reverse
         ), label = "pulse"
     )
 
-    val gradientBrush = Brush.linearGradient(
+    val haloRotation by animateFloatAsState(
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000),
+            repeatMode = RepeatMode.Restart
+        ), label = "haloRotation"
+    )
+
+    val shimmerColors = listOf(
+        Color(0xFFB3E5FC),
+        Color(0xFF81D4FA),
+        Color(0xFF29B6F6),
+        Color(0xFF0288D1)
+    )
+
+    val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.secondary,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            Color(0xFF0D47A1),
+            Color(0xFF1565C0),
+            Color(0xFF1E88E5)
         ),
-        start = Offset(0f, 0f),
-        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        startY = 0f,
+        endY = Float.POSITIVE_INFINITY
     )
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(gradientBrush)
+            .background(brush = backgroundGradient)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+            // ✨ Gradient Logo Text with glow
             Text(
                 text = "ExpenSEEs",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontSize = 46.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     shadow = Shadow(
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-                        offset = Offset(4f, 4f),
-                        blurRadius = 8f
+                        color = Color.Cyan.copy(alpha = 0.6f),
+                        offset = Offset(2f, 8f),
+                        blurRadius = 25f
                     )
                 ),
-                color = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
-                    .scale(textScale)
-                    .padding(bottom = 48.dp)
+                    .scale(logoScale)
+                    .padding(bottom = 10.dp),
+                color = Color.Unspecified,
+                softWrap = false
             )
 
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 6.dp,
+            Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .rotate(rotation)
-                    .scale(pulse)
+                    .height(2.dp)
+                    .width(200.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, Color.White, Color.Transparent)
+                        )
+                    )
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Loading Your Financial Adventure...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                modifier = Modifier.alpha(1f)
-            )
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
+                // 🔄 Rotating outer gradient ring
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .rotate(haloRotation)
+                        .background(
+                            brush = Brush.sweepGradient(shimmerColors),
+                            shape = CircleShape
+                        )
+                        .alpha(0.3f)
+                )
+
+                // 🌟 Inner glowing aura
+                // 🚀 Enhanced dual-ring loading spinner (no background circle)
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
+
+                    // Outer thin ring rotating clockwise
+                    CircularProgressIndicator(
+                        strokeWidth = 3.dp,
+                        color = Color.Cyan.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .size(100.dp)
+                            .rotate(haloRotation)
+                    )
+
+                    // Inner thicker ring rotating counter-clockwise
+                    CircularProgressIndicator(
+                        strokeWidth = 5.dp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .size(70.dp)
+                            .rotate(-haloRotation)
+                            .scale(pulse)
+                    )
+                }
+
+
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // 📝 Dynamic Tagline
+                Text(
+                    text = "Loading your financial power...",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.5f),
+                            offset = Offset(1f, 2f),
+                            blurRadius = 8f
+                        )
+                    ),
+                    color = Color.White.copy(alpha = 0.95f),
+                    modifier = Modifier.alpha(0.97f)
+                )
+            }
         }
     }
 }

@@ -80,12 +80,6 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                         }
                     }
                 },
-                onLogoutClick = {
-                    authRepository.logout()
-                    navController.navigate("login") {
-                        popUpTo("list_expenses") { inclusive = true }
-                    }
-                },
                 modifier = modifier
             )
         }

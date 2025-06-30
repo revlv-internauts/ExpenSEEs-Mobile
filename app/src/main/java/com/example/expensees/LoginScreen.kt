@@ -3,6 +3,7 @@ package com.example.expensees.screens
 import android.content.Context
 import android.util.Log
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -39,9 +40,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.expensees.network.AuthRepository
+import androidx.compose.ui.res.painterResource
+import com.example.expensees.R
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlin.math.sin
+import kotlin.math.cos
 
 @Composable
 fun LoginScreen(
@@ -79,48 +83,57 @@ fun LoginScreen(
         initialValue = 0f,
         targetValue = 2f * Math.PI.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 10000, easing = LinearEasing),
+            animation = tween(durationMillis = 15000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "wave_offset"
     )
 
-    // Enhanced background with dynamic gradients
-    val primaryGradient = Brush.radialGradient(
+    // Enhanced background with dynamic layered blue gradients
+    val baseGradient = Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            MaterialTheme.colorScheme.background.copy(alpha = 0.3f)
+            Color(0xFF0D47A1).copy(alpha = 0.85f), // Deep blue
+            Color(0xFF1976D2).copy(alpha = 0.65f), // Vibrant blue
+            Color(0xFF64B5F6).copy(alpha = 0.45f)  // Soft blue
         ),
-        center = Offset(
-            x = 600f + 500f * sin(animatedOffset * 0.5f),
-            y = 800f - 400f * sin(animatedOffset * 0.3f)
+        start = Offset(
+            x = 0f + 250f * cos(animatedOffset * 0.35f),
+            y = 0f + 250f * sin(animatedOffset * 0.45f)
         ),
-        radius = 1200f + 400f * sin(animatedOffset * 0.25f)
-    )
-
-    val secondaryGradient = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-            MaterialTheme.colorScheme.background.copy(alpha = 0.25f)
-        ),
-        start = Offset(0f, 0f),
         end = Offset(
-            x = 1000f + 300f * sin(animatedOffset * 0.4f),
-            y = 1400f + 300f * sin(animatedOffset * 0.6f)
+            x = 900f + 350f * sin(animatedOffset * 0.55f),
+            y = 1300f + 350f * cos(animatedOffset * 0.35f)
         )
     )
 
-    // Subtle particle-like noise overlay
-    val noiseBrush = Brush.linearGradient(
+    val accentGradient = Brush.radialGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.08f),
-            Color.White.copy(alpha = 0.06f),
-            Color.White.copy(alpha = 0.08f)
+            Color(0xFF0288D1).copy(alpha = 0.45f), // Bright blue
+            Color(0xFF4FC3F7).copy(alpha = 0.25f), // Light blue
+            Color.Transparent
         ),
-        start = Offset(0f, 0f),
-        end = Offset(250f, 250f)
+        center = Offset(
+            x = 500f + 700f * sin(animatedOffset * 0.45f),
+            y = 700f + 500f * cos(animatedOffset * 0.55f)
+        ),
+        radius = 1100f + 350f * sin(animatedOffset * 0.25f)
+    )
+
+    // Subtle blue shimmer effect
+    val shimmerGradient = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFB3E5FC).copy(alpha = 0.08f), // Pale blue
+            Color(0xFF81D4FA).copy(alpha = 0.04f), // Lighter blue
+            Color(0xFFB3E5FC).copy(alpha = 0.08f)  // Pale blue
+        ),
+        start = Offset(
+            x = 0f + 350f * sin(animatedOffset * 0.65f),
+            y = 0f
+        ),
+        end = Offset(
+            x = 700f + 350f * sin(animatedOffset * 0.65f),
+            y = 700f
+        )
     )
 
     // Shake animation for form card on error
@@ -145,9 +158,9 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(primaryGradient)
-            .background(secondaryGradient)
-            .background(noiseBrush),
+            .background(baseGradient)
+            .background(accentGradient)
+            .background(shimmerGradient),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -175,12 +188,12 @@ fun LoginScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Login",
+                        text = "      Login",
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 32.sp
+                            fontSize = 32.sp,
+                            color = Color.White
                         ),
-                        color = Color.White,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f)
                     )
@@ -197,179 +210,192 @@ fun LoginScreen(
                 }
             }
 
-            // App Name
-            Text(
-                text = "ExpenSEEs",
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.Black,
-                    fontSize = 36.sp
-                ),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
-                textAlign = TextAlign.Center,
+            // Welcome Message, App Name, and Logo
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 32.dp)
-            )
-
-            // Main Content in a glassmorphism card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .alpha(formAlpha)
-                    .shadow(10.dp, RoundedCornerShape(16.dp))
-                    .offset(x = shakeOffset.value.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                ),
-                shape = RoundedCornerShape(16.dp)
+                    .weight(1.2f) // Increased weight to push content lower
+                    .padding(top = 32.dp) // Increased top padding to move content down
             ) {
-                Column(
+                Text(
+                    text = "Welcome to ExpenSEEs!",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 32.sp // Increased font size for larger welcome message
+                    ),
+                    color = Color(0xFF4FC3F7).copy(alpha = 0.95f), // Light vibrant blue
+                    textAlign = TextAlign.Center
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.expensees),
+                    contentDescription = "ExpenSEEs logo",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Username or Email Field with Icon
-                    CustomTextField(
-                        value = usernameOrEmail,
-                        onValueChange = { usernameOrEmail = it.trim() },
-                        label = "Username or Email",
-                        placeholder = "Enter username or email",
-                        keyboardType = KeyboardType.Text,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = "Email or username icon",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-                    )
+                        .size(400.dp) // Increased size for larger logo
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
 
-                    // Password Field with Icon and Visibility Toggle
-                    CustomTextField(
-                        value = password,
-                        onValueChange = { password = it.trim() },
-                        label = "Password",
-                        placeholder = "Enter password",
-                        keyboardType = KeyboardType.Password,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Password icon",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        },
-                        isPassword = true
-                    )
-
-                    // Server-side Error Message
-                    errorMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .alpha(formAlpha),
-                            textAlign = TextAlign.Left
+            // Main Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 32.dp)
+                    .alpha(formAlpha)
+                    .offset(x = shakeOffset.value.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Username or Email Field with Icon
+                CustomTextField(
+                    value = usernameOrEmail,
+                    onValueChange = { usernameOrEmail = it.trim() },
+                    label = "Username or Email",
+                    placeholder = "Enter username or email",
+                    keyboardType = KeyboardType.Text,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = "Email or username icon",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
+                )
 
-                    // Login Button
-                    Box(
+                // Password Field with Icon and Visibility Toggle
+                CustomTextField(
+                    value = password,
+                    onValueChange = { password = it.trim() },
+                    label = "Password",
+                    placeholder = "Enter password",
+                    keyboardType = KeyboardType.Password,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Password icon",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    },
+                    isPassword = true
+                )
+
+                // Server-side Error Message
+                errorMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary
-                                    )
+                            .alpha(formAlpha),
+                        textAlign = TextAlign.Left
+                    )
+                }
+
+                // Login Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.secondary
                                 )
                             )
-                            .alpha(alpha)
-                            .scale(scale)
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null,
-                                enabled = !isLoading
-                            ) {
-                                when {
-                                    usernameOrEmail.isBlank() -> errorMessage = "Please enter a username or email"
-                                    password.isBlank() -> errorMessage = "Please enter a password"
-                                    password.length < 6 -> errorMessage = "Password must be at least 6 characters"
-                                    !usernameOrEmail.contains("@") && usernameOrEmail.length < 3 -> errorMessage = "Username must be at least 3 characters"
-                                    usernameOrEmail.contains("@") && !usernameOrEmail.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) -> errorMessage = "Please enter a valid email"
-                                    else -> {
-                                        isLoading = true
-                                        errorMessage = null
-                                        coroutineScope.launch {
-                                            Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail', coroutineContext=${currentCoroutineContext()}")
-                                            val result = authRepository.login(usernameOrEmail, password)
-                                            isLoading = false
-                                            result.onSuccess {
-                                                val refreshToken = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                                                    .getString("refresh_token", null)
-                                                Log.d(
-                                                    "LoginScreen",
-                                                    "Login successful, refreshToken=${refreshToken?.take(10) ?: "null"}... (length=${refreshToken?.length ?: 0})"
-                                                )
-                                                navController.navigate("home") {
-                                                    popUpTo("login") { inclusive = true }
-                                                }
-                                            }.onFailure { e ->
-                                                Log.e("LoginScreen", "Login failed: ${e.message}", e)
-                                                errorMessage = when (e.message) {
-                                                    "Invalid credentials" -> "Incorrect username/email or password"
-                                                    "No internet connection" -> "No internet connection. Please check your network"
-                                                    "Invalid login response: token or userId is missing" -> "Server error: Invalid response. Please try again."
-                                                    else -> e.message ?: "Login failed. Please try again"
-                                                }
+                        )
+                        .alpha(alpha)
+                        .scale(scale)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            enabled = !isLoading
+                        ) {
+                            when {
+                                usernameOrEmail.isBlank() -> errorMessage = "Please enter a username or email"
+                                password.isBlank() -> errorMessage = "Please enter a password"
+                                password.length < 6 -> errorMessage = "Password must be at least 6 characters"
+                                !usernameOrEmail.contains("@") && usernameOrEmail.length < 3 -> errorMessage = "Username must be at least 3 characters"
+                                usernameOrEmail.contains("@") && !usernameOrEmail.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) -> errorMessage = "Please enter a valid email"
+                                else -> {
+                                    isLoading = true
+                                    errorMessage = null
+                                    coroutineScope.launch {
+                                        Log.d("LoginScreen", "Attempting login with usernameOrEmail: '$usernameOrEmail', coroutineContext=${currentCoroutineContext()}")
+                                        val result = authRepository.login(usernameOrEmail, password)
+                                        isLoading = false
+                                        result.onSuccess {
+                                            val refreshToken = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                                                .getString("refresh_token", null)
+                                            Log.d(
+                                                "LoginScreen",
+                                                "Login successful, refreshToken=${refreshToken?.take(10) ?: "null"}... (length=${refreshToken?.length ?: 0})"
+                                            )
+                                            navController.navigate("home") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }.onFailure { e ->
+                                            Log.e("LoginScreen", "Login failed: ${e.message}", e)
+                                            errorMessage = when (e.message) {
+                                                "Invalid credentials" -> "Incorrect username/email or password"
+                                                "No internet connection" -> "No internet connection. Please check your network"
+                                                "Invalid login response: token or userId is missing" -> "Server error: Invalid response. Please try again."
+                                                else -> e.message ?: "Login failed. Please try again"
                                             }
                                         }
                                     }
                                 }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(28.dp),
-                                strokeWidth = 3.dp
-                            )
-                        } else {
-                            Text(
-                                text = "Sign In",
-                                fontSize = 18.sp,
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            )
-                        }
-                    }
-
-                    // Recover Password Button
-                    TextButton(
-                        onClick = { navController.navigate("forgot_password") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 3.dp
+                        )
+                    } else {
                         Text(
-                            text = "Recover Password",
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
+                            text = "Sign In",
+                            fontSize = 18.sp,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.ExtraBold
+                            )
                         )
                     }
                 }
+
+                // Recover Password Button
+                TextButton(
+                    onClick = { navController.navigate("forgotA_password") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Recover Password",
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
+
+            // Version Text
+            Text(
+                text = "Version 1.0",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
         }
     }
 }
@@ -415,7 +441,6 @@ fun CustomTextField(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.1f))
                 .scale(scale)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -463,7 +488,7 @@ fun CustomTextField(
                     unfocusedContainerColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha =0.6f)
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,

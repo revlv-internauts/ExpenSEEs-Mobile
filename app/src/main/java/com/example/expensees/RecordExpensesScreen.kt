@@ -17,8 +17,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,15 +31,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -668,13 +662,13 @@ fun RecordExpensesScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp), // Consistent with HomeScreen
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp, top = 16.dp), // Match HomeScreen header spacing
+                .padding(bottom = 8.dp, top = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { navController.navigate("home") }) {
@@ -684,92 +678,158 @@ fun RecordExpensesScreen(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Record Expenses",
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), // Match HomeScreen title style
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
+            Spacer(modifier = Modifier.weight(1f))
         }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp) // Consistent spacing
-        ) {
-            OutlinedTextField(
-                value = category,
-                onValueChange = { },
-                label = { Text("Category") },
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,
-                trailingIcon = {
-                    IconButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "▲" else "▼")
-                    }
-                }
-            )
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                categories.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            category = option
-                            expanded = false
-                        },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = amount,
-            onValueChange = { amount = it },
-            label = { Text("Amount") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp), // Consistent spacing
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-
-        OutlinedTextField(
-            value = dateOfTransaction,
-            onValueChange = { },
-            label = { Text("Date of Transaction (YYYY-MM-DD)") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp), // Consistent spacing
-            readOnly = true,
-            trailingIcon = {
-                IconButton(onClick = { datePickerDialog.show() }) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = "Select date",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        )
-
-        OutlinedTextField(
-            value = remarks,
-            onValueChange = { remarks = it },
-            label = { Text("Remarks") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp), // Consistent spacing
-            maxLines = 3
+        Divider(
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+            thickness = 1.dp,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp), // Consistent spacing
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .width(120.dp)
+                    .padding(end = 8.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false,
+                    readOnly = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = { expanded = !expanded }) {
+                            Text(if (expanded) "▲" else "▼")
+                        }
+                    }
+                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    categories.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                category = option
+                                expanded = false
+                            },
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Amount",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .width(120.dp)
+                    .padding(end = 8.dp)
+            )
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Date",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .width(120.dp)
+                    .padding(end = 8.dp)
+            )
+            OutlinedTextField(
+                value = dateOfTransaction,
+                onValueChange = { },
+                modifier = Modifier.weight(1f),
+                readOnly = true,
+                trailingIcon = {
+                    IconButton(onClick = { datePickerDialog.show() }) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Select date",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = "Remarks",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .width(120.dp)
+                    .padding(end = 8.dp, top = 16.dp)
+            )
+            OutlinedTextField(
+                value = remarks,
+                onValueChange = { remarks = it },
+                modifier = Modifier.weight(1f),
+                maxLines = 3
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
@@ -796,8 +856,8 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp) // Match HomeScreen button height
-                    .padding(end = 4.dp), // Consistent button spacing
+                    .height(50.dp)
+                    .padding(end = 4.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             ) {
                 Text(
@@ -832,8 +892,8 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp) // Match HomeScreen button height
-                    .padding(start = 4.dp), // Consistent button spacing
+                    .height(50.dp)
+                    .padding(start = 4.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             ) {
                 Text(
@@ -851,7 +911,7 @@ fun RecordExpensesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .padding(bottom = 12.dp) // Consistent spacing
+                    .padding(bottom = 12.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                     .clickable {
@@ -954,9 +1014,9 @@ fun RecordExpensesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .padding(bottom = 12.dp), // Consistent spacing
+                .padding(bottom = 12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(8.dp) // Match HomeScreen button shape
+            shape = RoundedCornerShape(8.dp)
         ) {
             Text(
                 text = "Add Expense",
@@ -966,124 +1026,6 @@ fun RecordExpensesScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp)) // Match HomeScreen section spacing
-
-        Text(
-            text = "Recent Transactions",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp), // Match HomeScreen card spacing
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(8.dp)
-            ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp) // Match HomeScreen transaction spacing
-                ) {
-                    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US).apply {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }
-                    val sortedExpenses = authRepository.userExpenses.sortedByDescending {
-                        try {
-                            it.createdAt?.let { createdAt -> dateFormat.parse(createdAt) } ?: Date(0)
-                        } catch (e: Exception) {
-                            Log.e("RecordExpensesScreen", "Failed to parse date: ${it.createdAt}, error: ${e.message}")
-                            try {
-                                it.dateOfTransaction?.let { dateOfTransaction ->
-                                    SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateOfTransaction)
-                                } ?: Date(0)
-                            } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Failed to parse dateOfTransaction: ${it.dateOfTransaction}, error: ${e.message}")
-                                Date(0)
-                            }
-                        }
-                    }.take(10)
-                    items(sortedExpenses) { expense ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp) // Match HomeScreen transaction card spacing
-                                .clickable {
-                                    selectedExpense = expense
-                                    showExpenseDialog = true
-                                },
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp), // Match HomeScreen transaction padding
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = expense.remarks ?: "",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${expense.category ?: ""}${if (expense.expenseId?.startsWith("local_") == true) " (Not Synced)" else ""}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = try {
-                                            expense.createdAt?.let { createdAt ->
-                                                val parsedDate = dateFormat.parse(createdAt)
-                                                SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US).format(parsedDate)
-                                            } ?: expense.dateOfTransaction ?: "Unknown date"
-                                        } catch (e: Exception) {
-                                            Log.e("RecordExpensesScreen", "Failed to format date: ${expense.createdAt}, error: ${e.message}")
-                                            expense.dateOfTransaction ?: "Unknown date"
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp)) // Match HomeScreen spacing
-                                Text(
-                                    text = "₱${String.format("%.2f", expense.amount)}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.End,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f)) // Match HomeScreen footer spacing
+        Spacer(modifier = Modifier.weight(1f))
     }
 }

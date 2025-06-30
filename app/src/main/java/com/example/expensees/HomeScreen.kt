@@ -269,17 +269,33 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Welcome to ExpenSEEs!",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Color(0xFF1F2937), // Dark gray
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp, top = 50.dp),
-                textAlign = TextAlign.Center
-            )
+                    .padding(top = 50.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { scope.launch { drawerState.open() } },
+                    modifier = Modifier
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open navigation drawer",
+                        tint = Color(0xFF1F2937) // Dark gray
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Welcome to ExpenSEEs!",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFF1F2937), // Dark gray
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+            }
             if (expenses.isEmpty()) {
                 Card(
                     modifier = Modifier
@@ -409,6 +425,7 @@ fun HomeScreen(
                             } catch (e) {
                                 console.error('Chart creation failed: ' + e.message);
                             }
+                            window.android.onCategorySelected('', 0);
                         </script>
                     </body>
                     </html>
@@ -608,12 +625,6 @@ fun HomeScreen(
                         onClick = { navController.navigate("liquidation_report") },
                         modifier = Modifier.weight(1f)
                     )
-                    NavigationButton(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        onClick = { scope.launch { drawerState.open() } },
-                        modifier = Modifier.weight(1f)
-                    )
                 }
             }
         }
@@ -731,8 +742,8 @@ fun HomeScreen(
                                 type: 'bar',
                                 data: {
                                     labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                                            "'${(expense.remarks ?: "").replace("'", "\\'")}'"
-                                                                        }.joinToString()}],
+                                                    "'${(expense.remarks ?: "").replace("'", "\\'")}'"
+                                                }.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
                                         backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
