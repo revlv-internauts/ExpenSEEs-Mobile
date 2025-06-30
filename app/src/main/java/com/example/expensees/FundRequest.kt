@@ -6,18 +6,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,10 +34,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.ui.text.input.KeyboardType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +92,7 @@ fun FundRequest(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent, // Transparent to show gradient
                     titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -141,7 +142,16 @@ fun FundRequest(
                 }
             )
         },
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFE3F2FD), // Light blue (Blue 50)
+                        Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
+                    )
+                )
+            )
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -279,7 +289,8 @@ fun FundRequest(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
-            ) {
+            )
+            {
                 Text(
                     text = "Total Expenses: ₱${numberFormat.format(totalExpenses)}",
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -366,14 +377,14 @@ fun FundRequest(
                                 label = { Text("Expense Category") },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { expanded = !expanded }, // Trigger dropdown on click
                                 readOnly = true,
                                 trailingIcon = {
                                     Icon(
                                         imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                                         contentDescription = if (expanded) "Collapse" else "Expand",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.clickable { expanded = !expanded }
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                 },
                                 colors = TextFieldDefaults.outlinedTextFieldColors(

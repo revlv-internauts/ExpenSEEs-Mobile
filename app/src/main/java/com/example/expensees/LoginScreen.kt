@@ -181,7 +181,7 @@ fun LoginScreen(
                 Text(
                     text = "Login",
                     style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 32.sp,
                         color = Color.White
                     ),
@@ -194,7 +194,7 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "View notifications",
-                        tint = Color(0xFFB0C4DE)
+                        tint = Color(0xFFffffff)
                     )
                 }
             }
@@ -210,8 +210,8 @@ fun LoginScreen(
                 Text(
                     text = "Welcome to ExpenSEEs!",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 32.sp // Increased font size for larger welcome message
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 34.sp // Increased font size for larger welcome message
                     ),
                     color = Color.White,
                     textAlign = TextAlign.Center
@@ -361,7 +361,7 @@ fun LoginScreen(
 
                 // Recover Password Button
                 TextButton(
-                    onClick = { navController.navigate("forgotA_password") },
+                    onClick = { navController.navigate("forgot_password") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(

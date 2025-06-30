@@ -9,7 +9,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +28,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,12 +63,20 @@ fun LoadingScreen(
         )
     }
 
-    val rotation by animateFloatAsState(
+    val rotation1 by animateFloatAsState(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000),
+            animation = tween(2000),
             repeatMode = RepeatMode.Restart
-        ), label = "rotation"
+        ), label = "rotation1"
+    )
+
+    val rotation2 by animateFloatAsState(
+        targetValue = -360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500),
+            repeatMode = RepeatMode.Restart
+        ), label = "rotation2"
     )
 
     val backgroundGradient = Brush.verticalGradient(
@@ -97,28 +107,41 @@ fun LoadingScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // 🔵 Glowing Pulsing Orb + Spinner
+            // 🔵 New Blue Spinner Design
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
 
-                // Outer spinner
+                // Outer rotating ring
                 CircularProgressIndicator(
-                    strokeWidth = 4.dp,
-                    color = Color.White.copy(alpha = 0.7f),
+                    strokeWidth = 6.dp,
+                    color = Color(0xFF42A5F5), // Blue shade
                     modifier = Modifier
                         .size(120.dp)
-                        .rotate(rotation)
+                        .rotate(rotation1)
+                        .alpha(0.8f)
                 )
 
-                // Glowing pulsing orb in center
-                Box(
+                // Inner counter-rotating ring
+                CircularProgressIndicator(
+                    strokeWidth = 3.dp,
+                    color = Color(0xFF90CAF9), // Lighter blue shade
                     modifier = Modifier
-                        .size((36 * pulseAnim.value).dp)
-                        .background(Color.Cyan.copy(alpha = 0.8f), shape = CircleShape)
+                        .size(90.dp)
+                        .rotate(rotation2)
+                        .alpha(0.6f)
+                )
+
+                // Pulsing eye icon in center
+                Icon(
+                    imageVector = Icons.Filled.Visibility,
+                    contentDescription = "Loading Eye Icon",
+                    tint = Color(0xFFBBDEFB).copy(alpha = 0.9f), // Very light blue
+                    modifier = Modifier
+                        .size((55 * pulseAnim.value).dp)
                         .shadow(
                             elevation = 16.dp,
                             shape = CircleShape,
-                            ambientColor = Color.Cyan,
-                            spotColor = Color.Cyan
+                            ambientColor = Color(0xFF42A5F5),
+                            spotColor = Color(0xFF42A5F5)
                         )
                 )
             }

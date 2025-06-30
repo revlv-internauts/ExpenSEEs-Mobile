@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -66,20 +68,22 @@ fun HomeScreen(
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
+        isGroupingUsed = true // Ensure thousands separators for readability
     }
+
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
 
-    val totalExpenses = expenses.sumOf { it.amount }
+    val totalExpenses = expenses.sumOf { it.amount.coerceAtLeast(0.0) }
     val categoryTotals = expenses.groupBy { it.category }
-        .mapValues { entry -> entry.value.sumOf { it.amount } }
+        .mapValues { entry -> entry.value.sumOf { it.amount.coerceAtLeast(0.0) } }
         .toList()
         .sortedByDescending { it.second }
         .take(5)
     val chartData = categories.map { category ->
-        expenses.filter { it.category == category }.sumOf { it.amount }
+        expenses.filter { it.category == category }.sumOf { it.amount.coerceAtLeast(0.0) }
     }
 
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -131,11 +135,35 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false, // Disable swipe gesture to open drawer
+        gesturesEnabled = false, // Disable all built-in swipe gestures
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = Color(0xFFF5F5F5), // Matte off-white
-                drawerContentColor = Color(0xFF1F2937) // Dark gray
+                drawerContentColor = Color(0xFF1F2937), // Dark gray
+                modifier = Modifier.pointerInput(Unit) {
+                    var startX = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            startX = offset.x
+                        },
+                        onDragEnd = {
+                            if (drawerState.isOpen) {
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            if (drawerState.isOpen && dragAmount < 0) {
+                                // Allow swipe left to close (negative drag amount)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
+                            // Ignore swipe right (positive drag amount) to prevent opening
+                        }
+                    )
+                }
             ) {
                 Column(
                     modifier = Modifier
@@ -172,7 +200,7 @@ fun HomeScreen(
                             Text(
                                 text = "user@example.com",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF6B7280) // Gray
+                                color = Color(0xFF4B5563) // Darker gray for contrast
                             )
                         }
                     }
@@ -192,7 +220,7 @@ fun HomeScreen(
                         Text(
                             text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5EAA), // Soft blue
+                            color = Color(0xFF3B82F6), // Blue 500
                             fontSize = 16.sp
                         )
                     }
@@ -208,7 +236,7 @@ fun HomeScreen(
                         Text(
                             text = "Theme",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5EAA), // Soft blue
+                            color = Color(0xFF3B82F6), // Blue 500
                             fontSize = 16.sp
                         )
                     }
@@ -224,7 +252,7 @@ fun HomeScreen(
                         Text(
                             text = "About",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5EAA), // Soft blue
+                            color = Color(0xFF3B82F6), // Blue 500
                             fontSize = 16.sp
                         )
                     }
@@ -241,7 +269,7 @@ fun HomeScreen(
                             .height(50.dp)
                             .padding(vertical = 8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6B7280) // Gray
+                            containerColor = Color(0xFF3B82F6) // Blue 500
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -262,8 +290,8 @@ fun HomeScreen(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFF9FAFB), // Light gray
-                            Color(0xFFE5E7EB) // Slightly darker gray
+                            Color(0xFFE3F2FD), // Light blue (Blue 50)
+                            Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
                         )
                     )
                 )
@@ -303,7 +331,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF5F5F5) // Matte off-white
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -311,7 +339,7 @@ fun HomeScreen(
                     Text(
                         text = "No expenses recorded yet.",
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF6B7280), // Gray
+                        color = Color(0xFF1F2937), // Dark gray
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
@@ -324,7 +352,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF5F5F5) // Matte off-white
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -350,7 +378,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #E6E8EA; /* Matte pale gray */
+                                background: #DBEAFE; /* Blue 50 */
                                 width: 100%;
                                 height: 100%;
                             }
@@ -458,7 +486,7 @@ fun HomeScreen(
                 }
                 Text(
                     text = if (selectedChartCategory != null) {
-                        "${selectedChartCategory} Expenses: ₱${numberFormat.format(selectedCategoryAmount)}"
+                        "${selectedChartCategory} Expenses: ₱${numberFormat.format(selectedCategoryAmount.coerceAtLeast(0.0))}"
                     } else {
                         "Total Expenses: ₱${numberFormat.format(totalExpenses)}"
                     },
@@ -478,7 +506,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF5F5F5) // Matte off-white
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -495,16 +523,18 @@ fun HomeScreen(
                             color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 260.dp), // Allow scrolling if content exceeds this height
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            categoryTotals.forEachIndexed { index, (category, amount) ->
+                            itemsIndexed(categoryTotals) { index, (category, amount) ->
                                 val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                val categoryColor = categoryColors[category] ?: Color(0xFF4B5EAA) // Fallback to soft blue
+                                val categoryColor = categoryColors[category] ?: Color(0xFF3B82F6) // Fallback to Blue 500
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 2.dp)
                                         .scale(scale)
                                         .clickable { selectedCategory = category },
                                     shape = RoundedCornerShape(8.dp),
@@ -549,22 +579,28 @@ fun HomeScreen(
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(12.dp))
-                                            Column {
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
                                                 Text(
                                                     text = category ?: "Unknown",
                                                     style = MaterialTheme.typography.bodyLarge.copy(
                                                         fontWeight = FontWeight.SemiBold,
                                                         fontSize = 14.sp
                                                     ),
-                                                    color = Color(0xFF1F2937) // Dark gray
+                                                    color = Color(0xFF1F2937), // Dark gray
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = Color(0xFF6B7280) // Gray
+                                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.widthIn(max = 120.dp) // Constrain amount text width
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.weight(1f))
                                             Text(
                                                 text = if (totalExpenses > 0) {
                                                     "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
@@ -575,7 +611,10 @@ fun HomeScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 14.sp
                                                 ),
-                                                color = categoryColor
+                                                color = categoryColor,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.widthIn(max = 60.dp) // Constrain percentage text width
                                             )
                                         }
                                     }
@@ -591,7 +630,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF5F5F5) // Matte off-white
+                    containerColor = Color(0xFFDBEAFE) // Blue 50
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 shape = RoundedCornerShape(12.dp)
@@ -639,7 +678,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .alpha(dialogAlpha),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFECEFF1) // Matte light gray
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
@@ -676,7 +715,7 @@ fun HomeScreen(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close dialog",
-                                    tint = Color(0xFF6B7280) // Gray
+                                    tint = Color(0xFF4B5563) // Darker gray for contrast
                                 )
                             }
                         }
@@ -691,7 +730,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No transactions recorded for this category.",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF6B7280) // Gray
+                                    color = Color(0xFF1F2937) // Dark gray
                                 )
                             }
                         } else {
@@ -718,7 +757,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #E6E8EA; /* Matte pale gray */
+                                background: #DBEAFE; /* Blue 50 */
                                 height: 100%;
                                 width: 100%;
                             }
@@ -853,7 +892,7 @@ fun HomeScreen(
                                                 showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = Color(0xFFF5F5F5) // Matte off-white
+                                            containerColor = Color(0xFFDBEAFE) // Blue 50
                                         ),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                                         shape = RoundedCornerShape(8.dp)
@@ -879,16 +918,21 @@ fun HomeScreen(
                                                 Text(
                                                     text = expense.dateOfTransaction ?: "",
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = Color(0xFF6B7280) // Gray
+                                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             Text(
-                                                text = "₱${numberFormat.format(expense.amount)}",
+                                                text = "₱${numberFormat.format(expense.amount.coerceAtLeast(0.0))}",
                                                 style = MaterialTheme.typography.bodyLarge.copy(
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 16.sp
                                                 ),
-                                                color = categoryColors[expense.category] ?: Color(0xFF4B5EAA) // Fallback to soft blue
+                                                color = categoryColors[expense.category] ?: Color(0xFF3B82F6), // Fallback to Blue 500
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.widthIn(max = 100.dp) // Constrain transaction amount width
                                             )
                                         }
                                     }
@@ -903,7 +947,7 @@ fun HomeScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF4B5EAA) // Soft blue
+                                containerColor = Color(0xFF3B82F6) // Blue 500
                             )
                         ) {
                             Text(
@@ -932,7 +976,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFECEFF1) // Matte light gray
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -949,7 +993,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF4B5EAA), // Soft blue
+                            color = Color(0xFF3B82F6), // Blue 500
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         selectedImagePath?.let { imagePath ->
@@ -958,7 +1002,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No receipt photo available",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF6B7280), // Gray
+                                    color = Color(0xFF4B5563), // Darker gray for contrast
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -978,7 +1022,7 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
-                                                Color(0xFF4B5EAA), // Soft blue
+                                                Color(0xFF3B82F6), // Blue 500
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
@@ -992,7 +1036,7 @@ fun HomeScreen(
                                     Text(
                                         text = "No receipt photo available",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFF6B7280), // Gray
+                                        color = Color(0xFF4B5563), // Darker gray for contrast
                                         modifier = Modifier.padding(bottom = 12.dp)
                                     )
                                 }
@@ -1006,7 +1050,7 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             1.5.dp,
-                                            Color(0xFF4B5EAA), // Soft blue
+                                            Color(0xFF3B82F6), // Blue 500
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable { showFullScreenImage = true },
@@ -1022,7 +1066,7 @@ fun HomeScreen(
                         } ?: Text(
                             text = "No receipt photo available",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF6B7280), // Gray
+                            color = Color(0xFF4B5563), // Darker gray for contrast
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1033,7 +1077,7 @@ fun HomeScreen(
                             TextButton(onClick = { showInfoDialog = true }) {
                                 Text(
                                     text = "Info",
-                                    color = Color(0xFF4B5EAA), // Soft blue
+                                    color = Color(0xFF3B82F6), // Blue 500
                                     fontSize = 16.sp
                                 )
                             }
@@ -1045,7 +1089,7 @@ fun HomeScreen(
                             }) {
                                 Text(
                                     text = "Close",
-                                    color = Color(0xFF4B5EAA), // Soft blue
+                                    color = Color(0xFF3B82F6), // Blue 500
                                     fontSize = 16.sp
                                 )
                             }
@@ -1069,7 +1113,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFECEFF1) // Matte light gray
+                        containerColor = Color(0xFFDBEAFE) // Blue 50
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -1085,7 +1129,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF4B5EAA), // Soft blue
+                            color = Color(0xFF3B82F6), // Blue 500
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Column(
@@ -1098,7 +1142,7 @@ fun HomeScreen(
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
-                                text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount ?: 0.0)}",
+                                text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                                 color = Color(0xFF1F2937), // Dark gray
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1134,7 +1178,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "Close",
-                                color = Color(0xFF4B5EAA), // Soft blue
+                                color = Color(0xFF3B82F6), // Blue 500
                                 fontSize = 16.sp
                             )
                         }
@@ -1156,7 +1200,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFECEFF1)) // Matte light gray
+                        .background(Color(0xFFDBEAFE)) // Blue 50
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
@@ -1171,7 +1215,7 @@ fun HomeScreen(
                             Text(
                                 text = "No image available",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                color = Color(0xFF6B7280), // Gray
+                                color = Color(0xFF4B5563), // Darker gray for contrast
                                 modifier = Modifier.padding(16.dp)
                             )
                         } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -1190,7 +1234,7 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            Color(0xFF4B5EAA), // Soft blue
+                                            Color(0xFF3B82F6), // Blue 500
                                             RoundedCornerShape(12.dp)
                                         ),
                                     contentScale = ContentScale.Fit
@@ -1200,7 +1244,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF6B7280), // Gray
+                                    color = Color(0xFF4B5563), // Darker gray for contrast
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
@@ -1213,7 +1257,7 @@ fun HomeScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         2.dp,
-                                        Color(0xFF4B5EAA), // Soft blue
+                                        Color(0xFF3B82F6), // Blue 500
                                         RoundedCornerShape(12.dp)
                                     ),
                                 contentScale = ContentScale.Fit,
@@ -1228,7 +1272,7 @@ fun HomeScreen(
                     } ?: Text(
                         text = "No image available",
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF6B7280), // Gray
+                        color = Color(0xFF4B5563), // Darker gray for contrast
                         modifier = Modifier.padding(16.dp)
                     )
                     IconButton(
@@ -1274,7 +1318,7 @@ fun NavigationButton(
             .padding(horizontal = 4.dp)
             .scale(scale),
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFD6D8DA), // Matte silver-gray
+        color = Color(0xFFDBEAFE), // Blue 50
         onClick = onClick
     ) {
         Column(
@@ -1287,13 +1331,13 @@ fun NavigationButton(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(28.dp),
-                tint = Color(0xFF4B5EAA) // Soft blue
+                tint = Color(0xFF3B82F6) // Blue 500
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = label,
                 fontSize = 10.sp,
-                color = Color(0xFF4B5EAA), // Soft blue
+                color = Color(0xFF3B82F6), // Blue 500
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

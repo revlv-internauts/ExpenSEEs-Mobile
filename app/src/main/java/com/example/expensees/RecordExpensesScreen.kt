@@ -31,6 +31,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -48,7 +50,6 @@ import com.example.expensees.models.Expense
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.utils.createImageUri
 import com.google.gson.Gson
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -77,6 +78,7 @@ fun RecordExpensesScreen(
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showAuthErrorDialog by remember { mutableStateOf(false) }
     var pendingExpense by remember { mutableStateOf<Expense?>(null) }
+    var isAddingExpense by remember { mutableStateOf(false) }
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
@@ -160,7 +162,7 @@ fun RecordExpensesScreen(
                 Text(
                     text = "Permission Required",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFF3B82F6) // Blue 500
                 )
             },
             text = {
@@ -171,7 +173,7 @@ fun RecordExpensesScreen(
                         else -> ""
                     },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color(0xFF1F2937) // Dark gray
                 )
             },
             confirmButton = {
@@ -192,7 +194,7 @@ fun RecordExpensesScreen(
                 ) {
                     Text(
                         text = "Grant Permission",
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF3B82F6), // Blue 500
                         fontSize = 16.sp
                     )
                 }
@@ -201,7 +203,7 @@ fun RecordExpensesScreen(
                 TextButton(onClick = { showPermissionRationale = false }) {
                     Text(
                         text = "Cancel",
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF3B82F6), // Blue 500
                         fontSize = 16.sp
                     )
                 }
@@ -220,14 +222,14 @@ fun RecordExpensesScreen(
                 Text(
                     text = "Authentication Error",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFF3B82F6) // Blue 500
                 )
             },
             text = {
                 Text(
                     text = "Your session has expired or is invalid. The expense has been saved locally. Please log in again to sync it with the server.",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color(0xFF1F2937) // Dark gray
                 )
             },
             confirmButton = {
@@ -242,7 +244,7 @@ fun RecordExpensesScreen(
                 ) {
                     Text(
                         text = "Log In",
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF3B82F6), // Blue 500
                         fontSize = 16.sp
                     )
                 }
@@ -251,7 +253,7 @@ fun RecordExpensesScreen(
                 TextButton(onClick = { showAuthErrorDialog = false }) {
                     Text(
                         text = "Cancel",
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF3B82F6), // Blue 500
                         fontSize = 16.sp
                     )
                 }
@@ -273,7 +275,7 @@ fun RecordExpensesScreen(
         ) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                    containerColor = Color(0xFFDBEAFE) // Blue 50
                 ),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -294,16 +296,18 @@ fun RecordExpensesScreen(
                         Text(
                             text = "${selectedExpense?.category ?: ""} Receipt",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF3B82F6) // Blue 500
                         )
                         IconButton(
                             onClick = { showExpenseDialog = false; selectedExpense = null },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFFCED4DA), CircleShape) // Matte cool gray
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close dialog",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = Color(0xFF1F2937) // Dark gray
                             )
                         }
                     }
@@ -313,7 +317,7 @@ fun RecordExpensesScreen(
                             Text(
                                 text = "No receipt photo available",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = Color(0xFF4B5563), // Darker gray
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
@@ -330,21 +334,21 @@ fun RecordExpensesScreen(
                                     contentDescription = "${selectedExpense?.category ?: ""} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(200.dp)
+                                        .weight(1f)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
                                         .clickable {
                                             expenseImageBitmap = it
                                             showFullScreenImage = true
                                         },
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit
                                 )
                             } ?: run {
                                 imageLoadFailed = true
                                 Text(
                                     text = "No receipt photo available",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = Color(0xFF4B5563), // Darker gray
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
@@ -354,11 +358,11 @@ fun RecordExpensesScreen(
                                 contentDescription = "${selectedExpense?.category ?: ""} receipt",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(200.dp)
+                                    .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
                                     .clickable { showFullScreenImage = true },
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 onError = {
                                     Log.e("RecordExpensesScreen", "Failed to load server image: ${it.result.throwable.message}")
                                     imageLoadFailed = true
@@ -371,7 +375,7 @@ fun RecordExpensesScreen(
                     } ?: Text(
                         text = "No receipt photo available",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color(0xFF4B5563), // Darker gray
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -382,7 +386,7 @@ fun RecordExpensesScreen(
                         TextButton(onClick = { showInfoDialog = true }) {
                             Text(
                                 text = "Info",
-                                color = MaterialTheme.colorScheme.primary,
+                                color = Color(0xFF3B82F6), // Blue 500
                                 fontSize = 16.sp
                             )
                         }
@@ -392,7 +396,7 @@ fun RecordExpensesScreen(
                         }) {
                             Text(
                                 text = "Close",
-                                color = MaterialTheme.colorScheme.primary,
+                                color = Color(0xFF3B82F6), // Blue 500
                                 fontSize = 16.sp
                             )
                         }
@@ -416,7 +420,7 @@ fun RecordExpensesScreen(
         ) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    containerColor = Color(0xFFDBEAFE) // Blue 50
                 ),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -429,7 +433,7 @@ fun RecordExpensesScreen(
                     Text(
                         text = "Expense Details",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF3B82F6), // Blue 500
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     Column(
@@ -438,31 +442,31 @@ fun RecordExpensesScreen(
                         Text(
                             text = "Category: ${selectedExpense?.category ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Amount: ₱${String.format("%.2f", selectedExpense?.amount ?: 0.0)}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Date of Transaction: ${selectedExpense?.dateOfTransaction ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Created At: ${selectedExpense?.createdAt ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Remarks: ${selectedExpense?.remarks ?: "N/A"}",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = Color(0xFF1F2937), // Dark gray
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
@@ -477,7 +481,7 @@ fun RecordExpensesScreen(
                     ) {
                         Text(
                             text = "Close",
-                            color = MaterialTheme.colorScheme.primary,
+                            color = Color(0xFF3B82F6), // Blue 500
                             fontSize = 16.sp
                         )
                     }
@@ -499,7 +503,7 @@ fun RecordExpensesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.9f))
+                    .background(Color(0xFFDBEAFE)) // Blue 50
                     .padding(
                         top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                         bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -512,7 +516,7 @@ fun RecordExpensesScreen(
                         Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFF4B5563), // Darker gray
                             modifier = Modifier.padding(16.dp)
                         )
                     } else if (expense.expenseId?.startsWith("local_") == true) {
@@ -532,7 +536,7 @@ fun RecordExpensesScreen(
                                         .fillMaxSize()
                                         .padding(16.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)), // Blue 500
                                     contentScale = ContentScale.Fit
                                 )
                             } ?: run {
@@ -540,14 +544,14 @@ fun RecordExpensesScreen(
                                 Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = Color(0xFF4B5563), // Darker gray
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFF4B5563), // Darker gray
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
@@ -559,7 +563,7 @@ fun RecordExpensesScreen(
                                     .fillMaxSize()
                                     .padding(16.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                                    .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)), // Blue 500
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     Log.e("RecordExpensesScreen", "Failed to load server full screen image: ${it.result.throwable.message}")
@@ -572,14 +576,14 @@ fun RecordExpensesScreen(
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color(0xFF4B5563), // Darker gray
                             modifier = Modifier.padding(16.dp)
                         )
                     }
                 } ?: Text(
                     text = "No image available",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF4B5563), // Darker gray
                     modifier = Modifier.padding(16.dp)
                 )
                 IconButton(
@@ -591,15 +595,12 @@ fun RecordExpensesScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                            CircleShape
-                        )
+                        .background(Color(0xFFCED4DA), CircleShape) // Matte cool gray
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close image",
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = Color(0xFF1F2937) // Dark gray
                     )
                 }
             }
@@ -609,7 +610,7 @@ fun RecordExpensesScreen(
     LaunchedEffect(Unit) {
         if (authRepository.isAuthenticated()) {
             scope.launch {
-                Log.d("RecordExpensesScreen", "Fetching expenses in coroutineContext=${currentCoroutineContext()}")
+                Log.d("RecordExpensesScreen", "Fetching expenses")
                 val fetchResult = authRepository.getExpenses()
                 fetchResult.onSuccess {
                     Log.d("RecordExpensesScreen", "Expenses fetched successfully")
@@ -618,7 +619,7 @@ fun RecordExpensesScreen(
                         val result = authRepository.addExpense(pendingExpense!!)
                         result.onSuccess { returnedExpense ->
                             Log.d("RecordExpensesScreen", "Pending expense added: expenseId=${returnedExpense.expenseId}")
-                            if (returnedExpense.expenseId?.startsWith("local_") == true) {
+                            if (returnedExpense.expenseId?.startsWith("local_") != true) {
                                 pendingExpense = null
                             }
                             Toast.makeText(context, "Expense synced successfully", Toast.LENGTH_SHORT).show()
@@ -661,7 +662,14 @@ fun RecordExpensesScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFE3F2FD), // Light blue (Blue 50)
+                        Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
+                    )
+                )
+            )
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -675,21 +683,21 @@ fun RecordExpensesScreen(
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Back to home",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = Color(0xFF3B82F6) // Blue 500
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Record Expenses",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
+                color = Color(0xFF1F2937), // Dark gray
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Spacer(modifier = Modifier.weight(1f))
         }
         Divider(
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-            thickness = 1.dp,
+            color = Color(0xFF1F2937), // Darker gray for better contrast
+            thickness = 2.dp, // Increased thickness for visibility
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
@@ -702,7 +710,7 @@ fun RecordExpensesScreen(
             Text(
                 text = "Category",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color(0xFF1F2937), // Dark gray
                 modifier = Modifier
                     .width(120.dp)
                     .padding(end = 8.dp)
@@ -719,27 +727,32 @@ fun RecordExpensesScreen(
                     enabled = false,
                     readOnly = true,
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        disabledTextColor = Color(0xFF1F2937), // Dark gray
+                        disabledBorderColor = Color(0xFFE5E7EB), // Light gray
+                        disabledPlaceholderColor = Color(0xFF4B5563), // Darker gray
+                        disabledLabelColor = Color(0xFF4B5563), // Darker gray
+                        disabledLeadingIconColor = Color(0xFF4B5563), // Darker gray
+                        disabledTrailingIconColor = Color(0xFF4B5563) // Darker gray
                     ),
                     trailingIcon = {
                         IconButton(onClick = { expanded = !expanded }) {
-                            Text(if (expanded) "▲" else "▼")
+                            Text(
+                                text = if (expanded) "▲" else "▼",
+                                color = Color(0xFF3B82F6) // Blue 500
+                            )
                         }
                     }
                 )
                 DropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFDBEAFE)) // Blue 50
                 ) {
                     categories.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option) },
+                            text = { Text(option, color = Color(0xFF1F2937)) }, // Dark gray
                             onClick = {
                                 category = option
                                 expanded = false
@@ -760,16 +773,22 @@ fun RecordExpensesScreen(
             Text(
                 text = "Amount",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color(0xFF1F2937), // Dark gray
                 modifier = Modifier
                     .width(120.dp)
                     .padding(end = 8.dp)
             )
             OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
+                value = remarks,
+                onValueChange = { remarks = it },
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                maxLines = 3,
+                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937)), // Dark gray
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = Color(0xFF3B82F6), // Blue 500
+                    unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
+                    cursorColor = Color(0xFF3B82F6) // Blue 500
+                )
             )
         }
 
@@ -782,7 +801,7 @@ fun RecordExpensesScreen(
             Text(
                 text = "Date",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color(0xFF1F2937), // Dark gray
                 modifier = Modifier
                     .width(120.dp)
                     .padding(end = 8.dp)
@@ -799,19 +818,19 @@ fun RecordExpensesScreen(
                     enabled = false,
                     readOnly = true,
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        disabledTextColor = Color(0xFF1F2937), // Dark gray
+                        disabledBorderColor = Color(0xFFE5E7EB), // Light gray
+                        disabledPlaceholderColor = Color(0xFF4B5563), // Darker gray
+                        disabledLabelColor = Color(0xFF4B5563), // Darker gray
+                        disabledLeadingIconColor = Color(0xFF4B5563), // Darker gray
+                        disabledTrailingIconColor = Color(0xFF4B5563) // Darker gray
                     ),
                     trailingIcon = {
                         IconButton(onClick = { datePickerDialog.show() }) {
                             Icon(
                                 imageVector = Icons.Default.DateRange,
                                 contentDescription = "Select date",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = Color(0xFF3B82F6) // Blue 500
                             )
                         }
                     }
@@ -828,7 +847,7 @@ fun RecordExpensesScreen(
             Text(
                 text = "Remarks",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color(0xFF1F2937), // Dark gray
                 modifier = Modifier
                     .width(120.dp)
                     .padding(end = 8.dp, top = 16.dp)
@@ -837,7 +856,13 @@ fun RecordExpensesScreen(
                 value = remarks,
                 onValueChange = { remarks = it },
                 modifier = Modifier.weight(1f),
-                maxLines = 3
+                maxLines = 3,
+                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937)), // Dark gray
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = Color(0xFF3B82F6), // Blue 500
+                    unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
+                    cursorColor = Color(0xFF3B82F6) // Blue 500
+                )
             )
         }
 
@@ -871,14 +896,19 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp)
-                    .padding(end = 4.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    .height(48.dp)
+                    .padding(end = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF3B82F6), // Blue 500
+                    contentColor = Color(0xFFFFFFFF) // White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 Text(
                     text = "Take Photo",
                     fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSecondary
+                    fontWeight = FontWeight.Medium
                 )
             }
             Button(
@@ -907,35 +937,46 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp)
-                    .padding(start = 4.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    .height(48.dp)
+                    .padding(start = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF3B82F6), // Blue 500
+                    contentColor = Color(0xFFFFFFFF) // White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 Text(
                     text = "Pick from Gallery",
                     fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSecondary
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
 
         selectedImageBitmap?.let { bitmap ->
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Selected expense photo",
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .padding(bottom = 12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                    .clickable {
-                        expenseImageBitmap = bitmap
-                        showFullScreenImage = true
-                    },
-                contentScale = ContentScale.Crop
-            )
-        }
+                    .weight(1f)
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Selected expense photo",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
+                        .clickable {
+                            expenseImageBitmap = bitmap
+                            showFullScreenImage = true
+                        },
+                    contentScale = ContentScale.Fit
+                )
+            }
+        } ?: Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = {
@@ -969,9 +1010,10 @@ fun RecordExpensesScreen(
                             selectedImageUri = null
                             return@Button
                         }
+                        isAddingExpense = true
                         scope.launch {
                             try {
-                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}, coroutineContext=${currentCoroutineContext()}")
+                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}")
                                 val result = authRepository.addExpense(newExpense)
                                 result.onSuccess { returnedExpense ->
                                     Log.d("RecordExpensesScreen", "Expense added: expenseId=${returnedExpense.expenseId}, expense=${Gson().toJson(returnedExpense)}")
@@ -1017,6 +1059,8 @@ fun RecordExpensesScreen(
                             } catch (e: Exception) {
                                 Log.e("RecordExpensesScreen", "Unexpected error: ${e.message}", e)
                                 Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                isAddingExpense = false
                             }
                         }
                     } else {
@@ -1028,36 +1072,51 @@ fun RecordExpensesScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .height(56.dp)
                 .padding(bottom = 12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(8.dp)
+            enabled = !isAddingExpense,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF3B82F6), // Blue 500
+                contentColor = Color(0xFFFFFFFF), // White
+                disabledContainerColor = Color(0xFF3B82F6).copy(alpha = 0.5f), // Blue 500
+                disabledContentColor = Color(0xFFFFFFFF).copy(alpha = 0.5f) // White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Text(
-                text = "Add Expense",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Medium
-            )
+            if (isAddingExpense) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color(0xFFFFFFFF), // White
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "Add Expense",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         Button(
             onClick = { navController.navigate("list_expenses") },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .height(56.dp)
                 .padding(bottom = 12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF3B82F6), // Blue 500
+                contentColor = Color(0xFFFFFFFF) // White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
             Text(
                 text = "View Expenses",
                 fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Medium
             )
         }
-
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
