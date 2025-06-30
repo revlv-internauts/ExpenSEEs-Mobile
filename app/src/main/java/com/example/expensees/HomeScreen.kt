@@ -266,8 +266,8 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
-                            .padding(vertical = 8.dp),
+                            .heightIn(min = 56.dp) // Dynamic height with minimum
+                            .padding(horizontal = 16.dp, vertical = 12.dp), // Adjusted padding
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF3B82F6) // Blue 500
                         ),
@@ -275,9 +275,13 @@ fun HomeScreen(
                     ) {
                         Text(
                             text = "Logout",
-                            fontSize = 18.sp,
+                            fontSize = 16.sp, // Slightly reduced font size for better fit
                             color = Color(0xFFFFFFFF), // White
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(4.dp) // Ensure internal padding for text
                         )
                     }
                 }

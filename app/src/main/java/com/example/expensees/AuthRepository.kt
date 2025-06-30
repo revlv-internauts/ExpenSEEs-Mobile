@@ -60,6 +60,16 @@ class AuthRepository(
                             } catch (e: JWTDecodeException) {
                                 Log.e("AuthRepository", "Failed to decode token: ${e.message}")
                             }
+
+                            // Fetch expenses after successful login
+                            val expenseResult = getExpenses()
+                            expenseResult.onSuccess {
+                                Log.d("AuthRepository", "Expenses fetched successfully after login")
+                            }.onFailure { e ->
+                                Log.e("AuthRepository", "Failed to fetch expenses after login: ${e.message}")
+                                // Note: Not failing the login due to expense fetch failure
+                            }
+
                             Result.success(Unit)
                         }
                     } ?: Result.failure(Exception("Empty response body"))
