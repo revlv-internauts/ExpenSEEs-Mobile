@@ -25,11 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,8 +41,6 @@ import androidx.compose.ui.res.painterResource
 import com.example.expensees.R
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
-import kotlin.math.sin
-import kotlin.math.cos
 
 @Composable
 fun LoginScreen(
@@ -78,63 +73,6 @@ fun LoginScreen(
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
         label = "button_scale"
     )
-    val infiniteTransition = rememberInfiniteTransition(label = "background_animation")
-    val animatedOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * Math.PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 15000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "wave_offset"
-    )
-
-    // Enhanced background with dynamic layered blue gradients
-    val baseGradient = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF0D47A1).copy(alpha = 0.85f), // Deep blue
-            Color(0xFF1976D2).copy(alpha = 0.65f), // Vibrant blue
-            Color(0xFF64B5F6).copy(alpha = 0.45f)  // Soft blue
-        ),
-        start = Offset(
-            x = 0f + 250f * cos(animatedOffset * 0.35f),
-            y = 0f + 250f * sin(animatedOffset * 0.45f)
-        ),
-        end = Offset(
-            x = 900f + 350f * sin(animatedOffset * 0.55f),
-            y = 1300f + 350f * cos(animatedOffset * 0.35f)
-        )
-    )
-
-    val accentGradient = Brush.radialGradient(
-        colors = listOf(
-            Color(0xFF0288D1).copy(alpha = 0.45f), // Bright blue
-            Color(0xFF4FC3F7).copy(alpha = 0.25f), // Light blue
-            Color.Transparent
-        ),
-        center = Offset(
-            x = 500f + 700f * sin(animatedOffset * 0.45f),
-            y = 700f + 500f * cos(animatedOffset * 0.55f)
-        ),
-        radius = 1100f + 350f * sin(animatedOffset * 0.25f)
-    )
-
-    // Subtle blue shimmer effect
-    val shimmerGradient = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFFB3E5FC).copy(alpha = 0.08f), // Pale blue
-            Color(0xFF81D4FA).copy(alpha = 0.04f), // Lighter blue
-            Color(0xFFB3E5FC).copy(alpha = 0.08f)  // Pale blue
-        ),
-        start = Offset(
-            x = 0f + 350f * sin(animatedOffset * 0.65f),
-            y = 0f
-        ),
-        end = Offset(
-            x = 700f + 350f * sin(animatedOffset * 0.65f),
-            y = 700f
-        )
-    )
 
     // Shake animation for form card on error
     val shakeOffset = remember { Animatable(0f) }
@@ -158,9 +96,7 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(baseGradient)
-            .background(accentGradient)
-            .background(shimmerGradient),
+            .background(Color(0xFF0B313E)), // Set solid background color
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -170,7 +106,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -183,7 +118,7 @@ fun LoginScreen(
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 32.sp,
-                        color = Color.White
+                        color = Color.White // Already white, good contrast
                     ),
                     textAlign = TextAlign.Center
                 )
@@ -194,7 +129,7 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "View notifications",
-                        tint = Color(0xFFffffff)
+                        tint = Color.White // Already white, good contrast
                     )
                 }
             }
@@ -204,23 +139,23 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1.2f) // Increased weight to push content lower
-                    .padding(top = 32.dp) // Increased top padding to move content down
+                    .weight(1.2f)
+                    .padding(top = 32.dp)
             ) {
                 Text(
                     text = "Welcome to ExpenSEEs!",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 34.sp // Increased font size for larger welcome message
+                        fontSize = 34.sp
                     ),
-                    color = Color.White,
+                    color = Color.White, // Already white, good contrast
                     textAlign = TextAlign.Center
                 )
                 Image(
                     painter = painterResource(id = R.drawable.expensees),
                     contentDescription = "ExpenSEEs logo",
                     modifier = Modifier
-                        .size(400.dp) // Increased size for larger logo
+                        .size(400.dp)
                         .clip(RoundedCornerShape(8.dp))
                 )
             }
@@ -246,7 +181,7 @@ fun LoginScreen(
                         Icon(
                             imageVector = Icons.Default.Email,
                             contentDescription = "Email or username icon",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            tint = Color(0xFFB0BEC5).copy(alpha = 0.7f) // Light gray with 70% opacity for good contrast
                         )
                     }
                 )
@@ -262,7 +197,7 @@ fun LoginScreen(
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "Password icon",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            tint = Color(0xFFB0BEC5) // Light gray for good contrast
                         )
                     },
                     isPassword = true
@@ -272,7 +207,7 @@ fun LoginScreen(
                 errorMessage?.let {
                     Text(
                         text = it,
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f),
+                        color = Color(0xFFFF8A80), // Light red for visibility
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier
@@ -291,8 +226,8 @@ fun LoginScreen(
                         .background(
                             brush = Brush.linearGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.secondary
+                                    MaterialTheme.colorScheme.primary, // Primary color (ensure it contrasts)
+                                    MaterialTheme.colorScheme.secondary // Secondary color (ensure it contrasts)
                                 )
                             )
                         )
@@ -343,7 +278,7 @@ fun LoginScreen(
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = Color.White, // White for visibility
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp
                         )
@@ -351,7 +286,7 @@ fun LoginScreen(
                         Text(
                             text = "Sign In",
                             fontSize = 18.sp,
-                            color = Color.White,
+                            color = Color.White, // White for visibility
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -366,7 +301,7 @@ fun LoginScreen(
                 ) {
                     Text(
                         text = "Recover Password",
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                        color = Color(0xFF4FC3F7), // Light blue for visibility
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
@@ -378,7 +313,7 @@ fun LoginScreen(
             Text(
                 text = "Version 1.0",
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                color = Color(0xFFB0BEC5), // Light gray for visibility
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -388,7 +323,6 @@ fun LoginScreen(
     }
 }
 
-// Reusable TextField Composable with Icon and Animations
 @Composable
 fun CustomTextField(
     value: String,
@@ -400,7 +334,6 @@ fun CustomTextField(
     leadingIcon: (@Composable () -> Unit)? = null,
     isPassword: Boolean = false
 ) {
-    // Scale animation for focus state
     val focusInteractionSource = remember { MutableInteractionSource() }
     val isFocused by focusInteractionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
@@ -409,7 +342,6 @@ fun CustomTextField(
         label = "field_scale"
     )
 
-    // Password visibility state
     var isPasswordVisible by remember { mutableStateOf(false) }
 
     Column {
@@ -419,7 +351,7 @@ fun CustomTextField(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 18.sp
             ),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.87f),
+            color = Color(0xFFECEFF1), // Light gray for visibility
             textAlign = TextAlign.Left,
             modifier = Modifier
                 .fillMaxWidth()
@@ -451,7 +383,7 @@ fun CustomTextField(
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = Color(0xFFB0BEC5) // Light gray for visibility
                         )
                     )
                 },
@@ -461,22 +393,22 @@ fun CustomTextField(
                             Icon(
                                 imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                 contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                tint = Color(0xFFB0BEC5) // Light gray for visibility
                             )
                         }
                     }
                 } else null,
                 shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedBorderColor = Color(0xFF4FC3F7), // Light blue for visibility
+                    unfocusedBorderColor = Color(0xFFB0BEC5), // Light gray for visibility
+                    focusedLabelColor = Color(0xFFECEFF1), // Light gray for visibility
+                    unfocusedLabelColor = Color(0xFFB0BEC5), // Light gray for visibility
+                    cursorColor = Color(0xFF4FC3F7), // Light blue for visibility
                     unfocusedContainerColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha =0.6f)
+                    focusedTextColor = Color.White, // White for visibility
+                    unfocusedTextColor = Color(0xFFECEFF1) // Light gray for visibility
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,

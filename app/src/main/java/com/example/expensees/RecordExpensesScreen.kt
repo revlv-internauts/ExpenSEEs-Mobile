@@ -701,6 +701,7 @@ fun RecordExpensesScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
+        // Category Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -726,6 +727,7 @@ fun RecordExpensesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = false,
                     readOnly = true,
+                    placeholder = { Text("Select a category", color = Color(0xFF4B5563)) }, // Added placeholder
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         disabledTextColor = Color(0xFF1F2937), // Dark gray
                         disabledBorderColor = Color(0xFFE5E7EB), // Light gray
@@ -764,6 +766,7 @@ fun RecordExpensesScreen(
             }
         }
 
+// Amount Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -779,19 +782,26 @@ fun RecordExpensesScreen(
                     .padding(end = 8.dp)
             )
             OutlinedTextField(
-                value = remarks,
-                onValueChange = { remarks = it },
+                value = amount,
+                onValueChange = { newValue ->
+                    if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        amount = newValue
+                    }
+                },
                 modifier = Modifier.weight(1f),
-                maxLines = 3,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937)), // Dark gray
                 colors = TextFieldDefaults.outlinedTextFieldColors(
                     focusedBorderColor = Color(0xFF3B82F6), // Blue 500
                     unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
                     cursorColor = Color(0xFF3B82F6) // Blue 500
-                )
+                ),
+                placeholder = { Text("Enter amount (e.g., 50.00)", color = Color(0xFF4B5563)) } // Updated placeholder
             )
         }
 
+// Date Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -817,6 +827,7 @@ fun RecordExpensesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = false,
                     readOnly = true,
+                    placeholder = { Text("Select date (YYYY-MM-DD)", color = Color(0xFF4B5563)) }, // Added placeholder
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         disabledTextColor = Color(0xFF1F2937), // Dark gray
                         disabledBorderColor = Color(0xFFE5E7EB), // Light gray
@@ -838,6 +849,7 @@ fun RecordExpensesScreen(
             }
         }
 
+// Remarks Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -862,7 +874,8 @@ fun RecordExpensesScreen(
                     focusedBorderColor = Color(0xFF3B82F6), // Blue 500
                     unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
                     cursorColor = Color(0xFF3B82F6) // Blue 500
-                )
+                ),
+                placeholder = { Text("Enter remarks (e.g., Lunch at Cafe)", color = Color(0xFF4B5563)) } // Added placeholder
             )
         }
 

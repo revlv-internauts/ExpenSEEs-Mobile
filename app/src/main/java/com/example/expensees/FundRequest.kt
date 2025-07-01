@@ -2,6 +2,8 @@ package com.example.expensees.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -373,13 +375,21 @@ fun FundRequest(
                         ) {
                             OutlinedTextField(
                                 value = category,
-                                onValueChange = { },
+                                onValueChange = { }, // Keep empty since selection is via dropdown
                                 label = { Text("Expense Category") },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { expanded = !expanded }, // Trigger dropdown on click
-                                readOnly = true,
+                                    .clip(RoundedCornerShape(8.dp)),
+                                readOnly = true, // Prevent keyboard input
+                                interactionSource = remember { MutableInteractionSource() }.also { interactionSource ->
+                                    LaunchedEffect(interactionSource) {
+                                        interactionSource.interactions.collect { interaction ->
+                                            if (interaction is PressInteraction.Press) {
+                                                expanded = true // Open dropdown on any press
+                                            }
+                                        }
+                                    }
+                                },
                                 trailingIcon = {
                                     Icon(
                                         imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,

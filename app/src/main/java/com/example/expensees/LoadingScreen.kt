@@ -149,7 +149,7 @@ fun LoadingScreen(
             Spacer(modifier = Modifier.height(36.dp))
 
             Text(
-                text = "Powering your budget brilliance...",
+                text = "Organizing your wallet data...",
                 style = MaterialTheme.typography.bodyLarge.copy(
                     color = Color.White.copy(alpha = 0.9f),
                     fontSize = 16.sp
