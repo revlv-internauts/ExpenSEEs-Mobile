@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -59,43 +60,17 @@ fun ResetPassword(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Reset Password",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        navController.navigate("home") {
-                            popUpTo("home") { inclusive = false }
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.primary
-                )
-            )
-        },
-        modifier = modifier.fillMaxSize()
-    ) { innerPadding ->
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFEEECE1))
+            .windowInsetsPadding(WindowInsets(0, 0, 0, 0)),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-                .background(MaterialTheme.colorScheme.background),
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -199,6 +174,24 @@ fun ResetPassword(
                     )
                 }
             }
+        }
+
+        // Back button in top-left corner
+        IconButton(
+            onClick = {
+                navController.navigate("home") {
+                    popUpTo("home") { inclusive = false }
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

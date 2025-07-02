@@ -20,7 +20,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -94,7 +93,7 @@ fun FundRequest(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent, // Transparent to show gradient
+                    containerColor = Color(0xFFEEECE1), // Consistent background color
                     titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -144,20 +143,22 @@ fun FundRequest(
                 }
             )
         },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(Color(0xFFEEECE1)) // Consistent background color
+            )
+        },
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFE3F2FD), // Light blue (Blue 50)
-                        Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
-                    )
-                )
-            )
+            .background(Color(0xFFEEECE1)) // Scaffold background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color(0xFFEEECE1)) // Ensure Column has the same background
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -291,8 +292,7 @@ fun FundRequest(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
-            )
-            {
+            ) {
                 Text(
                     text = "Total Expenses: ₱${numberFormat.format(totalExpenses)}",
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -353,6 +353,8 @@ fun FundRequest(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp)) // Additional spacing for bottom bar
         }
 
         // Add Expense Dialog
@@ -367,7 +369,9 @@ fun FundRequest(
                     )
                 },
                 text = {
-                    Column {
+                    Column(
+                        modifier = Modifier.background(Color(0xFFEEECE1)) // Set dialog content background
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -405,7 +409,9 @@ fun FundRequest(
                             DropdownMenu(
                                 expanded = expanded,
                                 onDismissRequest = { expanded = false },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFEEECE1)) // Set dropdown background
                             ) {
                                 categories.forEach { option ->
                                     DropdownMenuItem(
@@ -508,7 +514,9 @@ fun FundRequest(
                         )
                     }
                 },
-                modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFEEECE1)) // Set dialog background
             )
         }
     }

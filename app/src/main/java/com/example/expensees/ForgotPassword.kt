@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,19 +82,20 @@ fun ForgotPassword(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = Color(0xFFEEECE1), // Match TopAppBar to screen background
                     titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         },
+        containerColor = Color(0xFFEEECE1), // Explicitly set Scaffold background
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color(0xFFEEECE1)) // Ensure Column doesn't override background
                 .padding(innerPadding)
-                .padding(16.dp)
-                .background(MaterialTheme.colorScheme.background),
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

@@ -49,14 +49,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.expensees.ApiConfig
 import com.example.expensees.models.Expense
+import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import android.util.Log
-
-import coil.request.ImageRequest
+import com.example.expensees.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +65,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     expenses: SnapshotStateList<Expense>,
     navController: NavController,
+    authRepository: AuthRepository,
     onRecordExpensesClick: () -> Unit = {},
     onListExpensesClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {}
@@ -72,7 +74,7 @@ fun HomeScreen(
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
-        isGroupingUsed = true // Ensure thousands separators for readability
+        isGroupingUsed = true
     }
 
     val categories = listOf(
@@ -116,9 +118,11 @@ fun HomeScreen(
         )
     ).toMap()
 
-    val animatedScale = remember { SnapshotStateList<Animatable<Float, *>>().apply {
-        repeat(categoryTotals.size) { add(Animatable(0f)) }
-    } }
+    val animatedScale = remember {
+        SnapshotStateList<Animatable<Float, *>>().apply {
+            repeat(categoryTotals.size) { add(Animatable(0f)) }
+        }
+    }
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
@@ -137,13 +141,43 @@ fun HomeScreen(
         }
     }
 
+    // Pre-fetch token to avoid null token issue
+    var token by remember { mutableStateOf<String?>(null) }
+    var tokenFetchFailed by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        if (retryCount < 2) {
+            try {
+                val tokenResult = authRepository.getValidToken()
+                if (tokenResult.isSuccess) {
+                    token = tokenResult.getOrNull()
+                    Log.d("HomeScreen", "Initial token fetched: $token")
+                } else {
+                    retryCount++
+                    Log.e("HomeScreen", "Initial token retrieval failed: ${tokenResult.exceptionOrNull()?.message}")
+                    tokenFetchFailed = true
+                }
+            } catch (e: Exception) {
+                retryCount++
+                Log.e("HomeScreen", "Initial token retrieval exception: ${e.message}")
+                tokenFetchFailed = true
+            }
+        } else {
+            tokenFetchFailed = true
+            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+            navController.navigate("login") {
+                popUpTo("home") { inclusive = true }
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false, // Disable all built-in swipe gestures
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color(0xFFF5F5F5), // Matte off-white
-                drawerContentColor = Color(0xFF1F2937), // Dark gray
+                drawerContainerColor = Color(0xFFF5F5F5),
+                drawerContentColor = Color(0xFF1F2937),
                 modifier = Modifier.pointerInput(Unit) {
                     var startX = 0f
                     detectHorizontalDragGestures(
@@ -159,12 +193,10 @@ fun HomeScreen(
                         },
                         onHorizontalDrag = { _, dragAmount ->
                             if (drawerState.isOpen && dragAmount < 0) {
-                                // Allow swipe left to close (negative drag amount)
                                 scope.launch {
                                     drawerState.close()
                                 }
                             }
-                            // Ignore swipe right (positive drag amount) to prevent opening
                         }
                     )
                 }
@@ -183,13 +215,13 @@ fun HomeScreen(
                         Surface(
                             shape = CircleShape,
                             modifier = Modifier.size(56.dp),
-                            color = Color(0xFFD6D8DA) // Matte silver-gray
+                            color = Color(0xFFD6D8DA)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = "A",
                                     style = MaterialTheme.typography.headlineMedium,
-                                    color = Color(0xFF1F2937), // Dark gray
+                                    color = Color(0xFF1F2937),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -199,18 +231,18 @@ fun HomeScreen(
                             Text(
                                 text = "User Profile",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF1F2937) // Dark gray
+                                color = Color(0xFF1F2937)
                             )
                             Text(
                                 text = "user@example.com",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF4B5563) // Darker gray for contrast
+                                color = Color(0xFF4B5563)
                             )
                         }
                     }
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 8.dp),
-                        color = Color(0xFFE5E7EB) // Light gray
+                        color = Color(0xFFE5E7EB)
                     )
                     TextButton(
                         onClick = {
@@ -224,7 +256,7 @@ fun HomeScreen(
                         Text(
                             text = "Reset Password",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6), // Blue 500
+                            color = Color(0xFF3B82F6),
                             fontSize = 16.sp
                         )
                     }
@@ -240,7 +272,7 @@ fun HomeScreen(
                         Text(
                             text = "Theme",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6), // Blue 500
+                            color = Color(0xFF3B82F6),
                             fontSize = 16.sp
                         )
                     }
@@ -256,7 +288,7 @@ fun HomeScreen(
                         Text(
                             text = "About",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6), // Blue 500
+                            color = Color(0xFF3B82F6),
                             fontSize = 16.sp
                         )
                     }
@@ -270,22 +302,22 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp) // Dynamic height with minimum
-                            .padding(horizontal = 16.dp, vertical = 12.dp), // Adjusted padding
+                            .heightIn(min = 56.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF3B82F6) // Blue 500
+                            containerColor = Color(0xFF3B82F6)
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = "Logout",
-                            fontSize = 16.sp, // Slightly reduced font size for better fit
-                            color = Color(0xFFFFFFFF), // White
+                            fontSize = 16.sp,
+                            color = Color(0xFFFFFFFF),
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(4.dp) // Ensure internal padding for text
+                                .padding(4.dp)
                         )
                     }
                 }
@@ -295,7 +327,7 @@ fun HomeScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color(0xFFEEECE1)) // Updated background color to #eeece1
+                .background(Color(0xFFEEECE1))
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -312,7 +344,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Menu,
                         contentDescription = "Open navigation drawer",
-                        tint = Color(0xFF1F2937) // Dark gray
+                        tint = Color(0xFF1F2937)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -321,7 +353,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color(0xFF1F2937), // Dark gray
+                    color = Color(0xFF1F2937),
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
@@ -332,7 +364,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -340,7 +372,7 @@ fun HomeScreen(
                     Text(
                         text = "No expenses recorded yet.",
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF1F2937), // Dark gray
+                        color = Color(0xFF1F2937),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
@@ -353,7 +385,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -379,7 +411,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #DBEAFE; /* Blue 50 */
+                                background: #DBEAFE;
                                 width: 100%;
                                 height: 100%;
                             }
@@ -495,7 +527,7 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 18.sp
                     ),
-                    color = selectedChartCategory?.let { categoryColors[it] } ?: Color(0xFF1F2937), // Dark gray
+                    color = selectedChartCategory?.let { categoryColors[it] } ?: Color(0xFF1F2937),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
@@ -507,7 +539,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -521,18 +553,18 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 18.sp
                             ),
-                            color = Color(0xFF1F2937), // Dark gray
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 260.dp), // Allow scrolling if content exceeds this height
+                                .heightIn(max = 260.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             itemsIndexed(categoryTotals) { index, (category, amount) ->
                                 val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                val categoryColor = categoryColors[category] ?: Color(0xFF3B82F6) // Fallback to Blue 500
+                                val categoryColor = categoryColors[category] ?: Color(0xFF3B82F6)
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -574,7 +606,7 @@ fun HomeScreen(
                                                     Text(
                                                         text = "${index + 1}",
                                                         style = MaterialTheme.typography.labelLarge,
-                                                        color = Color(0xFFFFFFFF), // White
+                                                        color = Color(0xFFFFFFFF),
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 }
@@ -589,17 +621,17 @@ fun HomeScreen(
                                                         fontWeight = FontWeight.SemiBold,
                                                         fontSize = 14.sp
                                                     ),
-                                                    color = Color(0xFF1F2937), // Dark gray
+                                                    color = Color(0xFF1F2937),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                                    color = Color(0xFF4B5563),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.widthIn(max = 120.dp) // Constrain amount text width
+                                                    modifier = Modifier.widthIn(max = 120.dp)
                                                 )
                                             }
                                             Text(
@@ -615,7 +647,7 @@ fun HomeScreen(
                                                 color = categoryColor,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 60.dp) // Constrain percentage text width
+                                                modifier = Modifier.widthIn(max = 60.dp)
                                             )
                                         }
                                     }
@@ -668,7 +700,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .alpha(dialogAlpha),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
@@ -691,21 +723,21 @@ fun HomeScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 20.sp
                                 ),
-                                color = Color(0xFF1F2937) // Dark gray
+                                color = Color(0xFF1F2937)
                             )
                             IconButton(
                                 onClick = { selectedCategory = null },
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(
-                                        Color(0xFFCED4DA), // Matte cool gray
+                                        Color(0xFFCED4DA),
                                         CircleShape
                                     )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close dialog",
-                                    tint = Color(0xFF4B5563) // Darker gray for contrast
+                                    tint = Color(0xFF4B5563)
                                 )
                             }
                         }
@@ -720,7 +752,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No transactions recorded for this category.",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF1F2937) // Dark gray
+                                    color = Color(0xFF1F2937)
                                 )
                             }
                         } else {
@@ -729,7 +761,6 @@ fun HomeScreen(
                                 val factor = 0.8f - (index * 0.1f).coerceAtMost(0.5f)
                                 "#${baseColor.copy(alpha = factor).toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}"
                             }
-                            // Filter out zero or negative amounts for logarithmic scale
                             val validTransactions = transactionsForCategory.filter { it.amount > 0 }
                             val transactionData = validTransactions.map { it.amount }
                             val transactionLabels = validTransactions.mapIndexed { index, expense ->
@@ -753,7 +784,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #DBEAFE; /* Blue 50 */
+                                background: #DBEAFE;
                                 height: 100%;
                                 width: 100%;
                             }
@@ -775,7 +806,7 @@ fun HomeScreen(
                                     datasets: [{
                                         data: transactionData,
                                         backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
-                                        borderColor: '#D1D5DB', // Light gray border for subtle contrast
+                                        borderColor: '#D1D5DB',
                                         borderWidth: 1
                                     }]
                                 },
@@ -804,18 +835,18 @@ fun HomeScreen(
                                     scales: {
                                         x: {
                                             ticks: { display: false },
-                                            barPercentage: 0.8, // Adjust bar width
-                                            categoryPercentage: 0.9 // Adjust spacing between bars
+                                            barPercentage: 0.8,
+                                            categoryPercentage: 0.9
                                         },
                                         y: {
                                             type: 'logarithmic',
-                                            min: 0.1, // Set a small minimum to avoid log(0) issues
+                                            min: 0.1,
                                             ticks: {
                                                 callback: function(value) {
                                                     return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                                 },
                                                 font: { size: 12 },
-                                                color: '#1F2937', // Dark gray for tick labels
+                                                color: '#1F2937',
                                                 autoSkip: true,
                                                 maxTicksLimit: 6
                                             }
@@ -851,7 +882,7 @@ fun HomeScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(
                                         1.dp,
-                                        Color(0xFFE5E7EB), // Light gray
+                                        Color(0xFFE5E7EB),
                                         RoundedCornerShape(8.dp)
                                     )
                                     .padding(8.dp)
@@ -863,7 +894,7 @@ fun HomeScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 18.sp
                                 ),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             LazyColumn(
@@ -909,7 +940,7 @@ fun HomeScreen(
                                                         fontWeight = FontWeight.Medium,
                                                         fontSize = 16.sp
                                                     ),
-                                                    color = Color(0xFF1F2937), // Dark gray
+                                                    color = Color(0xFF1F2937),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -917,7 +948,7 @@ fun HomeScreen(
                                                 Text(
                                                     text = expense.dateOfTransaction ?: "",
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                                    color = Color(0xFF4B5563),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -928,10 +959,10 @@ fun HomeScreen(
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 16.sp
                                                 ),
-                                                color = categoryColors[expense.category] ?: Color(0xFF3B82F6), // Fallback to Blue 500
+                                                color = categoryColors[expense.category] ?: Color(0xFF3B82F6),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 100.dp) // Constrain transaction amount width
+                                                modifier = Modifier.widthIn(max = 100.dp)
                                             )
                                         }
                                     }
@@ -946,13 +977,13 @@ fun HomeScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF3B82F6) // Blue 500
+                                containerColor = Color(0xFF3B82F6)
                             )
                         ) {
                             Text(
                                 text = "Close",
                                 fontSize = 16.sp,
-                                color = Color(0xFFFFFFFF), // White
+                                color = Color(0xFFFFFFFF),
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -997,9 +1028,9 @@ fun HomeScreen(
                         )
                         selectedImagePath?.let { imagePath ->
                             var imageLoadFailed by remember { mutableStateOf(false) }
-                            if (imageLoadFailed) {
+                            if (tokenFetchFailed) {
                                 Text(
-                                    text = "No receipt photo available",
+                                    text = "Authentication error: Please log in again",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Color(0xFF4B5563),
                                     modifier = Modifier.padding(bottom = 12.dp)
@@ -1041,12 +1072,20 @@ fun HomeScreen(
                                     )
                                 }
                             } else {
-                                val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                                Log.d("HomeScreen", "Loading server image: $fullImageUrl")
+                                val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
+                                Log.d("HomeScreen", "Loading server image: $fullImageUrl with token: $token")
                                 AsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(fullImageUrl)
-                                        .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                        .apply {
+                                            if (token != null) {
+                                                addHeader("Authorization", "Bearer $token")
+                                            } else {
+                                                imageLoadFailed = true
+                                            }
+                                        }
+                                        .diskCacheKey(fullImageUrl)
+                                        .memoryCacheKey(fullImageUrl)
                                         .build(),
                                     contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
@@ -1060,12 +1099,29 @@ fun HomeScreen(
                                         )
                                         .clickable { showFullScreenImage = true },
                                     contentScale = ContentScale.Crop,
-                                    onError = {
+                                    onError = { error ->
                                         imageLoadFailed = true
                                         scope.launch {
-                                            Log.e("HomeScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
-                                            Toast.makeText(context, "Failed to load receipt image: $fullImageUrl", Toast.LENGTH_SHORT).show()
+                                            Log.e("HomeScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                            Toast.makeText(context, "Failed to load receipt image: ${error.result.throwable.message}", Toast.LENGTH_LONG).show()
+                                            if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                retryCount++
+                                                val tokenResult = authRepository.getValidToken()
+                                                if (tokenResult.isSuccess) {
+                                                    token = tokenResult.getOrNull()
+                                                    Log.d("HomeScreen", "Retry token fetched: $token")
+                                                } else {
+                                                    tokenFetchFailed = true
+                                                    Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("login") {
+                                                        popUpTo("home") { inclusive = true }
+                                                    }
+                                                }
+                                            }
                                         }
+                                    },
+                                    onSuccess = {
+                                        Log.d("HomeScreen", "Successfully loaded server image: $fullImageUrl")
                                     }
                                 )
                             }
@@ -1119,7 +1175,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -1135,7 +1191,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF3B82F6), // Blue 500
+                            color = Color(0xFF3B82F6),
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Column(
@@ -1144,31 +1200,31 @@ fun HomeScreen(
                             Text(
                                 text = "Category: ${selectedTransaction?.category ?: "N/A"}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
                                 text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937), // Dark gray
+                                color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
@@ -1184,7 +1240,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "Close",
-                                color = Color(0xFF3B82F6), // Blue 500
+                                color = Color(0xFF3B82F6),
                                 fontSize = 16.sp
                             )
                         }
@@ -1217,9 +1273,9 @@ fun HomeScreen(
                 ) {
                     selectedImagePath?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
-                        if (imageLoadFailed) {
+                        if (tokenFetchFailed) {
                             Text(
-                                text = "No image available",
+                                text = "Authentication error: Please log in again",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                                 color = Color(0xFF4B5563),
                                 modifier = Modifier.padding(16.dp)
@@ -1256,12 +1312,20 @@ fun HomeScreen(
                                 )
                             }
                         } else {
-                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                            Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl")
+                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
+                            Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: $token")
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(fullImageUrl)
-                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .apply {
+                                        if (token != null) {
+                                            addHeader("Authorization", "Bearer $token")
+                                        } else {
+                                            imageLoadFailed = true
+                                        }
+                                    }
+                                    .diskCacheKey(fullImageUrl)
+                                    .memoryCacheKey(fullImageUrl)
                                     .build(),
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
@@ -1273,12 +1337,29 @@ fun HomeScreen(
                                         RoundedCornerShape(12.dp)
                                     ),
                                 contentScale = ContentScale.Fit,
-                                onError = {
+                                onError = { error ->
                                     imageLoadFailed = true
                                     scope.launch {
-                                        Log.e("HomeScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${it.result.throwable.message}")
-                                        Toast.makeText(context, "Failed to load full screen image: $fullImageUrl", Toast.LENGTH_SHORT).show()
+                                        Log.e("HomeScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                        Toast.makeText(context, "Failed to load full screen image: ${error.result.throwable.message}", Toast.LENGTH_LONG).show()
+                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                            retryCount++
+                                            val tokenResult = authRepository.getValidToken()
+                                            if (tokenResult.isSuccess) {
+                                                token = tokenResult.getOrNull()
+                                                Log.d("HomeScreen", "Retry token fetched: $token")
+                                            } else {
+                                                tokenFetchFailed = true
+                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                navController.navigate("login") {
+                                                    popUpTo("home") { inclusive = true }
+                                                }
+                                            }
+                                        }
                                     }
+                                },
+                                onSuccess = {
+                                    Log.d("HomeScreen", "Successfully loaded full-screen server image: $fullImageUrl")
                                 }
                             )
                         }
@@ -1315,8 +1396,6 @@ fun HomeScreen(
     }
 }
 
-
-
 @Composable
 fun NavigationButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1333,7 +1412,7 @@ fun NavigationButton(
             .padding(horizontal = 4.dp)
             .scale(scale),
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFDBEAFE), // Blue 50
+        color = Color(0xFFDBEAFE),
         onClick = onClick
     ) {
         Column(
@@ -1346,13 +1425,13 @@ fun NavigationButton(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(28.dp),
-                tint = Color(0xFF3B82F6) // Blue 500
+                tint = Color(0xFF3B82F6)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = label,
                 fontSize = 10.sp,
-                color = Color(0xFF3B82F6), // Blue 500
+                color = Color(0xFF3B82F6),
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

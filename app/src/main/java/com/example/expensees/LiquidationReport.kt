@@ -142,7 +142,9 @@ fun LiquidationReport(
                 )
             )
         },
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFEEECE1)) // Apply the background color here
     ) { innerPadding ->
         Column(
             modifier = Modifier

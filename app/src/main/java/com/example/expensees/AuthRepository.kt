@@ -2,7 +2,6 @@ package com.example.expensees.network
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -34,6 +33,16 @@ class AuthRepository(
 ) {
     val userExpenses: SnapshotStateList<Expense> = mutableStateListOf()
 
+    // Check network availability
+    fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+    }
+
+    // Login with username or email and password
     suspend fun login(usernameOrEmail: String, password: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -43,41 +52,44 @@ class AuthRepository(
                 val rawResponseBody = response.body()?.let { Gson().toJson(it) } ?: "null"
                 val errorBody = response.errorBody()?.string() ?: "null"
                 Log.d("AuthRepository", "Sign-in response: HTTP ${response.code()}, body=$rawResponseBody, errorBody=$errorBody")
+
                 if (response.isSuccessful) {
                     response.body()?.let { signInResponse ->
-                        Log.d("AuthRepository", "Response details: token=${signInResponse.token?.take(20) ?: "null"}..., userId=${signInResponse.user_Id}, refreshToken=${signInResponse.refreshToken?.take(20) ?: "null"}...")
                         if (signInResponse.token.isNullOrEmpty() || signInResponse.user_Id.isNullOrEmpty()) {
                             Log.e("AuthRepository", "Login failed: token or userId is null or empty")
-                            Result.failure(Exception("Invalid login response: token or userId is missing"))
-                        } else {
-                            Log.d("AuthRepository", "Login successful: token=${signInResponse.token.take(20)}..., userId=${signInResponse.user_Id}, refreshToken=${signInResponse.refreshToken?.take(20) ?: "null"}...")
-                            context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                                .edit()
-                                .putString("auth_token", signInResponse.token)
-                                .putString("user_id", signInResponse.user_Id)
-                                .putString("refresh_token", signInResponse.refreshToken)
-                                .apply()
-                            if (signInResponse.refreshToken.isNullOrEmpty()) {
-                                Log.w("AuthRepository", "No refresh token provided by server. Token refresh will not be possible.")
-                            }
-                            try {
-                                val decodedJWT = JWT.decode(signInResponse.token)
-                                Log.d("AuthRepository", "Token claims: ${decodedJWT.claims}, expiresAt: ${decodedJWT.expiresAt}, raw exp: ${decodedJWT.getClaim("exp").asLong()}")
-                            } catch (e: JWTDecodeException) {
-                                Log.e("AuthRepository", "Failed to decode token: ${e.message}")
-                            }
-
-                            // Fetch expenses after successful login
-                            val expenseResult = getExpenses()
-                            expenseResult.onSuccess {
-                                Log.d("AuthRepository", "Expenses fetched successfully after login")
-                            }.onFailure { e ->
-                                Log.e("AuthRepository", "Failed to fetch expenses after login: ${e.message}")
-                                // Note: Not failing the login due to expense fetch failure
-                            }
-
-                            Result.success(Unit)
+                            return@withContext Result.failure(Exception("Invalid login response: token or userId is missing"))
                         }
+                        Log.d("AuthRepository", "Login successful: token=${signInResponse.token.take(20)}..., userId=${signInResponse.user_Id}, refreshToken=${signInResponse.refreshToken?.take(20) ?: "null"}...")
+                        context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("auth_token", signInResponse.token)
+                            .putString("user_id", signInResponse.user_Id)
+                            .putString("refresh_token", signInResponse.refreshToken)
+                            .apply()
+                        // Verify token storage
+                        val savedToken = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                            .getString("auth_token", null)
+                        Log.d("AuthRepository", "Verified saved token: ${savedToken?.take(20) ?: "null"}...")
+
+                        if (signInResponse.refreshToken.isNullOrEmpty()) {
+                            Log.w("AuthRepository", "No refresh token provided by server. Token refresh will not be possible.")
+                        }
+                        try {
+                            val decodedJWT = JWT.decode(signInResponse.token)
+                            Log.d("AuthRepository", "Token claims: ${decodedJWT.claims}, expiresAt: ${decodedJWT.expiresAt}, raw exp: ${decodedJWT.getClaim("exp").asLong()}")
+                        } catch (e: JWTDecodeException) {
+                            Log.e("AuthRepository", "Failed to decode token: ${e.message}")
+                        }
+
+                        // Fetch expenses after successful login
+                        val expenseResult = getExpenses()
+                        expenseResult.onSuccess {
+                            Log.d("AuthRepository", "Expenses fetched successfully after login")
+                        }.onFailure { e ->
+                            Log.e("AuthRepository", "Failed to fetch expenses after login: ${e.message}")
+                            // Not failing login due to expense fetch failure
+                        }
+                        Result.success(Unit)
                     } ?: Result.failure(Exception("Empty response body"))
                 } else {
                     val errorResponse = response.errorBody()?.string()?.let {
@@ -110,14 +122,7 @@ class AuthRepository(
         }
     }
 
-    fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-    }
-
+    // Fetch expenses from server
     suspend fun getExpenses(): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -202,6 +207,7 @@ class AuthRepository(
         }
     }
 
+    // Add a new expense
     suspend fun addExpense(expense: Expense): Result<Expense> {
         return withContext(Dispatchers.IO) {
             try {
@@ -283,7 +289,7 @@ class AuthRepository(
         }
     }
 
-
+    // Helper function to add expense with a valid token
     private suspend fun addExpenseWithToken(expense: Expense, token: String): Result<Expense> {
         return withContext(Dispatchers.IO) {
             try {
@@ -298,6 +304,7 @@ class AuthRepository(
                     return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
                 }
 
+                // Validate date formats
                 try {
                     expense.dateOfTransaction?.let {
                         SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it)
@@ -425,7 +432,7 @@ class AuthRepository(
                     dateOfTransaction = dateOfTransactionPart,
                     remarks = remarksPart,
                     createdAt = createdAtPart,
-                    files = imagePart // Update to "files" in ApiService
+                    files = imagePart
                 )
 
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
@@ -497,7 +504,7 @@ class AuthRepository(
         }
     }
 
-
+    // Refresh access token using refresh token
     private suspend fun refreshToken(refreshToken: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -570,12 +577,16 @@ class AuthRepository(
         }
     }
 
+    // Delete expenses
     suspend fun deleteExpenses(expenses: List<Expense>) {
         withContext(Dispatchers.IO) {
             try {
-                val token = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                    .getString("auth_token", null)
-                    ?: throw Exception("Not authenticated. Please log in.")
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token for deleteExpenses: ${tokenResult.exceptionOrNull()?.message}")
+                    throw Exception("Not authenticated. Please log in.")
+                }
+                val token = tokenResult.getOrNull()!!
                 expenses.forEach { expense ->
                     expense.expenseId?.let { expenseId ->
                         if (!expenseId.startsWith("local_")) {
@@ -607,30 +618,42 @@ class AuthRepository(
         }
     }
 
-    suspend fun syncLocalExpenses(token: String) {
+    // Sync local expenses with server
+    suspend fun syncLocalExpenses() {
         withContext(Dispatchers.IO) {
-            val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }
-            val serverExpenses = apiService.getExpenses("Bearer $token").body() ?: emptyList()
-            val serverExpenseIds = serverExpenses.mapNotNull { it.expenseId }.toSet()
-
-            for (localExpense in localExpenses) {
-                if (localExpense.expenseId !in serverExpenseIds) {
-                    val result = addExpenseWithToken(localExpense, token)
-                    if (result.isSuccess) {
-                        userExpenses.remove(localExpense)
-                        userExpenses.add(result.getOrNull()!!)
-                        Log.d("AuthRepository", "Synced local expense: ${localExpense.expenseId}")
-                    } else {
-                        Log.e("AuthRepository", "Failed to sync local expense: ${localExpense.expenseId}, error: ${result.exceptionOrNull()?.message}")
-                    }
-                } else {
-                    Log.d("AuthRepository", "Skipping sync for local expense ${localExpense.expenseId}, already exists on server")
-                    userExpenses.remove(localExpense)
+            try {
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token for syncLocalExpenses: ${tokenResult.exceptionOrNull()?.message}")
+                    return@withContext
                 }
+                val token = tokenResult.getOrNull()!!
+                val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }
+                val serverExpenses = apiService.getExpenses("Bearer $token").body() ?: emptyList()
+                val serverExpenseIds = serverExpenses.mapNotNull { it.expenseId }.toSet()
+
+                for (localExpense in localExpenses) {
+                    if (localExpense.expenseId !in serverExpenseIds) {
+                        val result = addExpenseWithToken(localExpense, token)
+                        if (result.isSuccess) {
+                            userExpenses.remove(localExpense)
+                            userExpenses.add(result.getOrNull()!!)
+                            Log.d("AuthRepository", "Synced local expense: ${localExpense.expenseId}")
+                        } else {
+                            Log.e("AuthRepository", "Failed to sync local expense: ${localExpense.expenseId}, error: ${result.exceptionOrNull()?.message}")
+                        }
+                    } else {
+                        Log.d("AuthRepository", "Skipping sync for local expense ${localExpense.expenseId}, already exists on server")
+                        userExpenses.remove(localExpense)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Sync local expenses error: ${e.message}", e)
             }
         }
     }
 
+    // Logout and clear session
     fun logout() {
         context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
             .edit()
@@ -640,6 +663,7 @@ class AuthRepository(
         Log.d("AuthRepository", "Logged out, cleared SharedPreferences and userExpenses")
     }
 
+    // Check if user is authenticated
     fun isAuthenticated(): Boolean {
         val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
         val token = prefs.getString("auth_token", null)
@@ -661,4 +685,45 @@ class AuthRepository(
         }
     }
 
+    // Get a valid token, refreshing if necessary
+    suspend fun getValidToken(): Result<String> {
+        return withContext(Dispatchers.IO) {
+            val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+            var token = prefs.getString("auth_token", null)
+            if (token.isNullOrEmpty()) {
+                Log.e("AuthRepository", "No token found in SharedPreferences")
+                return@withContext Result.failure(Exception("Not authenticated. Please log in."))
+            }
+
+            try {
+                val decodedJWT = JWT.decode(token)
+                val expiry = decodedJWT.expiresAt
+                val currentTime = Date()
+                if (expiry == null || expiry.before(currentTime)) {
+                    Log.d("AuthRepository", "Access token expired, attempting to refresh")
+                    val refreshToken = prefs.getString("refresh_token", null)
+                    if (refreshToken.isNullOrEmpty()) {
+                        Log.e("AuthRepository", "No refresh token available")
+                        return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                    }
+                    val refreshResult = refreshToken(refreshToken)
+                    if (refreshResult.isSuccess) {
+                        token = prefs.getString("auth_token", null)
+                        if (token.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "Failed to obtain new token after refresh")
+                            return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
+                        }
+                    } else {
+                        Log.e("AuthRepository", "Token refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                        return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                    }
+                }
+                Log.d("AuthRepository", "Valid token retrieved: ${token.take(20)}...")
+                Result.success(token)
+            } catch (e: JWTDecodeException) {
+                Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
+                Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
+            }
+        }
+    }
 }
