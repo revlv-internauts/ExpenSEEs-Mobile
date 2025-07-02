@@ -26,7 +26,7 @@ interface ApiService {
         @Part("dateOfTransaction") dateOfTransaction: RequestBody,
         @Part("remarks") remarks: RequestBody?,
         @Part("createdAt") createdAt: RequestBody,
-        @Part file: MultipartBody.Part? // Use "image" if server expects it
+        @Part files: MultipartBody.Part? // Changed from "image" to "files"
     ): Response<Expense>
 
     @DELETE("expenses/{expenseId}")

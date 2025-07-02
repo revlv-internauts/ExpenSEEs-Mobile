@@ -283,6 +283,7 @@ class AuthRepository(
         }
     }
 
+
     private suspend fun addExpenseWithToken(expense: Expense, token: String): Result<Expense> {
         return withContext(Dispatchers.IO) {
             try {
@@ -390,9 +391,9 @@ class AuthRepository(
                                     fileName.endsWith(".png", ignoreCase = true) -> "image/png"
                                     else -> "image/jpeg"
                                 }.toMediaTypeOrNull()
-                                Log.d("AuthRepository", "Image part created: fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
+                                Log.d("AuthRepository", "Image part created: fieldName=files, fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
                                 MultipartBody.Part.createFormData(
-                                    "file", // Use "image" if server expects it
+                                    "files", // Changed to match server expectation
                                     fileName,
                                     bytes.toRequestBody(mediaType)
                                 )
@@ -424,7 +425,7 @@ class AuthRepository(
                     dateOfTransaction = dateOfTransactionPart,
                     remarks = remarksPart,
                     createdAt = createdAtPart,
-                    file = imagePart // Use "image" if server expects it
+                    files = imagePart // Update to "files" in ApiService
                 )
 
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
@@ -494,7 +495,6 @@ class AuthRepository(
             }
         }
     }
-
 
 
     private suspend fun refreshToken(refreshToken: String): Result<Unit> {
