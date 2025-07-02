@@ -3,6 +3,7 @@ package com.example.expensees.screens
 import android.Manifest
 import android.app.Activity
 import android.app.DatePickerDialog
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -46,6 +47,8 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.expensees.ApiConfig
 import com.example.expensees.models.Expense
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.utils.createImageUri
@@ -311,7 +314,7 @@ fun RecordExpensesScreen(
                             )
                         }
                     }
-                    selectedExpense?.imagePaths?.let { imagePath ->
+                    selectedExpense?.imagePaths?.firstOrNull()?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
                         if (imageLoadFailed) {
                             Text(
@@ -353,8 +356,13 @@ fun RecordExpensesScreen(
                                 )
                             }
                         } else {
+                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                            Log.d("RecordExpensesScreen", "Loading server image: $fullImageUrl")
                             AsyncImage(
-                                model = imagePath,
+                                model = ImageRequest.Builder(context)
+                                    .data(fullImageUrl)
+                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .build(),
                                 contentDescription = "${selectedExpense?.category ?: ""} receipt",
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -364,7 +372,7 @@ fun RecordExpensesScreen(
                                     .clickable { showFullScreenImage = true },
                                 contentScale = ContentScale.Fit,
                                 onError = {
-                                    Log.e("RecordExpensesScreen", "Failed to load server image: ${it.result.throwable.message}")
+                                    Log.e("RecordExpensesScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
                                     imageLoadFailed = true
                                     scope.launch {
                                         Toast.makeText(context, "Failed to load receipt image", Toast.LENGTH_SHORT).show()
@@ -520,12 +528,12 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     } else if (expense.expenseId?.startsWith("local_") == true) {
-                        expense.imagePaths?.let { imagePaths ->
+                        expense.imagePaths?.firstOrNull()?.let { imagePath ->
                             val bitmap = try {
-                                val uri = Uri.parse(imagePaths)
+                                val uri = Uri.parse(imagePath)
                                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                             } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePaths: $imagePaths", e)
+                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePath: $imagePath", e)
                                 null
                             }
                             bitmap?.let {
@@ -555,9 +563,14 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
-                        expense.imagePaths?.let { imagePaths ->
+                        expense.imagePaths?.firstOrNull()?.let { imagePath ->
+                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                            Log.d("RecordExpensesScreen", "Loading full-screen server image: $fullImageUrl")
                             AsyncImage(
-                                model = imagePaths,
+                                model = ImageRequest.Builder(context)
+                                    .data(fullImageUrl)
+                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .build(),
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -566,7 +579,7 @@ fun RecordExpensesScreen(
                                     .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)), // Blue 500
                                 contentScale = ContentScale.Fit,
                                 onError = {
-                                    Log.e("RecordExpensesScreen", "Failed to load server full screen image: ${it.result.throwable.message}")
+                                    Log.e("RecordExpensesScreen", "Failed to load server full screen image: $fullImageUrl, error: ${it.result.throwable.message}")
                                     imageLoadFailed = true
                                     scope.launch {
                                         Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
@@ -766,7 +779,7 @@ fun RecordExpensesScreen(
             }
         }
 
-// Amount Input
+        // Amount Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -801,7 +814,7 @@ fun RecordExpensesScreen(
             )
         }
 
-// Date Input
+        // Date Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -849,7 +862,7 @@ fun RecordExpensesScreen(
             }
         }
 
-// Remarks Input
+        // Remarks Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -985,6 +998,15 @@ fun RecordExpensesScreen(
                         .clickable {
                             expenseImageBitmap = bitmap
                             showFullScreenImage = true
+                            selectedExpense = Expense(
+                                expenseId = "local_${System.currentTimeMillis()}",
+                                category = category.takeIf { it.isNotBlank() } ?: "N/A",
+                                amount = amount.toDoubleOrNull() ?: 0.0,
+                                dateOfTransaction = dateOfTransaction.takeIf { it.isNotBlank() },
+                                remarks = remarks.takeIf { it.isNotBlank() },
+                                imagePaths = selectedImageUri?.let { listOf(it.toString()) },
+                                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+                            )
                         },
                     contentScale = ContentScale.Fit
                 )
@@ -1006,7 +1028,7 @@ fun RecordExpensesScreen(
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
                             remarks = remarks,
-                            imagePaths = selectedImageUri?.toString(),
+                            imagePaths = selectedImageUri?.let { listOf(it.toString()) }, // Fix: Wrap URI in a list
                             createdAt = timestamp
                         )
                         if (!authRepository.isAuthenticated()) {

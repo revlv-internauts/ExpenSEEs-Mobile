@@ -49,10 +49,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.expensees.ApiConfig
 import com.example.expensees.models.Expense
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+import android.util.Log
+
+import coil.request.ImageRequest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -883,11 +887,11 @@ fun HomeScreen(
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
-                                                selectedImagePath = expense.imagePaths
+                                                selectedImagePath = expense.imagePaths?.firstOrNull()
                                                 showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                                            containerColor = Color(0xFFDBEAFE)
                                         ),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                                         shape = RoundedCornerShape(8.dp)
@@ -971,7 +975,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
+                        containerColor = Color(0xFFDBEAFE)
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -988,7 +992,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF3B82F6), // Blue 500
+                            color = Color(0xFF3B82F6),
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         selectedImagePath?.let { imagePath ->
@@ -997,7 +1001,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No receipt photo available",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                    color = Color(0xFF4B5563),
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -1005,6 +1009,7 @@ fun HomeScreen(
                                     val uri = Uri.parse(imagePath)
                                     BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                 } catch (e: Exception) {
+                                    Log.e("HomeScreen", "Failed to load local image: $imagePath, error: ${e.message}")
                                     null
                                 }
                                 bitmap?.let {
@@ -1017,7 +1022,7 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
-                                                Color(0xFF3B82F6), // Blue 500
+                                                Color(0xFF3B82F6),
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
@@ -1031,13 +1036,18 @@ fun HomeScreen(
                                     Text(
                                         text = "No receipt photo available",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFF4B5563), // Darker gray for contrast
+                                        color = Color(0xFF4B5563),
                                         modifier = Modifier.padding(bottom = 12.dp)
                                     )
                                 }
                             } else {
+                                val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                                Log.d("HomeScreen", "Loading server image: $fullImageUrl")
                                 AsyncImage(
-                                    model = imagePath,
+                                    model = ImageRequest.Builder(context)
+                                        .data(fullImageUrl)
+                                        .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                        .build(),
                                     contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1045,7 +1055,7 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             1.5.dp,
-                                            Color(0xFF3B82F6), // Blue 500
+                                            Color(0xFF3B82F6),
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable { showFullScreenImage = true },
@@ -1053,7 +1063,8 @@ fun HomeScreen(
                                     onError = {
                                         imageLoadFailed = true
                                         scope.launch {
-                                            Toast.makeText(context, "Failed to load receipt image", Toast.LENGTH_SHORT).show()
+                                            Log.e("HomeScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                            Toast.makeText(context, "Failed to load receipt image: $fullImageUrl", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
@@ -1061,7 +1072,7 @@ fun HomeScreen(
                         } ?: Text(
                             text = "No receipt photo available",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF4B5563), // Darker gray for contrast
+                            color = Color(0xFF4B5563),
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1072,7 +1083,7 @@ fun HomeScreen(
                             TextButton(onClick = { showInfoDialog = true }) {
                                 Text(
                                     text = "Info",
-                                    color = Color(0xFF3B82F6), // Blue 500
+                                    color = Color(0xFF3B82F6),
                                     fontSize = 16.sp
                                 )
                             }
@@ -1084,7 +1095,7 @@ fun HomeScreen(
                             }) {
                                 Text(
                                     text = "Close",
-                                    color = Color(0xFF3B82F6), // Blue 500
+                                    color = Color(0xFF3B82F6),
                                     fontSize = 16.sp
                                 )
                             }
@@ -1195,7 +1206,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFDBEAFE)) // Blue 50, complementary to #eeece1
+                        .background(Color(0xFFDBEAFE))
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
@@ -1210,7 +1221,7 @@ fun HomeScreen(
                             Text(
                                 text = "No image available",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                color = Color(0xFF4B5563), // Darker gray for contrast
+                                color = Color(0xFF4B5563),
                                 modifier = Modifier.padding(16.dp)
                             )
                         } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -1218,6 +1229,7 @@ fun HomeScreen(
                                 val uri = Uri.parse(imagePath)
                                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                             } catch (e: Exception) {
+                                Log.e("HomeScreen", "Failed to load local full-screen image: $imagePath, error: ${e.message}")
                                 null
                             }
                             bitmap?.let {
@@ -1229,7 +1241,7 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            Color(0xFF3B82F6), // Blue 500
+                                            Color(0xFF3B82F6),
                                             RoundedCornerShape(12.dp)
                                         ),
                                     contentScale = ContentScale.Fit
@@ -1239,27 +1251,33 @@ fun HomeScreen(
                                 Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF4B5563), // Darker gray for contrast
+                                    color = Color(0xFF4B5563),
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
                         } else {
+                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                            Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl")
                             AsyncImage(
-                                model = imagePath,
+                                model = ImageRequest.Builder(context)
+                                    .data(fullImageUrl)
+                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .build(),
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         2.dp,
-                                        Color(0xFF3B82F6), // Blue 500
+                                        Color(0xFF3B82F6),
                                         RoundedCornerShape(12.dp)
                                     ),
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     imageLoadFailed = true
                                     scope.launch {
-                                        Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                        Log.e("HomeScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                        Toast.makeText(context, "Failed to load full screen image: $fullImageUrl", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             )
@@ -1267,7 +1285,7 @@ fun HomeScreen(
                     } ?: Text(
                         text = "No image available",
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF4B5563), // Darker gray for contrast
+                        color = Color(0xFF4B5563),
                         modifier = Modifier.padding(16.dp)
                     )
                     IconButton(
@@ -1281,14 +1299,14 @@ fun HomeScreen(
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
                             .background(
-                                Color(0xFFCED4DA), // Matte cool gray
+                                Color(0xFFCED4DA),
                                 CircleShape
                             )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close image",
-                            tint = Color(0xFF1F2937) // Dark gray
+                            tint = Color(0xFF1F2937)
                         )
                     }
                 }
@@ -1296,6 +1314,8 @@ fun HomeScreen(
         }
     }
 }
+
+
 
 @Composable
 fun NavigationButton(

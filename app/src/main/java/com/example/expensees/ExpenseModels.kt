@@ -23,6 +23,7 @@ data class SubmittedBudget(
     val status: BudgetStatus = BudgetStatus.PENDING
 )
 
+
 data class Expense(
     @SerializedName("expenseId")
     val expenseId: String?,
@@ -34,8 +35,8 @@ data class Expense(
     val dateOfTransaction: String?,
     @SerializedName("remarks")
     val remarks: String?,
-    @SerializedName("imagePath")
-    val imagePaths: String?,
+    @SerializedName("imagePaths")
+    val imagePaths: List<String>?,
     @SerializedName("createdAt")
     val createdAt: String?
 )

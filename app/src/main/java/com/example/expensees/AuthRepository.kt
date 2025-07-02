@@ -324,12 +324,12 @@ class AuthRepository(
                 val remarksPart = expense.remarks?.toRequestBody("text/plain".toMediaTypeOrNull())
 
                 // Prepare image part
-                val imagePart = expense.imagePaths?.let { uriString ->
+                val imagePart = expense.imagePaths?.firstOrNull()?.let { uriString ->
                     try {
                         Log.d("AuthRepository", "Processing image URI: $uriString")
                         val uri = Uri.parse(uriString)
                         if (uri.scheme == null || !listOf("content", "file").contains(uri.scheme)) {
-                            Log.e("AuthRepository", "Invalid URI scheme: ${uri.scheme}")
+                            Log.e("AuthRepository", "Invalid URI scheme: ${uri.scheme} for URI: $uriString")
                             return@let null
                         }
                         // Verify URI accessibility
@@ -393,7 +393,7 @@ class AuthRepository(
                                 }.toMediaTypeOrNull()
                                 Log.d("AuthRepository", "Image part created: fieldName=files, fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
                                 MultipartBody.Part.createFormData(
-                                    "files", // Changed to match server expectation
+                                    "files", // Matches server expectation
                                     fileName,
                                     bytes.toRequestBody(mediaType)
                                 )
@@ -431,6 +431,7 @@ class AuthRepository(
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
                 if (response.isSuccessful) {
                     response.body()?.let { returnedExpense ->
+                        Log.d("AuthRepository", "Server returned expense with imagePaths: ${returnedExpense.imagePaths}")
                         if (returnedExpense.expenseId.isNullOrEmpty()) {
                             Log.e("AuthRepository", "Expense returned but has no expenseId: ${Gson().toJson(returnedExpense)}")
                             val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
@@ -659,4 +660,5 @@ class AuthRepository(
             }
         }
     }
+
 }

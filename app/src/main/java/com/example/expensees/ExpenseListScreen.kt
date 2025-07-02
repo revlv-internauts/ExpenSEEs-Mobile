@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -60,6 +61,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.*
+import android.util.Log
+import coil.request.ImageRequest
+import com.example.expensees.ApiConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
@@ -457,7 +461,7 @@ fun ExpenseListScreen(
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    expense.imagePaths?.let { imagePath ->
+                                    expense.imagePaths?.firstOrNull()?.let { imagePath ->
                                         var imageLoadFailed by remember { mutableStateOf(false) }
                                         if (imageLoadFailed) {
                                             Box(
@@ -483,6 +487,7 @@ fun ExpenseListScreen(
                                                 val uri = Uri.parse(imagePath)
                                                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                             } catch (e: Exception) {
+                                                Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
                                                 null
                                             }
                                             if (bitmap != null) {
@@ -504,6 +509,7 @@ fun ExpenseListScreen(
                                                     contentScale = ContentScale.Crop
                                                 )
                                             } else {
+                                                imageLoadFailed = true
                                                 Box(
                                                     modifier = Modifier
                                                         .size(56.dp)
@@ -524,8 +530,13 @@ fun ExpenseListScreen(
                                                 }
                                             }
                                         } else {
+                                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl")
                                             AsyncImage(
-                                                model = imagePath,
+                                                model = ImageRequest.Builder(context)
+                                                    .data(fullImageUrl)
+                                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                                    .build(),
                                                 contentDescription = "Expense receipt",
                                                 modifier = Modifier
                                                     .size(56.dp)
@@ -543,14 +554,32 @@ fun ExpenseListScreen(
                                                 onError = {
                                                     imageLoadFailed = true
                                                     scope.launch {
+                                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
                                                         snackbarHostState.showSnackbar(
-                                                            message = "Failed to load receipt image",
+                                                            message = "Failed to load receipt image: $fullImageUrl",
                                                             duration = SnackbarDuration.Short
                                                         )
                                                     }
                                                 }
                                             )
                                         }
+                                    } ?: Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                2.dp,
+                                                shade.copy(alpha = 0.7f),
+                                                RoundedCornerShape(12.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No Image",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = shade,
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
                                 }
                             }
@@ -672,7 +701,7 @@ fun ExpenseListScreen(
                                 color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
-                            selectedExpense?.imagePaths?.let { imagePath ->
+                            selectedExpense?.imagePaths?.firstOrNull()?.let { imagePath ->
                                 var imageLoadFailed by remember { mutableStateOf(false) }
                                 if (imageLoadFailed) {
                                     Text(
@@ -686,6 +715,7 @@ fun ExpenseListScreen(
                                         val uri = Uri.parse(imagePath)
                                         BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                     } catch (e: Exception) {
+                                        Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
                                         null
                                     }
                                     bitmap?.let {
@@ -717,8 +747,13 @@ fun ExpenseListScreen(
                                         )
                                     }
                                 } else {
+                                    val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                                    Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl")
                                     AsyncImage(
-                                        model = imagePath,
+                                        model = ImageRequest.Builder(context)
+                                            .data(fullImageUrl)
+                                            .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                            .build(),
                                         contentDescription = "${selectedExpense?.category ?: "Expense"} receipt",
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -734,8 +769,9 @@ fun ExpenseListScreen(
                                         onError = {
                                             imageLoadFailed = true
                                             scope.launch {
+                                                Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
                                                 snackbarHostState.showSnackbar(
-                                                    message = "Failed to load receipt image",
+                                                    message = "Failed to load receipt image: $fullImageUrl",
                                                     duration = SnackbarDuration.Short
                                                 )
                                             }
@@ -774,7 +810,6 @@ fun ExpenseListScreen(
                     }
                 }
             }
-
             // Expense info dialog
             if (showInfoDialog && selectedExpense != null) {
                 AlertDialog(
@@ -882,7 +917,7 @@ fun ExpenseListScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        selectedExpense?.imagePaths?.let { imagePath ->
+                        selectedExpense?.imagePaths?.firstOrNull()?.let { imagePath ->
                             var imageLoadFailed by remember { mutableStateOf(false) }
                             if (imageLoadFailed) {
                                 Text(
@@ -896,6 +931,7 @@ fun ExpenseListScreen(
                                     val uri = Uri.parse(imagePath)
                                     BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                                 } catch (e: Exception) {
+                                    Log.e("ExpenseListScreen", "Failed to load local full-screen image: $imagePath, error: ${e.message}")
                                     null
                                 }
                                 bitmap?.let {
@@ -923,8 +959,13 @@ fun ExpenseListScreen(
                                     )
                                 }
                             } else {
+                                val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
+                                Log.d("ExpenseListScreen", "Loading full-screen server image: $fullImageUrl")
                                 AsyncImage(
-                                    model = imagePath,
+                                    model = ImageRequest.Builder(context)
+                                        .data(fullImageUrl)
+                                        .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                        .build(),
                                     contentDescription = "Full screen receipt photo",
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -939,8 +980,9 @@ fun ExpenseListScreen(
                                     onError = {
                                         imageLoadFailed = true
                                         scope.launch {
+                                            Log.e("ExpenseListScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${it.result.throwable.message}")
                                             snackbarHostState.showSnackbar(
-                                                message = "Failed to load full screen image",
+                                                message = "Failed to load full screen image: $fullImageUrl",
                                                 duration = SnackbarDuration.Short
                                             )
                                         }
