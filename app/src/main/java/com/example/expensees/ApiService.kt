@@ -2,6 +2,8 @@ package com.example.expensees.network
 
 import com.example.expensees.models.Expense
 import com.google.gson.annotations.SerializedName
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -15,10 +17,16 @@ interface ApiService {
         @Header("refresh_token") authHeader: String? = null
     ): Response<SignInResponse>
 
+    @Multipart
     @POST("api/expenses")
     suspend fun addExpense(
         @Header("Authorization") token: String,
-        @Body expense: ExpenseRequest
+        @Part("category") category: RequestBody,
+        @Part("amount") amount: RequestBody,
+        @Part("dateOfTransaction") dateOfTransaction: RequestBody,
+        @Part("remarks") remarks: RequestBody?,
+        @Part("createdAt") createdAt: RequestBody,
+        @Part file: MultipartBody.Part? // Use "image" if server expects it
     ): Response<Expense>
 
     @DELETE("expenses/{expenseId}")

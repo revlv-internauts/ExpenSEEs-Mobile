@@ -291,14 +291,7 @@ fun HomeScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFE3F2FD), // Light blue (Blue 50)
-                            Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
-                        )
-                    )
-                )
+                .background(Color(0xFFEEECE1)) // Updated background color to #eeece1
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -335,7 +328,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -356,7 +349,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -510,7 +503,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                     shape = RoundedCornerShape(12.dp)
@@ -629,41 +622,30 @@ fun HomeScreen(
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            Card(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFDBEAFE) // Blue 50
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                shape = RoundedCornerShape(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    NavigationButton(
-                        icon = Icons.Default.Add,
-                        label = "Record",
-                        onClick = onRecordExpensesClick,
-                        modifier = Modifier.weight(1f)
-                    )
-                    NavigationButton(
-                        icon = Icons.Default.RequestQuote,
-                        label = "Request",
-                        onClick = { navController.navigate("fund_request") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    NavigationButton(
-                        icon = Icons.Default.Assignment,
-                        label = "Report",
-                        onClick = { navController.navigate("liquidation_report") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                NavigationButton(
+                    icon = Icons.Default.Add,
+                    label = "Record",
+                    onClick = onRecordExpensesClick,
+                    modifier = Modifier.weight(1f)
+                )
+                NavigationButton(
+                    icon = Icons.Default.RequestQuote,
+                    label = "Request",
+                    onClick = { navController.navigate("fund_request") },
+                    modifier = Modifier.weight(1f)
+                )
+                NavigationButton(
+                    icon = Icons.Default.Assignment,
+                    label = "Report",
+                    onClick = { navController.navigate("liquidation_report") },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
         if (selectedCategory != null) {
@@ -682,7 +664,7 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .alpha(dialogAlpha),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
@@ -743,6 +725,12 @@ fun HomeScreen(
                                 val factor = 0.8f - (index * 0.1f).coerceAtMost(0.5f)
                                 "#${baseColor.copy(alpha = factor).toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}"
                             }
+                            // Filter out zero or negative amounts for logarithmic scale
+                            val validTransactions = transactionsForCategory.filter { it.amount > 0 }
+                            val transactionData = validTransactions.map { it.amount }
+                            val transactionLabels = validTransactions.mapIndexed { index, expense ->
+                                "'${(expense.remarks ?: "").replace("'", "\\'")}'"
+                            }
 
                             AndroidView(
                                 factory = { ctx ->
@@ -774,14 +762,12 @@ fun HomeScreen(
                     <body>
                         <canvas id="transactionChart"></canvas>
                         <script>
-                            const transactionData = [${transactionsForCategory.map { it.amount }.joinToString()}];
+                            const transactionData = [${transactionData.joinToString { it.toString() }}];
                             const ctx = document.getElementById('transactionChart').getContext('2d');
                             const chart = new Chart(ctx, {
                                 type: 'bar',
                                 data: {
-                                    labels: [${transactionsForCategory.mapIndexed { index, expense ->
-                                                    "'${(expense.remarks ?: "").replace("'", "\\'")}'"
-                                                }.joinToString()}],
+                                    labels: [${transactionLabels.joinToString()}],
                                     datasets: [{
                                         data: transactionData,
                                         backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
@@ -796,7 +782,7 @@ fun HomeScreen(
                                         legend: { display: false },
                                         title: {
                                             display: true,
-                                            text: 'Transaction Amounts',
+                                            text: 'Transaction Amounts (Log Scale)',
                                             color: '#1F2937',
                                             font: { size: 16, weight: 'bold' },
                                             align: 'center'
@@ -813,16 +799,21 @@ fun HomeScreen(
                                     },
                                     scales: {
                                         x: {
-                                            ticks: { display: false }
+                                            ticks: { display: false },
+                                            barPercentage: 0.8, // Adjust bar width
+                                            categoryPercentage: 0.9 // Adjust spacing between bars
                                         },
                                         y: {
-                                            beginAtZero: true,
+                                            type: 'logarithmic',
+                                            min: 0.1, // Set a small minimum to avoid log(0) issues
                                             ticks: {
                                                 callback: function(value) {
                                                     return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                                 },
                                                 font: { size: 12 },
-                                                color: '#1F2937' // Dark gray for tick labels
+                                                color: '#1F2937', // Dark gray for tick labels
+                                                autoSkip: true,
+                                                maxTicksLimit: 6
                                             }
                                         }
                                     },
@@ -892,11 +883,11 @@ fun HomeScreen(
                                             .alpha(alpha)
                                             .clickable {
                                                 selectedTransaction = expense
-                                                selectedImagePath = expense.imagePath
+                                                selectedImagePath = expense.imagePaths
                                                 showExpenseDialog = true
                                             },
                                         colors = CardDefaults.cardColors(
-                                            containerColor = Color(0xFFDBEAFE) // Blue 50
+                                            containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                                         ),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                                         shape = RoundedCornerShape(8.dp)
@@ -980,7 +971,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -1117,7 +1108,7 @@ fun HomeScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE) // Blue 50
+                        containerColor = Color(0xFFDBEAFE) // Blue 50, complementary to #eeece1
                     ),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -1204,7 +1195,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFDBEAFE)) // Blue 50
+                        .background(Color(0xFFDBEAFE)) // Blue 50, complementary to #eeece1
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),

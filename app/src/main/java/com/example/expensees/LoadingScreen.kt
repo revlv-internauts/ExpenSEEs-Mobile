@@ -81,8 +81,8 @@ fun LoadingScreen(
 
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFF0D47A1),
-            Color(0xFF1976D2)
+            Color(0xFF540119),
+            Color(0xFF540119)
         )
     )
 

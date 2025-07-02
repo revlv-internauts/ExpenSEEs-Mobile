@@ -35,7 +35,7 @@ data class Expense(
     @SerializedName("remarks")
     val remarks: String?,
     @SerializedName("imagePath")
-    val imagePath: String?,
+    val imagePaths: String?,
     @SerializedName("createdAt")
     val createdAt: String?
 )

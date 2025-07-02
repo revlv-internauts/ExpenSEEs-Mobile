@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -96,7 +95,7 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0B313E)), // Set solid background color
+            .background(Color(0xFF5E384A)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -118,7 +117,7 @@ fun LoginScreen(
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 32.sp,
-                        color = Color.White // Already white, good contrast
+                        color = Color(0xFFF5F5F5) // Light gray for contrast
                     ),
                     textAlign = TextAlign.Center
                 )
@@ -129,7 +128,7 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "View notifications",
-                        tint = Color.White // Already white, good contrast
+                        tint = Color(0xFFF5F5F5) // Light gray for contrast
                     )
                 }
             }
@@ -148,11 +147,11 @@ fun LoginScreen(
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 34.sp
                     ),
-                    color = Color.White, // Already white, good contrast
+                    color = Color(0xFFF5F5F5), // Light gray for contrast
                     textAlign = TextAlign.Center
                 )
                 Image(
-                    painter = painterResource(id = R.drawable.expensees),
+                    painter = painterResource(id = R.drawable.expensees3),
                     contentDescription = "ExpenSEEs logo",
                     modifier = Modifier
                         .size(400.dp)
@@ -181,7 +180,7 @@ fun LoginScreen(
                         Icon(
                             imageVector = Icons.Default.Email,
                             contentDescription = "Email or username icon",
-                            tint = Color(0xFFB0BEC5).copy(alpha = 0.7f) // Light gray with 70% opacity for good contrast
+                            tint = Color(0xFFE0E0E0).copy(alpha = 0.7f) // Lighter gray for contrast
                         )
                     }
                 )
@@ -197,7 +196,7 @@ fun LoginScreen(
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "Password icon",
-                            tint = Color(0xFFB0BEC5) // Light gray for good contrast
+                            tint = Color(0xFFE0E0E0) // Lighter gray for contrast
                         )
                     },
                     isPassword = true
@@ -207,7 +206,7 @@ fun LoginScreen(
                 errorMessage?.let {
                     Text(
                         text = it,
-                        color = Color(0xFFFF8A80), // Light red for visibility
+                        color = Color(0xFFFFCDD2), // Light pink for visibility
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier
@@ -223,14 +222,7 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .height(48.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary, // Primary color (ensure it contrasts)
-                                    MaterialTheme.colorScheme.secondary // Secondary color (ensure it contrasts)
-                                )
-                            )
-                        )
+                        .background(Color(0xFFEEECE1)) // Updated button background color
                         .alpha(alpha)
                         .scale(scale)
                         .clickable(
@@ -278,7 +270,7 @@ fun LoginScreen(
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            color = Color.White, // White for visibility
+                            color = Color(0xFF5E384A), // Dark background color for contrast
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp
                         )
@@ -286,7 +278,7 @@ fun LoginScreen(
                         Text(
                             text = "Sign In",
                             fontSize = 18.sp,
-                            color = Color.White, // White for visibility
+                            color = Color(0xFF5E384A), // Dark background color for contrast
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -301,7 +293,7 @@ fun LoginScreen(
                 ) {
                     Text(
                         text = "Recover Password",
-                        color = Color(0xFF4FC3F7), // Light blue for visibility
+                        color = Color(0xFFEEECE1), // Updated to specified color
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
@@ -313,7 +305,7 @@ fun LoginScreen(
             Text(
                 text = "Version 1.0",
                 fontSize = 12.sp,
-                color = Color(0xFFB0BEC5), // Light gray for visibility
+                color = Color(0xFFE0E0E0), // Lighter gray for visibility
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -351,7 +343,7 @@ fun CustomTextField(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 18.sp
             ),
-            color = Color(0xFFECEFF1), // Light gray for visibility
+            color = Color(0xFFF5F5F5), // Light gray for visibility
             textAlign = TextAlign.Left,
             modifier = Modifier
                 .fillMaxWidth()
@@ -383,7 +375,7 @@ fun CustomTextField(
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp,
-                            color = Color(0xFFB0BEC5) // Light gray for visibility
+                            color = Color(0xFFE0E0E0) // Lighter gray for visibility
                         )
                     )
                 },
@@ -393,22 +385,22 @@ fun CustomTextField(
                             Icon(
                                 imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                 contentDescription = if (isPasswordVisible) "Hide password" else "Show password",
-                                tint = Color(0xFFB0BEC5) // Light gray for visibility
+                                tint = Color(0xFFE0E0E0) // Lighter gray for visibility
                             )
                         }
                     }
                 } else null,
                 shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF4FC3F7), // Light blue for visibility
-                    unfocusedBorderColor = Color(0xFFB0BEC5), // Light gray for visibility
-                    focusedLabelColor = Color(0xFFECEFF1), // Light gray for visibility
-                    unfocusedLabelColor = Color(0xFFB0BEC5), // Light gray for visibility
-                    cursorColor = Color(0xFF4FC3F7), // Light blue for visibility
+                    focusedBorderColor = Color(0xFF80DEEA), // Light cyan for visibility
+                    unfocusedBorderColor = Color(0xFFE0E0E0), // Lighter gray for visibility
+                    focusedLabelColor = Color(0xFFF5F5F5), // Light gray for visibility
+                    unfocusedLabelColor = Color(0xFFE0E0E0), // Lighter gray for visibility
+                    cursorColor = Color(0xFF80DEEA), // Light cyan for visibility
                     unfocusedContainerColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,
-                    focusedTextColor = Color.White, // White for visibility
-                    unfocusedTextColor = Color(0xFFECEFF1) // Light gray for visibility
+                    focusedTextColor = Color(0xFFF5F5F5), // Light gray for visibility
+                    unfocusedTextColor = Color(0xFFF5F5F5) // Light gray for visibility
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,

@@ -311,7 +311,7 @@ fun RecordExpensesScreen(
                             )
                         }
                     }
-                    selectedExpense?.imagePath?.let { imagePath ->
+                    selectedExpense?.imagePaths?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
                         if (imageLoadFailed) {
                             Text(
@@ -520,12 +520,12 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     } else if (expense.expenseId?.startsWith("local_") == true) {
-                        expense.imagePath?.let { imagePath ->
+                        expense.imagePaths?.let { imagePaths ->
                             val bitmap = try {
-                                val uri = Uri.parse(imagePath)
+                                val uri = Uri.parse(imagePaths)
                                 BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
                             } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePath: $imagePath", e)
+                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePaths: $imagePaths", e)
                                 null
                             }
                             bitmap?.let {
@@ -555,9 +555,9 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
-                        expense.imagePath?.let { imagePath ->
+                        expense.imagePaths?.let { imagePaths ->
                             AsyncImage(
-                                model = imagePath,
+                                model = imagePaths,
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -999,13 +999,14 @@ fun RecordExpensesScreen(
                         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
                             timeZone = TimeZone.getTimeZone("UTC")
                         }.format(Date())
+                        Log.d("RecordExpensesScreen", "Selected image URI: $selectedImageUri")
                         val newExpense = Expense(
                             expenseId = null,
                             category = category,
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
                             remarks = remarks,
-                            imagePath = selectedImageUri?.toString(),
+                            imagePaths = selectedImageUri?.toString(),
                             createdAt = timestamp
                         )
                         if (!authRepository.isAuthenticated()) {
@@ -1013,7 +1014,7 @@ fun RecordExpensesScreen(
                             val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
                             authRepository.userExpenses.add(localExpense)
                             pendingExpense = newExpense
-                            Toast.makeText(context, "Expense saved locally. Please log in to sync.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Not logged in. Expense saved locally, please log in to sync.", Toast.LENGTH_LONG).show()
                             showAuthErrorDialog = true
                             remarks = ""
                             amount = ""
@@ -1037,7 +1038,11 @@ fun RecordExpensesScreen(
                                     selectedImageBitmap = null
                                     selectedImageUri = null
                                     pendingExpense = null
-                                    Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
+                                    if (selectedImageUri != null && returnedExpense.imagePaths.isNullOrEmpty()) {
+                                        Toast.makeText(context, "Expense added, but image upload failed. Please try again.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
+                                    }
                                 }.onFailure { e ->
                                     Log.e("RecordExpensesScreen", "Failed to add expense: ${e.message}", e)
                                     when {
@@ -1066,12 +1071,18 @@ fun RecordExpensesScreen(
                                         }
                                         else -> {
                                             Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                            authRepository.userExpenses.add(localExpense)
+                                            pendingExpense = newExpense
                                         }
                                     }
                                 }
                             } catch (e: Exception) {
                                 Log.e("RecordExpensesScreen", "Unexpected error: ${e.message}", e)
                                 Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                authRepository.userExpenses.add(localExpense)
+                                pendingExpense = newExpense
                             } finally {
                                 isAddingExpense = false
                             }

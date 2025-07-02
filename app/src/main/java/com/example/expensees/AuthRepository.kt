@@ -21,6 +21,12 @@ import java.util.Locale
 import java.util.TimeZone
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.widget.Toast
+import id.zelory.compressor.Compressor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 class AuthRepository(
     private val apiService: ApiService,
@@ -208,7 +214,7 @@ class AuthRepository(
                 }
 
                 val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                val token = prefs.getString("auth_token", null)
+                var token = prefs.getString("auth_token", null)
                 Log.d("AuthRepository", "Stored auth_token: ${token?.take(20) ?: "null"}...")
                 if (token.isNullOrEmpty()) {
                     Log.e("AuthRepository", "No token found in SharedPreferences")
@@ -223,10 +229,29 @@ class AuthRepository(
                     val currentTime = Date()
                     Log.d("AuthRepository", "Token expiry: $expiry, currentTime: $currentTime, raw exp: ${decodedJWT.getClaim("exp").asLong()}, timezone: ${TimeZone.getDefault().id}, claims: ${decodedJWT.claims}")
                     if (expiry == null || expiry.before(currentTime)) {
-                        Log.e("AuthRepository", "Access token expired or invalid")
-                        val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                        userExpenses.add(localExpense)
-                        return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        Log.d("AuthRepository", "Access token expired, attempting to refresh")
+                        val refreshToken = prefs.getString("refresh_token", null)
+                        if (refreshToken.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "No refresh token available")
+                            val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                            userExpenses.add(localExpense)
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                        val refreshResult = refreshToken(refreshToken)
+                        if (refreshResult.isSuccess) {
+                            token = prefs.getString("auth_token", null)
+                            if (token.isNullOrEmpty()) {
+                                Log.e("AuthRepository", "Failed to obtain new token after refresh")
+                                val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                userExpenses.add(localExpense)
+                                return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
+                            }
+                        } else {
+                            Log.e("AuthRepository", "Token refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                            val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                            userExpenses.add(localExpense)
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
                     }
                 } catch (e: JWTDecodeException) {
                     Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
@@ -287,34 +312,119 @@ class AuthRepository(
                     return@withContext Result.failure(Exception("Invalid date format: ${e.message}"))
                 }
 
-                val imageBase64 = expense.imagePath?.let { uriString ->
+                // Prepare multipart parts
+                val categoryPart = expense.category?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    ?: throw IllegalArgumentException("Category is required")
+                val amountPart = expense.amount.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                val dateOfTransactionPart = expense.dateOfTransaction?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    ?: throw IllegalArgumentException("Date of transaction is required")
+                val createdAtPart = expense.createdAt?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    ?: throw IllegalArgumentException("Created at timestamp is required")
+                val remarksPart = expense.remarks?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                // Prepare image part
+                val imagePart = expense.imagePaths?.let { uriString ->
                     try {
+                        Log.d("AuthRepository", "Processing image URI: $uriString")
                         val uri = Uri.parse(uriString)
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            val bytes = input.readBytes()
-                            Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        if (uri.scheme == null || !listOf("content", "file").contains(uri.scheme)) {
+                            Log.e("AuthRepository", "Invalid URI scheme: ${uri.scheme}")
+                            return@let null
+                        }
+                        // Verify URI accessibility
+                        try {
+                            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                if (!cursor.moveToFirst()) {
+                                    Log.e("AuthRepository", "URI is invalid or inaccessible: $uri")
+                                    return@let null
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to query URI: ${e.message}", e)
+                            return@let null
+                        }
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        if (inputStream == null) {
+                            Log.e("AuthRepository", "Failed to open input stream for URI: $uri")
+                            return@let null
+                        }
+                        inputStream.use { input ->
+                            // Create temp file
+                            val tempFile = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
+                            Log.d("AuthRepository", "Creating temp file: ${tempFile.absolutePath}")
+                            tempFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                            if (!tempFile.exists() || tempFile.length() == 0L) {
+                                Log.e("AuthRepository", "Temp file is empty or not created: ${tempFile.absolutePath}")
+                                if (tempFile.exists()) {
+                                    try {
+                                        tempFile.delete()
+                                        Log.d("AuthRepository", "Deleted empty temp file: ${tempFile.absolutePath}")
+                                    } catch (e: Exception) {
+                                        Log.e("AuthRepository", "Error deleting empty temp file: ${e.message}", e)
+                                    }
+                                }
+                                return@let null
+                            }
+                            val imageFile = try {
+                                Compressor.compress(context, tempFile)
+                            } catch (e: Exception) {
+                                Log.w("AuthRepository", "Compression failed: ${e.message}, using original file")
+                                tempFile // Fallback to original file
+                            }
+                            try {
+                                val bytes = imageFile.readBytes()
+                                val fileName = uri.lastPathSegment?.let { segment ->
+                                    if (segment.endsWith(".jpg", ignoreCase = true) || segment.endsWith(".jpeg", ignoreCase = true) || segment.endsWith(".png", ignoreCase = true)) {
+                                        segment
+                                    } else {
+                                        "expense_image_${System.currentTimeMillis()}.jpg"
+                                    }
+                                } ?: "expense_image_${System.currentTimeMillis()}.jpg"
+                                if (bytes.isEmpty()) {
+                                    Log.e("AuthRepository", "Image bytes are empty for URI: $uri")
+                                    return@let null
+                                }
+                                val mediaType = when {
+                                    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+                                    else -> "image/jpeg"
+                                }.toMediaTypeOrNull()
+                                Log.d("AuthRepository", "Image part created: fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
+                                MultipartBody.Part.createFormData(
+                                    "file", // Use "image" if server expects it
+                                    fileName,
+                                    bytes.toRequestBody(mediaType)
+                                )
+                            } finally {
+                                // Delete temp file
+                                if (imageFile.exists()) {
+                                    try {
+                                        imageFile.delete()
+                                        Log.d("AuthRepository", "Temp file deleted: ${imageFile.absolutePath}")
+                                    } catch (e: Exception) {
+                                        Log.e("AuthRepository", "Error deleting temp file: ${e.message}", e)
+                                    }
+                                }
+                            }
                         }
                     } catch (e: Exception) {
-                        Log.e("AuthRepository", "Failed to convert image to base64: ${e.message}", e)
+                        Log.e("AuthRepository", "Failed to prepare image part for URI $uriString: ${e.message}", e)
                         null
                     }
                 }
 
-                val expenseRequest = ExpenseRequest(
-                    category = expense.category ?: throw Exception("Category is required"),
-                    amount = expense.amount,
-                    dateOfTransaction = expense.dateOfTransaction ?: throw Exception("Date of transaction is required"),
-                    remarks = expense.remarks,
-                    createdAt = expense.createdAt ?: throw Exception("Created at timestamp is required"),
-                    image = imageBase64
-                )
+                Log.d("AuthRepository", "Adding expense: category=${expense.category}, amount=${expense.amount}, dateOfTransaction=${expense.dateOfTransaction}, remarks=${expense.remarks}, createdAt=${expense.createdAt}, hasImage=${imagePart != null}")
 
-                Log.d("AuthRepository", "Adding expense: ${Gson().toJson(expenseRequest)}")
-
-                Log.d("AuthRepository", "Sending request to /api/expenses with token: Bearer ${token.take(20)}...")
+                Log.d("AuthRepository", "Sending multipart request to /api/expenses with token: Bearer ${token.take(20)}...")
                 val response = apiService.addExpense(
                     token = "Bearer $token",
-                    expense = expenseRequest
+                    category = categoryPart,
+                    amount = amountPart,
+                    dateOfTransaction = dateOfTransactionPart,
+                    remarks = remarksPart,
+                    createdAt = createdAtPart,
+                    file = imagePart // Use "image" if server expects it
                 )
 
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
@@ -328,10 +438,16 @@ class AuthRepository(
                         } else {
                             userExpenses.add(returnedExpense)
                             Log.d("AuthRepository", "Expense added: expenseId=${returnedExpense.expenseId}")
+                            if (imagePart != null && returnedExpense.imagePaths.isNullOrEmpty()) {
+                                Log.w("AuthRepository", "Image part was sent but server returned empty imagePaths")
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Expense added, but image upload may have failed", Toast.LENGTH_LONG).show()
+                                }
+                            }
                             Result.success(returnedExpense)
                         }
                     } ?: Result.failure(Exception("Empty response body"))
-                }else {
+                } else {
                     val errorBody = response.errorBody()?.string()
                     Log.e("AuthRepository", "Add expense failed: HTTP ${response.code()}, body=$errorBody, headers=${response.headers()}")
                     val errorResponse = errorBody?.let {
@@ -378,6 +494,8 @@ class AuthRepository(
             }
         }
     }
+
+
 
     private suspend fun refreshToken(refreshToken: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
@@ -488,41 +606,26 @@ class AuthRepository(
         }
     }
 
-    suspend fun syncLocalExpenses(maxRetries: Int = 3): Result<Unit> {
-        return withContext(Dispatchers.IO) {
-            try {
-                Log.d("AuthRepository", "Syncing local expenses")
-                val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }.toList()
-                Log.d("AuthRepository", "Syncing ${localExpenses.size} local expenses")
-                var allSynced = true
-                localExpenses.forEach { expense ->
-                    var retryCount = 0
-                    var result: Result<Expense>
-                    do {
-                        result = addExpense(expense.copy(expenseId = null))
-                        result.onSuccess { syncedExpense ->
-                            userExpenses.remove(expense)
-                            userExpenses.add(syncedExpense)
-                            Log.d("AuthRepository", "Synced local expense: expenseId=${syncedExpense.expenseId}")
-                        }.onFailure { e ->
-                            Log.e("AuthRepository", "Failed to sync local expense: ${e.message}, retry=$retryCount")
-                            retryCount++
-                            if (retryCount >= maxRetries) {
-                                allSynced = false
-                            }
-                        }
-                    } while (result.isFailure && retryCount < maxRetries)
-                }
-                if (allSynced) {
-                    Log.d("AuthRepository", "All local expenses synced successfully")
-                    Result.success(Unit)
+    suspend fun syncLocalExpenses(token: String) {
+        withContext(Dispatchers.IO) {
+            val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }
+            val serverExpenses = apiService.getExpenses("Bearer $token").body() ?: emptyList()
+            val serverExpenseIds = serverExpenses.mapNotNull { it.expenseId }.toSet()
+
+            for (localExpense in localExpenses) {
+                if (localExpense.expenseId !in serverExpenseIds) {
+                    val result = addExpenseWithToken(localExpense, token)
+                    if (result.isSuccess) {
+                        userExpenses.remove(localExpense)
+                        userExpenses.add(result.getOrNull()!!)
+                        Log.d("AuthRepository", "Synced local expense: ${localExpense.expenseId}")
+                    } else {
+                        Log.e("AuthRepository", "Failed to sync local expense: ${localExpense.expenseId}, error: ${result.exceptionOrNull()?.message}")
+                    }
                 } else {
-                    Log.e("AuthRepository", "Some local expenses failed to sync after $maxRetries retries")
-                    Result.failure(Exception("Failed to sync some local expenses"))
+                    Log.d("AuthRepository", "Skipping sync for local expense ${localExpense.expenseId}, already exists on server")
+                    userExpenses.remove(localExpense)
                 }
-            } catch (e: Exception) {
-                Log.e("AuthRepository", "Sync local expenses error: ${e.message}", e)
-                Result.failure(Exception("Failed to sync local expenses: ${e.message}"))
             }
         }
     }

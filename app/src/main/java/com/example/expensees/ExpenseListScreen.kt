@@ -457,7 +457,7 @@ fun ExpenseListScreen(
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    expense.imagePath?.let { imagePath ->
+                                    expense.imagePaths?.let { imagePath ->
                                         var imageLoadFailed by remember { mutableStateOf(false) }
                                         if (imageLoadFailed) {
                                             Box(
@@ -672,7 +672,7 @@ fun ExpenseListScreen(
                                 color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
-                            selectedExpense?.imagePath?.let { imagePath ->
+                            selectedExpense?.imagePaths?.let { imagePath ->
                                 var imageLoadFailed by remember { mutableStateOf(false) }
                                 if (imageLoadFailed) {
                                     Text(
@@ -882,7 +882,7 @@ fun ExpenseListScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        selectedExpense?.imagePath?.let { imagePath ->
+                        selectedExpense?.imagePaths?.let { imagePath ->
                             var imageLoadFailed by remember { mutableStateOf(false) }
                             if (imageLoadFailed) {
                                 Text(
