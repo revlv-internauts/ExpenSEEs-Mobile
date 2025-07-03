@@ -33,10 +33,12 @@ import com.example.expensees.models.BudgetStatus
 import com.example.expensees.models.Expense
 import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
+import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.util.Locale
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @RequiresApi(Build.VERSION_CODES.O)
 @SuppressLint("UnrememberedMutableState")
@@ -44,12 +46,13 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun LiquidationReport(
     modifier: Modifier = Modifier,
-    submittedBudgets: List<SubmittedBudget>,
-    expenses: List<Expense>,
-    navController: NavController
+    navController: NavController,
+    authRepository: AuthRepository
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var selectedBudget by remember { mutableStateOf<SubmittedBudget?>(null) }
+    var selectedCategory by remember { mutableStateOf<BudgetStatus?>(null) }
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = remember { mutableStateMapOf<Int, MutableList<Expense>>() }
@@ -62,6 +65,8 @@ fun LiquidationReport(
     var showReportDialog by remember { mutableStateOf(false) }
     var reportContent by remember { mutableStateOf("") }
     var showAllReportsDialog by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFFFCA28),
@@ -75,8 +80,27 @@ fun LiquidationReport(
         BudgetStatus.DENIED to Color.Black
     )
 
+    // Fetch budgets and expenses when composable is launched
+    LaunchedEffect(Unit) {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            val budgetResult = authRepository.getBudgets()
+            val expenseResult = authRepository.getExpenses()
+            if (budgetResult.isFailure) {
+                errorMessage = budgetResult.exceptionOrNull()?.message ?: "Failed to fetch budgets"
+                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            }
+            if (expenseResult.isFailure) {
+                errorMessage = (errorMessage ?: "") + "\n" + (expenseResult.exceptionOrNull()?.message ?: "Failed to fetch expenses")
+                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            }
+            isLoading = false
+        }
+    }
+
     fun calculateTotalRemainingBalance(): Double {
-        return submittedBudgets.sumOf { budget ->
+        return authRepository.submittedBudgets.sumOf { budget ->
             budget.expenses.withIndex().sumOf { (index, expense) ->
                 val budgetedAmount = expense.quantity * expense.amountPerUnit
                 val actualExpenseTotal = if (budget == selectedBudget) {
@@ -96,6 +120,8 @@ fun LiquidationReport(
     BackHandler(enabled = true) {
         if (selectedBudget != null) {
             selectedBudget = null
+        } else if (selectedCategory != null) {
+            selectedCategory = null
         } else {
             if (navController.currentBackStackEntry?.destination?.route != "home") {
                 navController.navigate("home") {
@@ -121,6 +147,8 @@ fun LiquidationReport(
                     IconButton(onClick = {
                         if (selectedBudget != null) {
                             selectedBudget = null
+                        } else if (selectedCategory != null) {
+                            selectedCategory = null
                         } else {
                             if (navController.currentBackStackEntry?.destination?.route != "home") {
                                 navController.navigate("home") {
@@ -144,7 +172,7 @@ fun LiquidationReport(
         },
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFEEECE1)) // Apply the background color here
+            .background(Color(0xFFEEECE1))
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -155,7 +183,63 @@ fun LiquidationReport(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (submittedBudgets.isEmpty()) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.CenterHorizontally),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Loading budgets...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            } else if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    textAlign = TextAlign.Center
+                )
+                Button(
+                    onClick = {
+                        isLoading = true
+                        errorMessage = null
+                        coroutineScope.launch {
+                            val budgetResult = authRepository.getBudgets()
+                            val expenseResult = authRepository.getExpenses()
+                            if (budgetResult.isFailure) {
+                                errorMessage = budgetResult.exceptionOrNull()?.message ?: "Failed to fetch budgets"
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                            }
+                            if (expenseResult.isFailure) {
+                                errorMessage = (errorMessage ?: "") + "\n" + (expenseResult.exceptionOrNull()?.message ?: "Failed to fetch expenses")
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                            }
+                            isLoading = false
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = "Retry",
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            } else if (authRepository.submittedBudgets.isEmpty()) {
                 Text(
                     text = "No budget requests submitted yet.",
                     style = MaterialTheme.typography.bodyLarge,
@@ -166,80 +250,202 @@ fun LiquidationReport(
                     textAlign = TextAlign.Center
                 )
             } else if (selectedBudget == null) {
-                Text(
-                    text = "Select a Budget Request",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Button(
-                    onClick = { showAllReportsDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
-                ) {
+                if (selectedCategory == null) {
                     Text(
-                        text = "View All Reports",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onTertiary
+                        text = "Select a Budget Category",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
-                }
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(submittedBudgets) { budget ->
-                        Card(
+                    Button(
+                        onClick = { showAllReportsDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    ) {
+                        Text(
+                            text = "View All Reports",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onTertiary
+                        )
+                    }
+                    // Category Buttons
+                    val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
+                    val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
+                    val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.PENDING },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = statusColors[BudgetStatus.PENDING] ?: MaterialTheme.colorScheme.primary
+                        ),
+                        enabled = pendingCount > 0
+                    ) {
+                        Text(
+                            text = "Pending Budgets ($pendingCount)",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.APPROVED },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = statusColors[BudgetStatus.APPROVED] ?: MaterialTheme.colorScheme.primary
+                        ),
+                        enabled = approvedCount > 0
+                    ) {
+                        Text(
+                            text = "Approved Budgets ($approvedCount)",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.DENIED },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = statusColors[BudgetStatus.DENIED] ?: MaterialTheme.colorScheme.primary
+                        ),
+                        enabled = deniedCount > 0
+                    ) {
+                        Text(
+                            text = "Denied Budgets ($deniedCount)",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                } else {
+                    val category = selectedCategory!!
+                    Text(
+                        text = "${category.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} Budget Requests",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Button(
+                        onClick = { selectedCategory = null },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Text(
+                            text = "Back to Categories",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                    Button(
+                        onClick = { showAllReportsDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    ) {
+                        Text(
+                            text = "View All Reports",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onTertiary
+                        )
+                    }
+                    val filteredBudgets = authRepository.submittedBudgets.filter { it.status == category }
+                    if (filteredBudgets.isEmpty()) {
+                        Text(
+                            text = "No ${category.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} budget requests.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedBudget = budget },
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                .padding(16.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            items(filteredBudgets) { budget ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .then(
+                                            if (budget.status == BudgetStatus.APPROVED) {
+                                                Modifier.clickable { selectedBudget = budget }
+                                            } else {
+                                                Modifier
+                                            }
+                                        ),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when (budget.status) {
+                                            BudgetStatus.APPROVED -> Color(0xFFB3E5FC)
+                                            BudgetStatus.DENIED -> Color(0xFFFFCDD2)
+                                            else -> MaterialTheme.colorScheme.surface
+                                        }
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                 ) {
-                                    Text(
-                                        text = budget.name,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = textColors[budget.status] ?: MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Box(
+                                    Column(
                                         modifier = Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .background(statusColors[budget.status] ?: Color.Gray)
-                                    )
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = budget.name,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = textColors[budget.status] ?: MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(statusColors[budget.status] ?: Color.Gray)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Total: ₱${numberFormat.format(budget.total)}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = textColors[budget.status] ?: MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = statusColors[budget.status] ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Total: ₱${numberFormat.format(budget.total)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = textColors[budget.status] ?: MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = statusColors[budget.status] ?: MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }
@@ -502,7 +708,7 @@ fun LiquidationReport(
                                         if (selectedExpenses.isNotEmpty()) {
                                             reportBuilder.append("- **Uploaded Receipts**:\n")
                                             selectedExpenses.forEach { selected ->
-                                                reportBuilder.append("  - ${selected.remarks ?: "No remarks"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
+                                                reportBuilder.append("  - ${selected.remarks ?: "No remarks"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction?.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
                                             }
                                         }
                                     }
@@ -540,7 +746,7 @@ fun LiquidationReport(
         }
 
         if (showExpenseSelectionDialog && currentExpenseItem != null) {
-            val filteredExpenses = expenses.filter { it.category == currentExpenseItem!!.first.category }
+            val filteredExpenses = authRepository.userExpenses.filter { it.category == currentExpenseItem!!.first.category }
             val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
             LaunchedEffect(filteredExpenses, currentExpenseItem) {
                 filteredExpenses.forEach { expense ->
@@ -704,7 +910,7 @@ fun LiquidationReport(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = reportContent as String,
+                            text = reportContent,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -757,7 +963,7 @@ fun LiquidationReport(
                                         modifier = Modifier.padding(bottom = 8.dp)
                                     )
                                     Text(
-                                        text = report as String,
+                                        text = report,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )

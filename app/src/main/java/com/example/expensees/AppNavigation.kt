@@ -111,12 +111,10 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 modifier = Modifier
             )
         }
-        composable("liquidation_report") {
+        composable("liquidation_Report") {
             LiquidationReport(
-                submittedBudgets = submittedBudgets,
-                expenses = authRepository.userExpenses,
                 navController = navController,
-                modifier = modifier
+                authRepository = authRepository
             )
         }
         composable("reset_password") {

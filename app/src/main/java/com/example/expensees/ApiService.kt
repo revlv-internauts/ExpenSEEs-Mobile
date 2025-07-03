@@ -30,7 +30,7 @@ interface ApiService {
         @Part files: MultipartBody.Part? // Changed from "image" to "files"
     ): Response<Expense>
 
-    @DELETE("expenses/{expenseId}")
+    @DELETE("api/expenses/{expenseId}")
     suspend fun deleteExpense(
         @Header("Authorization") token: String,
         @Path("expenseId") expenseId: String
@@ -46,6 +46,11 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body budget: SubmittedBudget
     ): Response<SubmittedBudget>
+
+    @GET("api/budgets")
+    suspend fun getBudgets(
+        @Header("Authorization") token: String
+    ): Response<List<SubmittedBudget>>
 }
 
 data class SignInRequest(

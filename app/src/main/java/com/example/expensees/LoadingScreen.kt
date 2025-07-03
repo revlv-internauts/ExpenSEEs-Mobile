@@ -25,19 +25,37 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
+import android.app.Activity
 
 @Composable
 fun LoadingScreen(
     modifier: Modifier = Modifier,
     onLoadingComplete: () -> Unit = {}
 ) {
+    // Enable immersive mode
+    val view = LocalView.current
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val activity = context as? Activity
+        activity?.let {
+            WindowCompat.setDecorFitsSystemWindows(it.window, false)
+            val controller = WindowCompat.getInsetsController(it.window, view)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
     LaunchedEffect(Unit) {
         delay(3000L)
         onLoadingComplete()
@@ -89,11 +107,11 @@ fun LoadingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets(0, 0, 0, 0)) // Ignore system insets
             .background(brush = backgroundGradient),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
             // Logo
             Text(
                 text = "ExpenSEEs",
@@ -109,7 +127,6 @@ fun LoadingScreen(
 
             // 🔵 New Blue Spinner Design
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
-
                 // Outer rotating ring
                 CircularProgressIndicator(
                     strokeWidth = 6.dp,

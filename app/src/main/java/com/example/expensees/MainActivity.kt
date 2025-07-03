@@ -1,5 +1,8 @@
 package com.example.expensees
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -59,4 +62,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+// Utility function to get Activity from Context
+fun Context.getActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.getActivity()
+    else -> null
 }

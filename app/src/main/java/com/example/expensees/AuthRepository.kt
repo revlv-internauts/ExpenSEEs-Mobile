@@ -745,6 +745,53 @@ class AuthRepository(
         }
     }
 
+    suspend fun getBudgets(): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection, returning local budgets")
+                    return@withContext Result.success(Unit)
+                }
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
+                }
+                val token = tokenResult.getOrNull()!!
+                Log.d("AuthRepository", "Fetching budgets with token: Bearer ${token.take(20)}...")
+                val response = apiService.getBudgets("Bearer $token")
+                Log.d("AuthRepository", "Get budgets response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+                if (response.isSuccessful) {
+                    response.body()?.let { budgets ->
+                        // Keep local budgets (e.g., unsynced with local_ prefix)
+                        submittedBudgets.removeAll { !it.budgetId.orEmpty().startsWith("local_") }
+                        submittedBudgets.addAll(budgets)
+                        Log.d("AuthRepository", "Fetched ${budgets.size} budgets")
+                        Result.success(Unit)
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Get budgets failed: HTTP ${response.code()}, body=$errorBody")
+                    val errorMessage = when (response.code()) {
+                        401 -> "Unauthorized: Invalid or expired token."
+                        400 -> "Invalid request: check API format."
+                        else -> "Server error (${response.code()}): $errorBody"
+                    }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in getBudgets: ${e.message()}, code=${e.code()}", e)
+                Result.failure(Exception("Network error: ${e.message()}"))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in getBudgets: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Get budgets error: ${e.message}", e)
+                Result.failure(Exception("Failed to fetch budgets: ${e.message}"))
+            }
+        }
+    }
+
     // Sync local budgets with server
     suspend fun syncLocalBudgets() {
         withContext(Dispatchers.IO) {

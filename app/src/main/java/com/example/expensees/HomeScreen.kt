@@ -103,19 +103,15 @@ fun HomeScreen(
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
 
+    val colorList = listOf(
+        Color(0xFF6B4E38), // Brown
+        Color(0xFFE7685D), // Coral Red
+        Color(0xFFFBBD92), // Light Peach
+        Color(0xFFFBBD92), // Light Peach (repeated)
+        Color(0xFF656774)  // Slate Gray
+    )
     val categoryColors = categories.zip(
-        listOf(
-            Color(0xFF6B7280), // Muted Slate Gray
-            Color(0xFF9CA3AF), // Soft Gray-Blue
-            Color(0xFF8B9DC3), // Muted Blue
-            Color(0xFF7F9E9F), // Muted Teal
-            Color(0xFFA7B4C5), // Pale Blue-Gray
-            Color(0xFFB7C1C3), // Light Cyan
-            Color(0xFF9E9E9E), // Neutral Gray
-            Color(0xFFB0BEC5), // Light Slate
-            Color(0xFFA5B4B6), // Muted Aqua
-            Color(0xFFBCC1C5)  // Pale Gray
-        )
+        List(categories.size) { index -> colorList[index % colorList.size] }
     ).toMap()
 
     val animatedScale = remember {
@@ -305,20 +301,32 @@ fun HomeScreen(
                             .heightIn(min = 56.dp)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF3B82F6)
+                            containerColor = Color.Transparent
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text(
-                            text = "Logout",
-                            fontSize = 16.sp,
-                            color = Color(0xFFFFFFFF),
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(4.dp)
-                        )
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                    )
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Logout",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
@@ -327,19 +335,21 @@ fun HomeScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color(0xFFEEECE1))
+                .background(Color(0xFFF5F5F5))
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 50.dp, bottom = 12.dp),
+                    .padding(top = 50.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = { scope.launch { drawerState.open() } },
                     modifier = Modifier
+                        .background(Color(0xFFE5E7EB), CircleShape)
+                        .size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Menu,
@@ -347,11 +357,12 @@ fun HomeScreen(
                         tint = Color(0xFF1F2937)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Welcome to ExpenSEEs!",
+                    text = "ExpenSEEs",
                     style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
                     ),
                     color = Color(0xFF1F2937),
                     modifier = Modifier.weight(1f),
@@ -359,36 +370,29 @@ fun HomeScreen(
                 )
             }
             if (expenses.isEmpty()) {
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "No expenses recorded yet.",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 18.sp
+                        ),
+                        color = Color(0xFF4B5563),
                         textAlign = TextAlign.Center
                     )
                 }
             } else {
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .padding(vertical = 12.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    color = Color.Transparent
                 ) {
                     AndroidView(
                         factory = { ctx ->
@@ -411,7 +415,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #DBEAFE;
+                                background: transparent;
                                 width: 100%;
                                 height: 100%;
                             }
@@ -440,7 +444,7 @@ fun HomeScreen(
                                         datasets: [{
                                             data: chartData,
                                             backgroundColor: [
-                                                '${categoryColors.values.joinToString("','") { "#${it.toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}" }}'
+                                                '${colorList.joinToString("','") { "#${it.toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}" }}'
                                             ],
                                             borderColor: ['#FFFFFF'],
                                             borderWidth: 1
@@ -512,9 +516,8 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(240.dp)
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(260.dp)
+                            .padding(8.dp)
                     )
                 }
                 Text(
@@ -533,123 +536,110 @@ fun HomeScreen(
                         .padding(vertical = 8.dp),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = RoundedCornerShape(12.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(8.dp)
+                    Text(
+                        text = "Your Top 5 Expenses",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Your Top 5 Expenses",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 18.sp
-                            ),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 260.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            itemsIndexed(categoryTotals) { index, (category, amount) ->
-                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                val categoryColor = categoryColors[category] ?: Color(0xFF3B82F6)
-                                Surface(
+                        itemsIndexed(categoryTotals) { index, (category, amount) ->
+                            val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                            val categoryColor = categoryColors[category] ?: Color(0xFF6B4E38)
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .scale(scale)
+                                    .clickable { selectedCategory = category },
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.Transparent
+                            ) {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .scale(scale)
-                                        .clickable { selectedCategory = category },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.Transparent
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        categoryColor.copy(alpha = 0.15f),
-                                                        categoryColor.copy(alpha = 0.05f)
-                                                    ),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                                )
-                                            )
-                                            .border(
-                                                1.dp,
-                                                categoryColor.copy(alpha = 0.5f),
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(8.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = categoryColor,
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                        color = Color(0xFFFFFFFF),
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column(
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text(
-                                                    text = category ?: "Unknown",
-                                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 14.sp
-                                                    ),
-                                                    color = Color(0xFF1F2937),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.widthIn(max = 120.dp)
-                                                )
-                                            }
-                                            Text(
-                                                text = if (totalExpenses > 0) {
-                                                    "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
-                                                } else {
-                                                    "0.00%"
-                                                },
-                                                style = MaterialTheme.typography.bodyLarge.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(
+                                                    categoryColor.copy(alpha = 0.1f),
+                                                    categoryColor.copy(alpha = 0.03f)
                                                 ),
-                                                color = categoryColor,
+                                                start = Offset(0f, 0f),
+                                                end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            categoryColor.copy(alpha = 0.3f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = categoryColor,
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = "${index + 1}",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = category ?: "Unknown",
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 16.sp
+                                                ),
+                                                color = Color(0xFF1F2937),
                                                 maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 60.dp)
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = Color(0xFF4B5563),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
+                                        Text(
+                                            text = if (totalExpenses > 0) {
+                                                "${String.format("%.2f", (amount / totalExpenses) * 100)}%"
+                                            } else {
+                                                "0.00%"
+                                            },
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            ),
+                                            color = categoryColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
                             }
@@ -662,7 +652,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 NavigationButton(
                     icon = Icons.Default.Add,
@@ -670,12 +660,14 @@ fun HomeScreen(
                     onClick = onRecordExpensesClick,
                     modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(12.dp))
                 NavigationButton(
                     icon = Icons.Default.RequestQuote,
                     label = "Request",
                     onClick = { navController.navigate("fund_request") },
                     modifier = Modifier.weight(1f)
                 )
+                Spacer(modifier = Modifier.width(12.dp))
                 NavigationButton(
                     icon = Icons.Default.Assignment,
                     label = "Report",
@@ -693,16 +685,14 @@ fun HomeScreen(
                     targetValue = if (selectedCategory != null) 1f else 0f,
                     animationSpec = tween(300, easing = LinearOutSlowInEasing)
                 )
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth(0.95f)
                         .fillMaxHeight(0.85f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .alpha(dialogAlpha),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    color = Color(0xFFF5F5F5),
+                    shadowElevation = 8.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -728,9 +718,9 @@ fun HomeScreen(
                             IconButton(
                                 onClick = { selectedCategory = null },
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(36.dp)
                                     .background(
-                                        Color(0xFFCED4DA),
+                                        Color(0xFFE5E7EB),
                                         CircleShape
                                     )
                             ) {
@@ -752,7 +742,7 @@ fun HomeScreen(
                                 Text(
                                     text = "No transactions recorded for this category.",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF1F2937)
+                                    color = Color(0xFF4B5563)
                                 )
                             }
                         } else {
@@ -784,7 +774,7 @@ fun HomeScreen(
                             html, body {
                                 margin: 0;
                                 padding: 0;
-                                background: #DBEAFE;
+                                background: transparent;
                                 height: 100%;
                                 width: 100%;
                             }
@@ -878,12 +868,12 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .height(220.dp)
+                                    .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         1.dp,
                                         Color(0xFFE5E7EB),
-                                        RoundedCornerShape(8.dp)
+                                        RoundedCornerShape(12.dp)
                                     )
                                     .padding(8.dp)
                             )
@@ -912,7 +902,7 @@ fun HomeScreen(
                                             easing = LinearOutSlowInEasing
                                         )
                                     )
-                                    Card(
+                                    Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .alpha(alpha)
@@ -921,11 +911,9 @@ fun HomeScreen(
                                                 selectedImagePath = expense.imagePaths?.firstOrNull()
                                                 showExpenseDialog = true
                                             },
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = Color(0xFFDBEAFE)
-                                        ),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                                        shape = RoundedCornerShape(8.dp)
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFFF5F5F5),
+                                        shadowElevation = 4.dp
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -959,10 +947,9 @@ fun HomeScreen(
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 16.sp
                                                 ),
-                                                color = categoryColors[expense.category] ?: Color(0xFF3B82F6),
+                                                color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
                                                 maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 100.dp)
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
@@ -977,15 +964,30 @@ fun HomeScreen(
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF3B82F6)
-                            )
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(
-                                text = "Close",
-                                fontSize = 16.sp,
-                                color = Color(0xFFFFFFFF),
-                                fontWeight = FontWeight.Medium
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        )
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Close",
+                                    fontSize = 16.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -1001,15 +1003,13 @@ fun HomeScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth(0.95f)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(16.dp)),
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 8.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -1049,7 +1049,7 @@ fun HomeScreen(
                                         contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(220.dp)
+                                            .height(240.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
@@ -1090,7 +1090,7 @@ fun HomeScreen(
                                     contentDescription = "${selectedTransaction?.category ?: "Receipt"} receipt",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(220.dp)
+                                        .height(240.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             1.5.dp,
@@ -1136,23 +1136,49 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(onClick = { showInfoDialog = true }) {
+                            TextButton(
+                                onClick = { showInfoDialog = true },
+                                modifier = Modifier
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
                                 Text(
                                     text = "Info",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 16.sp
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                            TextButton(onClick = {
-                                showExpenseDialog = false
-                                selectedTransaction = null
-                                expenseImageBitmap = null
-                                selectedImagePath = null
-                            }) {
+                            TextButton(
+                                onClick = {
+                                    showExpenseDialog = false
+                                    selectedTransaction = null
+                                    expenseImageBitmap = null
+                                    selectedImagePath = null
+                                },
+                                modifier = Modifier
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
                                 Text(
                                     text = "Close",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 16.sp
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -1170,15 +1196,13 @@ fun HomeScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth(0.95f)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(16.dp)),
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFDBEAFE)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 8.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -1236,12 +1260,23 @@ fun HomeScreen(
                                 expenseImageBitmap = null
                                 selectedImagePath = null
                             },
-                            modifier = Modifier.align(Alignment.End)
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text(
                                 text = "Close",
                                 color = Color(0xFF3B82F6),
-                                fontSize = 16.sp
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -1262,7 +1297,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFDBEAFE))
+                        .background(Color(0xFFF5F5F5))
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
@@ -1380,7 +1415,7 @@ fun HomeScreen(
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
                             .background(
-                                Color(0xFFCED4DA),
+                                Color(0xFFE5E7EB),
                                 CircleShape
                             )
                     ) {
@@ -1412,30 +1447,43 @@ fun NavigationButton(
             .padding(horizontal = 4.dp)
             .scale(scale),
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFDBEAFE),
+        color = Color.Transparent,
+        shadowElevation = 4.dp,
         onClick = onClick
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .padding(8.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                        start = Offset(0f, 0f),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                    )
+                )
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(28.dp),
-                tint = Color(0xFF3B82F6)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                color = Color(0xFF3B82F6),
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(28.dp),
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
