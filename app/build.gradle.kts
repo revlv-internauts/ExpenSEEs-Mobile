@@ -108,5 +108,5 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation ("id.zelory:compressor:3.0.1")
-
+    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.27.0")
 }

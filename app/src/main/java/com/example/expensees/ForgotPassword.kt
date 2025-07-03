@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,20 @@ fun ForgotPassword(
     modifier: Modifier = Modifier,
     navController: NavController
 ) {
+    // Set system bars colors
+    val systemUiController = rememberSystemUiController()
+    val backgroundColor = Color(0xFFEEECE1)
+    SideEffect {
+        systemUiController.setStatusBarColor(
+            color = backgroundColor,
+            darkIcons = true // Use dark icons for light background
+        )
+        systemUiController.setNavigationBarColor(
+            color = backgroundColor,
+            darkIcons = true // Use dark icons for light background
+        )
+    }
+
     var email by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -82,18 +97,18 @@ fun ForgotPassword(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFEEECE1), // Match TopAppBar to screen background
+                    containerColor = backgroundColor, // Match TopAppBar to screen background
                     titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         },
-        containerColor = Color(0xFFEEECE1), // Explicitly set Scaffold background
+        containerColor = backgroundColor, // Explicitly set Scaffold background
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFEEECE1)) // Ensure Column doesn't override background
+                .background(backgroundColor) // Ensure Column doesn't override background
                 .padding(innerPadding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center,

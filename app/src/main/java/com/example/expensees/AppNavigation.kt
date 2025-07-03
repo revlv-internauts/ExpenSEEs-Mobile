@@ -90,6 +90,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
             ExpenseListScreen(
                 navController = navController,
                 expenses = authRepository.userExpenses,
+                authRepository = authRepository, // Added authRepository parameter
                 onDeleteExpenses = { expensesToDelete ->
                     scope.launch {
                         try {

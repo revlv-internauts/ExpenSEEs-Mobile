@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +53,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.expensees.ApiConfig
 import com.example.expensees.models.Expense
+import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -62,8 +64,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.*
 import android.util.Log
-import coil.request.ImageRequest
-import com.example.expensees.ApiConfig
+import android.widget.Toast
+import androidx.compose.ui.graphics.graphicsLayer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
@@ -72,6 +74,7 @@ fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
     expenses: SnapshotStateList<Expense>,
+    authRepository: AuthRepository, // Add AuthRepository as a parameter
     onDeleteExpenses: (List<Expense>) -> Unit
 ) {
     var selectedExpenses by remember { mutableStateOf(setOf<Expense>()) }
@@ -82,12 +85,43 @@ fun ExpenseListScreen(
     var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showFullScreenImage by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
+    var selectedImagePath by remember { mutableStateOf<String?>(null) } // Track selected image path
+    var token by remember { mutableStateOf<String?>(null) } // Token state
+    var tokenFetchFailed by remember { mutableStateOf(false) } // Track token fetch failure
+    var retryCount by remember { mutableStateOf(0) } // Retry count for token refresh
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
+    }
+
+    // Fetch token on initialization
+    LaunchedEffect(Unit) {
+        if (retryCount < 2) {
+            try {
+                val tokenResult = authRepository.getValidToken()
+                if (tokenResult.isSuccess) {
+                    token = tokenResult.getOrNull()
+                    Log.d("ExpenseListScreen", "Initial token fetched: ${token?.take(20)}...")
+                } else {
+                    retryCount++
+                    Log.e("ExpenseListScreen", "Initial token retrieval failed: ${tokenResult.exceptionOrNull()?.message}")
+                    tokenFetchFailed = true
+                }
+            } catch (e: Exception) {
+                retryCount++
+                Log.e("ExpenseListScreen", "Initial token retrieval exception: ${e.message}")
+                tokenFetchFailed = true
+            }
+        } else {
+            tokenFetchFailed = true
+            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+            navController.navigate("login") {
+                popUpTo("home") { inclusive = true }
+            }
+        }
     }
 
     // Calendar state
@@ -336,6 +370,7 @@ fun ExpenseListScreen(
                                     indication = null
                                 ) {
                                     selectedExpense = expense
+                                    selectedImagePath = expense.imagePaths?.firstOrNull()
                                     showExpenseDialog = true
                                 }
                                 .graphicsLayer {
@@ -463,7 +498,7 @@ fun ExpenseListScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     expense.imagePaths?.firstOrNull()?.let { imagePath ->
                                         var imageLoadFailed by remember { mutableStateOf(false) }
-                                        if (imageLoadFailed) {
+                                        if (tokenFetchFailed) {
                                             Box(
                                                 modifier = Modifier
                                                     .size(56.dp)
@@ -476,7 +511,7 @@ fun ExpenseListScreen(
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
-                                                    text = "No Image",
+                                                    text = "Auth Error",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = shade,
                                                     textAlign = TextAlign.Center
@@ -530,12 +565,20 @@ fun ExpenseListScreen(
                                                 }
                                             }
                                         } else {
-                                            val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl")
+                                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}/images"
+                                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
                                             AsyncImage(
                                                 model = ImageRequest.Builder(context)
                                                     .data(fullImageUrl)
-                                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                                    .apply {
+                                                        if (token != null) {
+                                                            addHeader("Authorization", "Bearer $token")
+                                                        } else {
+                                                            imageLoadFailed = true
+                                                        }
+                                                    }
+                                                    .diskCacheKey(fullImageUrl)
+                                                    .memoryCacheKey(fullImageUrl)
                                                     .build(),
                                                 contentDescription = "Expense receipt",
                                                 modifier = Modifier
@@ -551,15 +594,32 @@ fun ExpenseListScreen(
                                                         animationSpec = tween(200)
                                                     ),
                                                 contentScale = ContentScale.Crop,
-                                                onError = {
+                                                onError = { error ->
                                                     imageLoadFailed = true
                                                     scope.launch {
-                                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
                                                         snackbarHostState.showSnackbar(
-                                                            message = "Failed to load receipt image: $fullImageUrl",
+                                                            message = "Failed to load receipt image: ${error.result.throwable.message}",
                                                             duration = SnackbarDuration.Short
                                                         )
+                                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                            retryCount++
+                                                            val tokenResult = authRepository.getValidToken()
+                                                            if (tokenResult.isSuccess) {
+                                                                token = tokenResult.getOrNull()
+                                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                            } else {
+                                                                tokenFetchFailed = true
+                                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                                navController.navigate("login") {
+                                                                    popUpTo("home") { inclusive = true }
+                                                                }
+                                                            }
+                                                        }
                                                     }
+                                                },
+                                                onSuccess = {
+                                                    Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
                                                 }
                                             )
                                         }
@@ -672,6 +732,7 @@ fun ExpenseListScreen(
                         showExpenseDialog = false
                         selectedExpense = null
                         expenseImageBitmap = null
+                        selectedImagePath = null
                     },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
@@ -701,11 +762,11 @@ fun ExpenseListScreen(
                                 color = categoryColors[selectedExpense?.category] ?: Color.Gray,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
-                            selectedExpense?.imagePaths?.firstOrNull()?.let { imagePath ->
+                            selectedImagePath?.let { imagePath ->
                                 var imageLoadFailed by remember { mutableStateOf(false) }
-                                if (imageLoadFailed) {
+                                if (tokenFetchFailed) {
                                     Text(
-                                        text = "No receipt photo available",
+                                        text = "Authentication error: Please log in again",
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(bottom = 8.dp)
@@ -747,12 +808,20 @@ fun ExpenseListScreen(
                                         )
                                     }
                                 } else {
-                                    val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                                    Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl")
+                                    val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
+                                    Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(fullImageUrl)
-                                            .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                            .apply {
+                                                if (token != null) {
+                                                    addHeader("Authorization", "Bearer $token")
+                                                } else {
+                                                    imageLoadFailed = true
+                                                }
+                                            }
+                                            .diskCacheKey(fullImageUrl)
+                                            .memoryCacheKey(fullImageUrl)
                                             .build(),
                                         contentDescription = "${selectedExpense?.category ?: "Expense"} receipt",
                                         modifier = Modifier
@@ -766,15 +835,32 @@ fun ExpenseListScreen(
                                             )
                                             .clickable { showFullScreenImage = true },
                                         contentScale = ContentScale.Crop,
-                                        onError = {
+                                        onError = { error ->
                                             imageLoadFailed = true
                                             scope.launch {
-                                                Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                                Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
                                                 snackbarHostState.showSnackbar(
-                                                    message = "Failed to load receipt image: $fullImageUrl",
+                                                    message = "Failed to load receipt image: ${error.result.throwable.message}",
                                                     duration = SnackbarDuration.Short
                                                 )
+                                                if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                    retryCount++
+                                                    val tokenResult = authRepository.getValidToken()
+                                                    if (tokenResult.isSuccess) {
+                                                        token = tokenResult.getOrNull()
+                                                        Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                    } else {
+                                                        tokenFetchFailed = true
+                                                        Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                        navController.navigate("login") {
+                                                            popUpTo("home") { inclusive = true }
+                                                        }
+                                                    }
+                                                }
                                             }
+                                        },
+                                        onSuccess = {
+                                            Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
                                         }
                                     )
                                 }
@@ -799,6 +885,7 @@ fun ExpenseListScreen(
                                     showExpenseDialog = false
                                     selectedExpense = null
                                     expenseImageBitmap = null
+                                    selectedImagePath = null
                                 }) {
                                     Text(
                                         text = "Close",
@@ -810,6 +897,7 @@ fun ExpenseListScreen(
                     }
                 }
             }
+
             // Expense info dialog
             if (showInfoDialog && selectedExpense != null) {
                 AlertDialog(
@@ -817,6 +905,7 @@ fun ExpenseListScreen(
                         showInfoDialog = false
                         selectedExpense = null
                         expenseImageBitmap = null
+                        selectedImagePath = null
                     },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
@@ -884,6 +973,7 @@ fun ExpenseListScreen(
                                     showInfoDialog = false
                                     selectedExpense = null
                                     expenseImageBitmap = null
+                                    selectedImagePath = null
                                 },
                                 modifier = Modifier.align(Alignment.End)
                             ) {
@@ -903,6 +993,7 @@ fun ExpenseListScreen(
                     onDismissRequest = {
                         showFullScreenImage = false
                         expenseImageBitmap = null
+                        selectedImagePath = null
                     },
                     modifier = Modifier.fillMaxSize(),
                     properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -917,11 +1008,11 @@ fun ExpenseListScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        selectedExpense?.imagePaths?.firstOrNull()?.let { imagePath ->
+                        selectedImagePath?.let { imagePath ->
                             var imageLoadFailed by remember { mutableStateOf(false) }
-                            if (imageLoadFailed) {
+                            if (tokenFetchFailed) {
                                 Text(
-                                    text = "No image available",
+                                    text = "Authentication error: Please log in again",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(16.dp)
@@ -959,12 +1050,20 @@ fun ExpenseListScreen(
                                     )
                                 }
                             } else {
-                                val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                                Log.d("ExpenseListScreen", "Loading full-screen server image: $fullImageUrl")
+                                val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
+                                Log.d("ExpenseListScreen", "Loading full-screen server image: $fullImageUrl with token: ${token?.take(20)}...")
                                 AsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(fullImageUrl)
-                                        .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                        .apply {
+                                            if (token != null) {
+                                                addHeader("Authorization", "Bearer $token")
+                                            } else {
+                                                imageLoadFailed = true
+                                            }
+                                        }
+                                        .diskCacheKey(fullImageUrl)
+                                        .memoryCacheKey(fullImageUrl)
                                         .build(),
                                     contentDescription = "Full screen receipt photo",
                                     modifier = Modifier
@@ -977,15 +1076,32 @@ fun ExpenseListScreen(
                                             RoundedCornerShape(12.dp)
                                         ),
                                     contentScale = ContentScale.Fit,
-                                    onError = {
+                                    onError = { error ->
                                         imageLoadFailed = true
                                         scope.launch {
-                                            Log.e("ExpenseListScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                            Log.e("ExpenseListScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}")
                                             snackbarHostState.showSnackbar(
-                                                message = "Failed to load full screen image: $fullImageUrl",
+                                                message = "Failed to load full screen image: ${error.result.throwable.message}",
                                                 duration = SnackbarDuration.Short
                                             )
+                                            if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                retryCount++
+                                                val tokenResult = authRepository.getValidToken()
+                                                if (tokenResult.isSuccess) {
+                                                    token = tokenResult.getOrNull()
+                                                    Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                } else {
+                                                    tokenFetchFailed = true
+                                                    Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("login") {
+                                                        popUpTo("home") { inclusive = true }
+                                                    }
+                                                }
+                                            }
                                         }
+                                    },
+                                    onSuccess = {
+                                        Log.d("ExpenseListScreen", "Successfully loaded full-screen server image: $fullImageUrl")
                                     }
                                 )
                             }
@@ -999,6 +1115,7 @@ fun ExpenseListScreen(
                             onClick = {
                                 showFullScreenImage = false
                                 expenseImageBitmap = null
+                                selectedImagePath = null
                             },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
