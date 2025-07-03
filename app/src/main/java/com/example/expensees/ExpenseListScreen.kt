@@ -41,7 +41,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -74,7 +73,7 @@ fun ExpenseListScreen(
     modifier: Modifier = Modifier,
     navController: NavController,
     expenses: SnapshotStateList<Expense>,
-    authRepository: AuthRepository, // Add AuthRepository as a parameter
+    authRepository: AuthRepository,
     onDeleteExpenses: (List<Expense>) -> Unit
 ) {
     var selectedExpenses by remember { mutableStateOf(setOf<Expense>()) }
@@ -82,13 +81,12 @@ fun ExpenseListScreen(
     var showExpenseDialog by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
-    var expenseImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showFullScreenImage by remember { mutableStateOf(false) }
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    var selectedImagePath by remember { mutableStateOf<String?>(null) } // Track selected image path
-    var token by remember { mutableStateOf<String?>(null) } // Token state
-    var tokenFetchFailed by remember { mutableStateOf(false) } // Track token fetch failure
-    var retryCount by remember { mutableStateOf(0) } // Retry count for token refresh
+    var showDatePickerDialog by remember { mutableStateOf(false) } // Moved declaration here
+    var selectedImagePath by remember { mutableStateOf<String?>(null) }
+    var token by remember { mutableStateOf<String?>(null) }
+    var tokenFetchFailed by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -692,7 +690,7 @@ fun ExpenseListScreen(
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text("Delete Expenses") },
-                    text = { Text("Are you sure you want to delete ${selectedExpenses.size} expense(s)?") },
+                    text = { Text("Are you sure you want to delete ${selectedExpenses.size} expense(s)? This action cannot be undone.") },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -702,10 +700,12 @@ fun ExpenseListScreen(
                                         selectedExpenses = emptySet()
                                         showDeleteDialog = false
                                         snackbarHostState.showSnackbar(
-                                            message = "Expenses deleted",
+                                            message = "${selectedExpenses.size} expense(s) deleted successfully",
                                             duration = SnackbarDuration.Short
                                         )
                                     } catch (e: Exception) {
+                                        Log.e("ExpenseListScreen", "Deletion failed: ${e.message}")
+                                        showDeleteDialog = false
                                         snackbarHostState.showSnackbar(
                                             message = "Failed to delete expenses: ${e.message}",
                                             duration = SnackbarDuration.Long
@@ -731,7 +731,6 @@ fun ExpenseListScreen(
                     onDismissRequest = {
                         showExpenseDialog = false
                         selectedExpense = null
-                        expenseImageBitmap = null
                         selectedImagePath = null
                     },
                     modifier = Modifier
@@ -793,7 +792,7 @@ fun ExpenseListScreen(
                                                     RoundedCornerShape(12.dp)
                                                 )
                                                 .clickable {
-                                                    expenseImageBitmap = it
+                                                    selectedImagePath = imagePath
                                                     showFullScreenImage = true
                                                 },
                                             contentScale = ContentScale.Crop
@@ -884,7 +883,6 @@ fun ExpenseListScreen(
                                 TextButton(onClick = {
                                     showExpenseDialog = false
                                     selectedExpense = null
-                                    expenseImageBitmap = null
                                     selectedImagePath = null
                                 }) {
                                     Text(
@@ -904,7 +902,6 @@ fun ExpenseListScreen(
                     onDismissRequest = {
                         showInfoDialog = false
                         selectedExpense = null
-                        expenseImageBitmap = null
                         selectedImagePath = null
                     },
                     modifier = Modifier
@@ -972,7 +969,6 @@ fun ExpenseListScreen(
                                 onClick = {
                                     showInfoDialog = false
                                     selectedExpense = null
-                                    expenseImageBitmap = null
                                     selectedImagePath = null
                                 },
                                 modifier = Modifier.align(Alignment.End)
@@ -992,7 +988,6 @@ fun ExpenseListScreen(
                 AlertDialog(
                     onDismissRequest = {
                         showFullScreenImage = false
-                        expenseImageBitmap = null
                         selectedImagePath = null
                     },
                     modifier = Modifier.fillMaxSize(),
@@ -1114,7 +1109,6 @@ fun ExpenseListScreen(
                         IconButton(
                             onClick = {
                                 showFullScreenImage = false
-                                expenseImageBitmap = null
                                 selectedImagePath = null
                             },
                             modifier = Modifier

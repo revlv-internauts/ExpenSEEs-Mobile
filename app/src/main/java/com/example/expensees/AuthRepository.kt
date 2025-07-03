@@ -1,5 +1,6 @@
 package com.example.expensees.network
 
+import android.app.VoiceInteractor
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -21,9 +22,12 @@ import java.util.TimeZone
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
+import com.example.expensees.ApiConfig
 import id.zelory.compressor.Compressor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
@@ -577,43 +581,43 @@ class AuthRepository(
         }
     }
 
-    // Delete expenses
     suspend fun deleteExpenses(expenses: List<Expense>) {
         withContext(Dispatchers.IO) {
-            try {
-                val tokenResult = getValidToken()
-                if (tokenResult.isFailure) {
-                    Log.e("AuthRepository", "Failed to get valid token for deleteExpenses: ${tokenResult.exceptionOrNull()?.message}")
-                    throw Exception("Not authenticated. Please log in.")
-                }
-                val token = tokenResult.getOrNull()!!
-                expenses.forEach { expense ->
-                    expense.expenseId?.let { expenseId ->
-                        if (!expenseId.startsWith("local_")) {
-                            Log.d("AuthRepository", "Deleting expense: expenseId=$expenseId")
-                            val response = apiService.deleteExpense("Bearer $token", expenseId)
+            val tokenResult = getValidToken()
+            if (tokenResult.isFailure) {
+                throw IOException("Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+            }
+            val token = tokenResult.getOrNull() ?: throw IOException("Token is null")
+
+            val client = OkHttpClient()
+            expenses.forEach { expense ->
+                if (expense.expenseId?.startsWith("local_") == true) {
+                    // Remove local expense from userExpenses
+                    userExpenses.remove(expense)
+                    Log.d("AuthRepository", "Deleted local expense: ${expense.expenseId}")
+                } else {
+                    // Delete server-synced expense via API
+                    val request = Request.Builder()
+                        .url("${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}")
+                        .delete()
+                        .addHeader("Authorization", "Bearer $token")
+                        .build()
+
+                    try {
+                        client.newCall(request).execute().use { response ->
                             if (response.isSuccessful) {
+                                // Remove from local list after successful server deletion
                                 userExpenses.remove(expense)
-                                Log.d("AuthRepository", "Expense deleted: expenseId=$expenseId")
+                                Log.d("AuthRepository", "Deleted server expense: ${expense.expenseId}")
                             } else {
-                                Log.e("AuthRepository", "Failed to delete expense: HTTP ${response.code()}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
-                                throw Exception("Failed to delete expense: HTTP ${response.code()}")
+                                throw IOException("Failed to delete expense ${expense.expenseId}: ${response.message}")
                             }
-                        } else {
-                            Log.d("AuthRepository", "Removing local expense: expenseId=$expenseId")
-                            userExpenses.remove(expense)
                         }
-                    } ?: Log.w("AuthRepository", "Skipping expense with null expenseId: ${Gson().toJson(expense)}")
+                    } catch (e: Exception) {
+                        Log.e("AuthRepository", "Error deleting expense ${expense.expenseId}: ${e.message}")
+                        throw e
+                    }
                 }
-            } catch (e: HttpException) {
-                Log.e("AuthRepository", "HTTP error deleting expenses: ${e.message()}, code=${e.code()}, response=${e.response()?.raw()}", e)
-                throw Exception("Failed to delete expenses: HTTP ${e.code()}")
-            } catch (e: IOException) {
-                Log.e("AuthRepository", "IO error deleting expenses: ${e.message}", e)
-                throw Exception("No internet connection")
-            } catch (e: Exception) {
-                Log.e("AuthRepository", "Delete expenses error: ${e.message}", e)
-                throw Exception("Failed to delete expenses: ${e.message}")
             }
         }
     }
