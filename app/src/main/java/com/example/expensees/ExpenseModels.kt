@@ -1,7 +1,9 @@
 package com.example.expensees.models
 
 import android.net.Uri
+import android.os.Parcelable
 import com.google.gson.annotations.SerializedName
+
 
 
 
@@ -10,17 +12,29 @@ enum class BudgetStatus {
 }
 
 data class ExpenseItem(
+    @SerializedName("expenseItemId")
+    val expenseItemId: String? = null,
+    @SerializedName("category")
     val category: String,
+    @SerializedName("quantity")
     val quantity: Int,
+    @SerializedName("amountPerUnit")
     val amountPerUnit: Double,
-    val remarks: String = ""
+    @SerializedName("remarks")
+    val remarks: String
 )
 
 data class SubmittedBudget(
+    @SerializedName("budgetId")
+    val budgetId: String? = null,
+    @SerializedName("name")
     val name: String,
+    @SerializedName("expenses")
     val expenses: List<ExpenseItem>,
+    @SerializedName("total")
     val total: Double,
-    val status: BudgetStatus = BudgetStatus.PENDING
+    @SerializedName("status")
+    val status: BudgetStatus
 )
 
 

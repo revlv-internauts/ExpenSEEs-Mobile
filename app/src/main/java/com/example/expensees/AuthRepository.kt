@@ -1,6 +1,5 @@
 package com.example.expensees.network
 
-import android.app.VoiceInteractor
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -8,7 +7,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.auth0.jwt.JWT
 import com.auth0.jwt.exceptions.JWTDecodeException
+import com.example.expensees.ApiConfig
 import com.example.expensees.models.Expense
+import com.example.expensees.models.SubmittedBudget
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -22,12 +23,9 @@ import java.util.TimeZone
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
-import com.example.expensees.ApiConfig
 import id.zelory.compressor.Compressor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
@@ -36,6 +34,7 @@ class AuthRepository(
     private val context: Context
 ) {
     val userExpenses: SnapshotStateList<Expense> = mutableStateListOf()
+    val submittedBudgets: SnapshotStateList<SubmittedBudget> = mutableStateListOf()
 
     // Check network availability
     fun isNetworkAvailable(context: Context): Boolean {
@@ -581,6 +580,7 @@ class AuthRepository(
         }
     }
 
+    // Delete expenses
     suspend fun deleteExpenses(expenses: List<Expense>) {
         withContext(Dispatchers.IO) {
             val tokenResult = getValidToken()
@@ -589,7 +589,6 @@ class AuthRepository(
             }
             val token = tokenResult.getOrNull() ?: throw IOException("Token is null")
 
-            val client = OkHttpClient()
             expenses.forEach { expense ->
                 if (expense.expenseId?.startsWith("local_") == true) {
                     // Remove local expense from userExpenses
@@ -597,21 +596,23 @@ class AuthRepository(
                     Log.d("AuthRepository", "Deleted local expense: ${expense.expenseId}")
                 } else {
                     // Delete server-synced expense via API
-                    val request = Request.Builder()
-                        .url("${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}")
-                        .delete()
-                        .addHeader("Authorization", "Bearer $token")
-                        .build()
-
                     try {
-                        client.newCall(request).execute().use { response ->
-                            if (response.isSuccessful) {
-                                // Remove from local list after successful server deletion
-                                userExpenses.remove(expense)
-                                Log.d("AuthRepository", "Deleted server expense: ${expense.expenseId}")
-                            } else {
-                                throw IOException("Failed to delete expense ${expense.expenseId}: ${response.message}")
-                            }
+                        val response = apiService.deleteExpense("Bearer $token", expense.expenseId!!)
+                        if (response.isSuccessful) {
+                            // Remove from local list after successful server deletion
+                            userExpenses.remove(expense)
+                            Log.d("AuthRepository", "Deleted server expense: ${expense.expenseId}")
+                        } else {
+                            val errorBody = response.errorBody()?.string()
+                            val errorMessage = errorBody?.let {
+                                try {
+                                    Gson().fromJson(it, ErrorResponse::class.java)?.message
+                                        ?: "Server error (${response.code()})"
+                                } catch (e: Exception) {
+                                    "Server error (${response.code()})"
+                                }
+                            } ?: "Server error (${response.code()})"
+                            throw IOException("Failed to delete expense ${expense.expenseId}: $errorMessage")
                         }
                     } catch (e: Exception) {
                         Log.e("AuthRepository", "Error deleting expense ${expense.expenseId}: ${e.message}")
@@ -622,37 +623,152 @@ class AuthRepository(
         }
     }
 
-    // Sync local expenses with server
-    suspend fun syncLocalExpenses() {
+    // Add a new budget
+    suspend fun addBudget(budget: SubmittedBudget): Result<SubmittedBudget> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AuthRepository", "Adding budget: name=${budget.name}, total=${budget.total}, expenses=${budget.expenses.size}, coroutineContext=${currentCoroutineContext()}")
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection, saving locally")
+                    val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                    submittedBudgets.add(localBudget)
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+
+                val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                var token = prefs.getString("auth_token", null)
+                Log.d("AuthRepository", "Stored auth_token: ${token?.take(20) ?: "null"}...")
+                if (token.isNullOrEmpty()) {
+                    Log.e("AuthRepository", "No token found in SharedPreferences")
+                    val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                    submittedBudgets.add(localBudget)
+                    return@withContext Result.failure(Exception("Not authenticated. Please log in."))
+                }
+
+                try {
+                    val decodedJWT = JWT.decode(token)
+                    val expiry = decodedJWT.expiresAt
+                    val currentTime = Date()
+                    Log.d("AuthRepository", "Token expiry: $expiry, currentTime: $currentTime, raw exp: ${decodedJWT.getClaim("exp").asLong()}, timezone: ${TimeZone.getDefault().id}, claims: ${decodedJWT.claims}")
+                    if (expiry == null || expiry.before(currentTime)) {
+                        Log.d("AuthRepository", "Access token expired, attempting to refresh")
+                        val refreshToken = prefs.getString("refresh_token", null)
+                        if (refreshToken.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "No refresh token available")
+                            val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                            submittedBudgets.add(localBudget)
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                        val refreshResult = refreshToken(refreshToken)
+                        if (refreshResult.isSuccess) {
+                            token = prefs.getString("auth_token", null)
+                            if (token.isNullOrEmpty()) {
+                                Log.e("AuthRepository", "Failed to obtain new token after refresh")
+                                val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                                submittedBudgets.add(localBudget)
+                                return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
+                            }
+                        } else {
+                            Log.e("AuthRepository", "Token refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                            val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                            submittedBudgets.add(localBudget)
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                    }
+                } catch (e: JWTDecodeException) {
+                    Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
+                    val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                    submittedBudgets.add(localBudget)
+                    return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
+                }
+
+                Log.d("AuthRepository", "Sending request to /api/budgets with token: Bearer ${token.take(20)}...")
+                val response = apiService.addBudget("Bearer $token", budget)
+                Log.d("AuthRepository", "Add budget response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
+
+                if (response.isSuccessful) {
+                    response.body()?.let { returnedBudget ->
+                        if (returnedBudget.budgetId.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "Budget returned but has no budgetId: ${Gson().toJson(returnedBudget)}")
+                            val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                            submittedBudgets.add(localBudget)
+                            Result.failure(Exception("Budget not saved on server (missing budgetId), saved locally"))
+                        } else {
+                            submittedBudgets.add(returnedBudget)
+                            Log.d("AuthRepository", "Budget added: budgetId=${returnedBudget.budgetId}")
+                            Result.success(returnedBudget)
+                        }
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Add budget failed: HTTP ${response.code()}, body=$errorBody, headers=${response.headers()}")
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
+                    }
+                    val errorMessage = errorResponse?.message
+                        ?: errorResponse?.error
+                        ?: when (response.code()) {
+                            401 -> "Unauthorized: Invalid or expired token. Please log in again."
+                            400 -> "Invalid budget data: check field formats"
+                            422 -> "Validation error: ensure all required fields are provided"
+                            else -> "Server error (${response.code()}). Please try again."
+                        }
+                    val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                    submittedBudgets.add(localBudget)
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in addBudget: ${e.message()}, code=${e.code()}, response=${e.response()?.raw()}", e)
+                val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                submittedBudgets.add(localBudget)
+                val errorMessage = when (e.code()) {
+                    401 -> "Unauthorized: Invalid or expired token."
+                    else -> "Network error: ${e.message()}"
+                }
+                Result.failure(Exception(errorMessage))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in addBudget: ${e.message}", e)
+                val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                submittedBudgets.add(localBudget)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Add budget error: ${e.message}", e)
+                val localBudget = budget.copy(budgetId = "local_${System.currentTimeMillis()}")
+                submittedBudgets.add(localBudget) // Fixed: Replaced concurrentsubmittedBudgets with submittedBudgets
+                Result.failure(Exception("Failed to add budget: ${e.message}"))
+            }
+        }
+    }
+
+    // Sync local budgets with server
+    suspend fun syncLocalBudgets() {
         withContext(Dispatchers.IO) {
             try {
                 val tokenResult = getValidToken()
                 if (tokenResult.isFailure) {
-                    Log.e("AuthRepository", "Failed to get valid token for syncLocalExpenses: ${tokenResult.exceptionOrNull()?.message}")
+                    Log.e("AuthRepository", "Failed to get valid token for syncLocalBudgets: ${tokenResult.exceptionOrNull()?.message}")
                     return@withContext
                 }
                 val token = tokenResult.getOrNull()!!
-                val localExpenses = userExpenses.filter { it.expenseId?.startsWith("local_") == true }
-                val serverExpenses = apiService.getExpenses("Bearer $token").body() ?: emptyList()
-                val serverExpenseIds = serverExpenses.mapNotNull { it.expenseId }.toSet()
+                val localBudgets = submittedBudgets.filter { it.budgetId?.startsWith("local_") == true }
 
-                for (localExpense in localExpenses) {
-                    if (localExpense.expenseId !in serverExpenseIds) {
-                        val result = addExpenseWithToken(localExpense, token)
-                        if (result.isSuccess) {
-                            userExpenses.remove(localExpense)
-                            userExpenses.add(result.getOrNull()!!)
-                            Log.d("AuthRepository", "Synced local expense: ${localExpense.expenseId}")
-                        } else {
-                            Log.e("AuthRepository", "Failed to sync local expense: ${localExpense.expenseId}, error: ${result.exceptionOrNull()?.message}")
-                        }
+                for (localBudget in localBudgets) {
+                    val result = addBudget(localBudget)
+                    if (result.isSuccess) {
+                        submittedBudgets.remove(localBudget)
+                        submittedBudgets.add(result.getOrNull()!!)
+                        Log.d("AuthRepository", "Synced local budget: ${localBudget.budgetId}")
                     } else {
-                        Log.d("AuthRepository", "Skipping sync for local expense ${localExpense.expenseId}, already exists on server")
-                        userExpenses.remove(localExpense)
+                        Log.e("AuthRepository", "Failed to sync local budget: ${localBudget.budgetId}, error: ${result.exceptionOrNull()?.message}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("AuthRepository", "Sync local expenses error: ${e.message}", e)
+                Log.e("AuthRepository", "Sync local budgets error: ${e.message}", e)
             }
         }
     }
@@ -664,7 +780,8 @@ class AuthRepository(
             .clear()
             .apply()
         userExpenses.clear()
-        Log.d("AuthRepository", "Logged out, cleared SharedPreferences and userExpenses")
+        submittedBudgets.clear()
+        Log.d("AuthRepository", "Logged out, cleared SharedPreferences, userExpenses, and submittedBudgets")
     }
 
     // Check if user is authenticated

@@ -1,6 +1,7 @@
 package com.example.expensees.network
 
 import com.example.expensees.models.Expense
+import com.example.expensees.models.SubmittedBudget
 import com.google.gson.annotations.SerializedName
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -39,6 +40,12 @@ interface ApiService {
     suspend fun getExpenses(
         @Header("Authorization") token: String
     ): Response<List<Expense>>
+
+    @POST("api/budgets")
+    suspend fun addBudget(
+        @Header("Authorization") token: String,
+        @Body budget: SubmittedBudget
+    ): Response<SubmittedBudget>
 }
 
 data class SignInRequest(

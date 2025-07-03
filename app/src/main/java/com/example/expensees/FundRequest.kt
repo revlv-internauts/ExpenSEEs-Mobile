@@ -16,12 +16,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +29,7 @@ import androidx.navigation.NavController
 import com.example.expensees.models.BudgetStatus
 import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
+import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -41,7 +40,7 @@ import java.util.Locale
 fun FundRequest(
     modifier: Modifier = Modifier,
     navController: NavController,
-    submittedBudgets: MutableList<SubmittedBudget>
+    authRepository: AuthRepository
 ) {
     // State management
     var budgetName by remember { mutableStateOf("") }
@@ -93,7 +92,7 @@ fun FundRequest(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFEEECE1), // Consistent background color
+                    containerColor = Color(0xFFEEECE1),
                     titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -148,17 +147,17 @@ fun FundRequest(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .background(Color(0xFFEEECE1)) // Consistent background color
+                    .background(Color(0xFFEEECE1))
             )
         },
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFEEECE1)) // Scaffold background
+            .background(Color(0xFFEEECE1))
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFEEECE1)) // Ensure Column has the same background
+                .background(Color(0xFFEEECE1))
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -309,33 +308,43 @@ fun FundRequest(
             Button(
                 onClick = {
                     if (budgetName.isNotBlank() && expenses.isNotEmpty()) {
-                        val submittedBudgetName = budgetName // Store budgetName before clearing
-                        submittedBudgets.add(
-                            SubmittedBudget(
-                                name = budgetName,
-                                expenses = expenses.toList(),
-                                total = totalExpenses,
-                                status = BudgetStatus.PENDING
-                            )
+                        val submittedBudgetName = budgetName
+                        val budget = SubmittedBudget(
+                            budgetId = null, // Server assigns budgetId
+                            name = budgetName,
+                            expenses = expenses.toList(),
+                            total = totalExpenses,
+                            status = BudgetStatus.PENDING
                         )
                         coroutineScope.launch {
-                            // Show snackbar
-                            val job = coroutineScope.launch {
+                            try {
+                                val result = authRepository.addBudget(budget)
+                                result.onSuccess { returnedBudget ->
+                                    snackbarHostState.showSnackbar(
+                                        message = "Budget request for $submittedBudgetName submitted successfully!",
+                                        actionLabel = "OK",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    // Clear form after successful submission
+                                    budgetName = ""
+                                    expenses.clear()
+                                    // Navigate back to the previous screen
+                                    navController.popBackStack()
+                                }.onFailure { e ->
+                                    snackbarHostState.showSnackbar(
+                                        message = "Failed to submit budget: ${e.message}",
+                                        actionLabel = "OK",
+                                        duration = SnackbarDuration.Long
+                                    )
+                                }
+                            } catch (e: Exception) {
                                 snackbarHostState.showSnackbar(
-                                    message = "Budget request for $submittedBudgetName submitted successfully!",
+                                    message = "Failed to submit budget: ${e.message}",
                                     actionLabel = "OK",
-                                    duration = SnackbarDuration.Indefinite
+                                    duration = SnackbarDuration.Long
                                 )
                             }
-                            // Delay for 2 seconds
-                            delay(2000L)
-                            // Dismiss the snackbar
-                            job.cancel()
-                            snackbarHostState.currentSnackbarData?.dismiss()
                         }
-                        // Clear form after submission
-                        budgetName = ""
-                        expenses.clear()
                     }
                 },
                 modifier = Modifier
@@ -354,7 +363,7 @@ fun FundRequest(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp)) // Additional spacing for bottom bar
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // Add Expense Dialog
@@ -370,7 +379,7 @@ fun FundRequest(
                 },
                 text = {
                     Column(
-                        modifier = Modifier.background(Color(0xFFEEECE1)) // Set dialog content background
+                        modifier = Modifier.background(Color(0xFFEEECE1))
                     ) {
                         Box(
                             modifier = Modifier
@@ -379,17 +388,17 @@ fun FundRequest(
                         ) {
                             OutlinedTextField(
                                 value = category,
-                                onValueChange = { }, // Keep empty since selection is via dropdown
+                                onValueChange = { },
                                 label = { Text("Expense Category") },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp)),
-                                readOnly = true, // Prevent keyboard input
+                                readOnly = true,
                                 interactionSource = remember { MutableInteractionSource() }.also { interactionSource ->
                                     LaunchedEffect(interactionSource) {
                                         interactionSource.interactions.collect { interaction ->
                                             if (interaction is PressInteraction.Press) {
-                                                expanded = true // Open dropdown on any press
+                                                expanded = true
                                             }
                                         }
                                     }
@@ -411,7 +420,7 @@ fun FundRequest(
                                 onDismissRequest = { expanded = false },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFFEEECE1)) // Set dropdown background
+                                    .background(Color(0xFFEEECE1))
                             ) {
                                 categories.forEach { option ->
                                     DropdownMenuItem(
@@ -516,7 +525,7 @@ fun FundRequest(
                 },
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFEEECE1)) // Set dialog background
+                    .background(Color(0xFFEEECE1))
             )
         }
     }

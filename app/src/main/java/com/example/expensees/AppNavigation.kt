@@ -107,8 +107,8 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         composable("fund_request") {
             FundRequest(
                 navController = navController,
-                submittedBudgets = submittedBudgets,
-                modifier = modifier
+                authRepository = authRepository,
+                modifier = Modifier
             )
         }
         composable("liquidation_report") {
