@@ -103,16 +103,20 @@ fun HomeScreen(
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
 
+    // Updated color list with unique colors for each category
     val colorList = listOf(
         Color(0xFF6B4E38), // Brown
         Color(0xFFE7685D), // Coral Red
         Color(0xFFFBBD92), // Light Peach
-        Color(0xFFFBBD92), // Light Peach (repeated)
-        Color(0xFF656774)  // Slate Gray
+        Color(0xFF4CAF50), // Green
+        Color(0xFF2196F3), // Blue
+        Color(0xFFFF9800), // Orange
+        Color(0xFFE28743), // orange
+        Color(0xFF009688), // Teal
+        Color(0xFFFF5722), // Deep Orange
+        Color(0xFF607D8B)  // Blue Grey
     )
-    val categoryColors = categories.zip(
-        List(categories.size) { index -> colorList[index % colorList.size] }
-    ).toMap()
+    val categoryColors = categories.zip(colorList).toMap()
 
     val animatedScale = remember {
         SnapshotStateList<Animatable<Float, *>>().apply {
@@ -362,10 +366,12 @@ fun HomeScreen(
                     text = "ExpenSEEs",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
+                        fontSize = 28.sp
                     ),
                     color = Color(0xFF1F2937),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .offset(x = (-18).dp),
                     textAlign = TextAlign.Center
                 )
             }
@@ -549,13 +555,12 @@ fun HomeScreen(
                         color = Color(0xFF1F2937),
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    LazyColumn(
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp),
+                            .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        itemsIndexed(categoryTotals) { index, (category, amount) ->
+                        categoryTotals.forEachIndexed { index, (category, amount) ->
                             val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
                             val categoryColor = categoryColors[category] ?: Color(0xFF6B4E38)
                             Surface(
