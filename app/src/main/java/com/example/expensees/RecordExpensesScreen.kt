@@ -32,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -155,133 +157,268 @@ fun RecordExpensesScreen(
     }
 
     if (showPermissionRationale) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { showPermissionRationale = false },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(12.dp)),
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            title = {
-                Text(
-                    text = "Permission Required",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFF3B82F6) // Blue 500
-                )
-            },
-            text = {
-                Text(
-                    text = when (permissionType) {
-                        "camera" -> "Camera access is needed to take photos of your expense receipts."
-                        "storage" -> "Storage access is needed to select photos from your gallery."
-                        else -> ""
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF1F2937) // Dark gray
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPermissionRationale = false
-                        val permission = when (permissionType) {
-                            "camera" -> Manifest.permission.CAMERA
-                            "storage" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                Manifest.permission.READ_MEDIA_IMAGES
-                            } else {
-                                Manifest.permission.READ_EXTERNAL_STORAGE
-                            }
-                            else -> ""
-                        }
-                        multiplePermissionsLauncher.launch(arrayOf(permission))
-                    }
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Grant Permission",
-                        color = Color(0xFF3B82F6), // Blue 500
-                        fontSize = 16.sp
+                        text = "Permission Required",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPermissionRationale = false }) {
                     Text(
-                        text = "Cancel",
-                        color = Color(0xFF3B82F6), // Blue 500
-                        fontSize = 16.sp
+                        text = when (permissionType) {
+                            "camera" -> "Camera access is needed to take photos of your expense receipts."
+                            "storage" -> "Storage access is needed to select photos from your gallery."
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                        color = Color(0xFF4B5563),
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(
+                            onClick = {
+                                showPermissionRationale = false
+                                val permission = when (permissionType) {
+                                    "camera" -> Manifest.permission.CAMERA
+                                    "storage" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        Manifest.permission.READ_MEDIA_IMAGES
+                                    } else {
+                                        Manifest.permission.READ_EXTERNAL_STORAGE
+                                    }
+                                    else -> ""
+                                }
+                                multiplePermissionsLauncher.launch(arrayOf(permission))
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(end = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Grant Permission",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { showPermissionRationale = false },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Cancel",
+                                    color = Color(0xFF3B82F6),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 
     if (showAuthErrorDialog) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { showAuthErrorDialog = false },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(12.dp)),
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            title = {
-                Text(
-                    text = "Authentication Error",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFF3B82F6) // Blue 500
-                )
-            },
-            text = {
-                Text(
-                    text = "Your session has expired or is invalid. The expense has been saved locally. Please log in again to sync it with the server.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF1F2937) // Dark gray
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showAuthErrorDialog = false
-                        authRepository.logout()
-                        navController.navigate("login") {
-                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
-                        }
-                    }
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Log In",
-                        color = Color(0xFF3B82F6), // Blue 500
-                        fontSize = 16.sp
+                        text = "Authentication Error",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAuthErrorDialog = false }) {
                     Text(
-                        text = "Cancel",
-                        color = Color(0xFF3B82F6), // Blue 500
-                        fontSize = 16.sp
+                        text = "Your session has expired or is invalid. The expense has been saved locally. Please log in again to sync it with the server.",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                        color = Color(0xFF4B5563),
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(
+                            onClick = {
+                                showAuthErrorDialog = false
+                                authRepository.logout()
+                                navController.navigate("login") {
+                                    popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(end = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Log In",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { showAuthErrorDialog = false },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Cancel",
+                                    color = Color(0xFF3B82F6),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 
     if (showExpenseDialog && selectedExpense != null) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {
                 showExpenseDialog = false
                 selectedExpense = null
             },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.85f)
-                .clip(RoundedCornerShape(12.dp)),
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFDBEAFE) // Blue 50
-                ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .fillMaxHeight(0.85f)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -298,19 +435,22 @@ fun RecordExpensesScreen(
                     ) {
                         Text(
                             text = "${selectedExpense?.category ?: ""} Receipt",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = Color(0xFF3B82F6) // Blue 500
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 20.sp
+                            ),
+                            color = Color(0xFF1F2937)
                         )
                         IconButton(
                             onClick = { showExpenseDialog = false; selectedExpense = null },
                             modifier = Modifier
-                                .size(28.dp)
-                                .background(Color(0xFFCED4DA), CircleShape) // Matte cool gray
+                                .size(36.dp)
+                                .background(Color(0xFFE5E7EB), CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close dialog",
-                                tint = Color(0xFF1F2937) // Dark gray
+                                tint = Color(0xFF1F2937)
                             )
                         }
                     }
@@ -319,9 +459,9 @@ fun RecordExpensesScreen(
                         if (imageLoadFailed) {
                             Text(
                                 text = "No receipt photo available",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF4B5563), // Darker gray
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                                color = Color(0xFF4B5563),
+                                modifier = Modifier.padding(bottom = 12.dp)
                             )
                         } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
                             val bitmap = try {
@@ -339,7 +479,7 @@ fun RecordExpensesScreen(
                                         .fillMaxWidth()
                                         .weight(1f)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
+                                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
                                         .clickable {
                                             expenseImageBitmap = it
                                             showFullScreenImage = true
@@ -350,9 +490,9 @@ fun RecordExpensesScreen(
                                 imageLoadFailed = true
                                 Text(
                                     text = "No receipt photo available",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF4B5563), // Darker gray
-                                    modifier = Modifier.padding(bottom = 8.dp)
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                                    color = Color(0xFF4B5563),
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             }
                         } else {
@@ -368,7 +508,7 @@ fun RecordExpensesScreen(
                                     .fillMaxWidth()
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
+                                    .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
                                     .clickable { showFullScreenImage = true },
                                 contentScale = ContentScale.Fit,
                                 onError = {
@@ -382,31 +522,87 @@ fun RecordExpensesScreen(
                         }
                     } ?: Text(
                         text = "No receipt photo available",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4B5563), // Darker gray
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF4B5563),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        TextButton(onClick = { showInfoDialog = true }) {
-                            Text(
-                                text = "Info",
-                                color = Color(0xFF3B82F6), // Blue 500
-                                fontSize = 16.sp
-                            )
+                        Button(
+                            onClick = { showInfoDialog = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(end = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Info",
+                                    color = Color(0xFF3B82F6),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
-                        TextButton(onClick = {
-                            showExpenseDialog = false
-                            selectedExpense = null
-                        }) {
-                            Text(
-                                text = "Close",
-                                color = Color(0xFF3B82F6), // Blue 500
-                                fontSize = 16.sp
-                            )
+                        Button(
+                            onClick = {
+                                showExpenseDialog = false
+                                selectedExpense = null
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Close",
+                                    color = Color(0xFF3B82F6),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -415,23 +611,20 @@ fun RecordExpensesScreen(
     }
 
     if (showInfoDialog && selectedExpense != null) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {
                 showInfoDialog = false
                 selectedExpense = null
                 expenseImageBitmap = null
             },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(12.dp)),
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFDBEAFE) // Blue 50
-                ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -440,8 +633,11 @@ fun RecordExpensesScreen(
                 ) {
                     Text(
                         text = "Expense Details",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color(0xFF3B82F6), // Blue 500
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp
+                        ),
+                        color = Color(0xFF1F2937),
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     Column(
@@ -449,49 +645,73 @@ fun RecordExpensesScreen(
                     ) {
                         Text(
                             text = "Category: ${selectedExpense?.category ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF1F2937), // Dark gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Amount: ₱${String.format("%.2f", selectedExpense?.amount ?: 0.0)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF1F2937), // Dark gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Date of Transaction: ${selectedExpense?.dateOfTransaction ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF1F2937), // Dark gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Created At: ${selectedExpense?.createdAt ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF1F2937), // Dark gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
                             text = "Remarks: ${selectedExpense?.remarks ?: "N/A"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF1F2937), // Dark gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(
+                    Button(
                         onClick = {
                             showInfoDialog = false
                             selectedExpense = null
                             expenseImageBitmap = null
                         },
-                        modifier = Modifier.align(Alignment.End)
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text(
-                            text = "Close",
-                            color = Color(0xFF3B82F6), // Blue 500
-                            fontSize = 16.sp
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Close",
+                                color = Color(0xFF3B82F6),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -499,22 +719,23 @@ fun RecordExpensesScreen(
     }
 
     if (showFullScreenImage) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {
                 showFullScreenImage = false
                 selectedExpense = null
                 expenseImageBitmap = null
             },
-            modifier = Modifier.fillMaxSize(),
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFDBEAFE)) // Blue 50
+                    .background(Color(0xFFF5F5F5))
                     .padding(
                         top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                        start = 16.dp,
+                        end = 16.dp
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -523,8 +744,8 @@ fun RecordExpensesScreen(
                     if (imageLoadFailed) {
                         Text(
                             text = "No image available",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5563), // Darker gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF4B5563),
                             modifier = Modifier.padding(16.dp)
                         )
                     } else if (expense.expenseId?.startsWith("local_") == true) {
@@ -542,24 +763,23 @@ fun RecordExpensesScreen(
                                     contentDescription = "Full screen expense photo",
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(16.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)), // Blue 500
+                                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)),
                                     contentScale = ContentScale.Fit
                                 )
                             } ?: run {
                                 imageLoadFailed = true
                                 Text(
                                     text = "No image available",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color(0xFF4B5563), // Darker gray
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                    color = Color(0xFF4B5563),
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
                         } ?: Text(
                             text = "No image available",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5563), // Darker gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF4B5563),
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
@@ -574,9 +794,8 @@ fun RecordExpensesScreen(
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(16.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)), // Blue 500
+                                    .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     Log.e("RecordExpensesScreen", "Failed to load server full screen image: $fullImageUrl, error: ${it.result.throwable.message}")
@@ -588,15 +807,15 @@ fun RecordExpensesScreen(
                             )
                         } ?: Text(
                             text = "No image available",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF4B5563), // Darker gray
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = Color(0xFF4B5563),
                             modifier = Modifier.padding(16.dp)
                         )
                     }
                 } ?: Text(
                     text = "No image available",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF4B5563), // Darker gray
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                    color = Color(0xFF4B5563),
                     modifier = Modifier.padding(16.dp)
                 )
                 IconButton(
@@ -608,12 +827,12 @@ fun RecordExpensesScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .background(Color(0xFFCED4DA), CircleShape) // Matte cool gray
+                        .background(Color(0xFFE5E7EB), CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close image",
-                        tint = Color(0xFF1F2937) // Dark gray
+                        tint = Color(0xFF1F2937)
                     )
                 }
             }
@@ -675,58 +894,58 @@ fun RecordExpensesScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFE3F2FD), // Light blue (Blue 50)
-                        Color(0xFFBBDEFB) // Slightly darker blue (Blue 100)
-                    )
-                )
-            )
+            .background(Color(0xFFF5F5F5))
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp, top = 16.dp),
+                .padding(top = 50.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { navController.navigate("home") }) {
+            IconButton(
+                onClick = { navController.navigate("home") },
+                modifier = Modifier
+                    .background(Color(0xFFE5E7EB), CircleShape)
+                    .size(40.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Back to home",
-                    tint = Color(0xFF3B82F6) // Blue 500
+                    tint = Color(0xFF1F2937)
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "Record Expenses",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color(0xFF1F2937), // Dark gray
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                text = "ExpenSEEs",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp
+                ),
+                color = Color(0xFF1F2937),
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.weight(1f))
         }
-        Divider(
-            color = Color(0xFF1F2937), // Darker gray for better contrast
-            thickness = 2.dp, // Increased thickness for visibility
-            modifier = Modifier.padding(bottom = 16.dp)
+        HorizontalDivider(
+            modifier = Modifier.padding(bottom = 12.dp),
+            color = Color(0xFFE5E7EB)
         )
 
         // Category Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Category",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF1F2937), // Dark gray
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                color = Color(0xFF1F2937),
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(100.dp)
                     .padding(end = 8.dp)
             )
             Box(
@@ -737,23 +956,27 @@ fun RecordExpensesScreen(
                 OutlinedTextField(
                     value = category,
                     onValueChange = { },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     enabled = false,
                     readOnly = true,
-                    placeholder = { Text("Select a category", color = Color(0xFF4B5563)) }, // Added placeholder
+                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                    placeholder = { Text("Select a category", color = Color(0xFF4B5563), fontSize = 14.sp) },
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = Color(0xFF1F2937), // Dark gray
-                        disabledBorderColor = Color(0xFFE5E7EB), // Light gray
-                        disabledPlaceholderColor = Color(0xFF4B5563), // Darker gray
-                        disabledLabelColor = Color(0xFF4B5563), // Darker gray
-                        disabledLeadingIconColor = Color(0xFF4B5563), // Darker gray
-                        disabledTrailingIconColor = Color(0xFF4B5563) // Darker gray
+                        disabledTextColor = Color(0xFF1F2937),
+                        disabledBorderColor = Color(0xFFE5E7EB),
+                        disabledPlaceholderColor = Color(0xFF4B5563),
+                        disabledLabelColor = Color(0xFF4B5563),
+                        disabledLeadingIconColor = Color(0xFF4B5563),
+                        disabledTrailingIconColor = Color(0xFF4B5563)
                     ),
                     trailingIcon = {
                         IconButton(onClick = { expanded = !expanded }) {
                             Text(
                                 text = if (expanded) "▲" else "▼",
-                                color = Color(0xFF3B82F6) // Blue 500
+                                color = Color(0xFF8A5B6E),
+                                fontSize = 14.sp
                             )
                         }
                     }
@@ -763,16 +986,16 @@ fun RecordExpensesScreen(
                     onDismissRequest = { expanded = false },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFDBEAFE)) // Blue 50
+                        .background(Color(0xFFF5F5F5))
                 ) {
                     categories.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option, color = Color(0xFF1F2937)) }, // Dark gray
+                            text = { Text(option, color = Color(0xFF1F2937), fontSize = 14.sp) },
                             onClick = {
                                 category = option
                                 expanded = false
                             },
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
                         )
                     }
                 }
@@ -783,15 +1006,15 @@ fun RecordExpensesScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Amount",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF1F2937), // Dark gray
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                color = Color(0xFF1F2937),
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(100.dp)
                     .padding(end = 8.dp)
             )
             OutlinedTextField(
@@ -801,16 +1024,18 @@ fun RecordExpensesScreen(
                         amount = newValue
                     }
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937)), // Dark gray
+                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937), fontSize = 14.sp),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = Color(0xFF3B82F6), // Blue 500
-                    unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
-                    cursorColor = Color(0xFF3B82F6) // Blue 500
+                    focusedBorderColor = Color(0xFF3B82F6),
+                    unfocusedBorderColor = Color(0xFFE5E7EB),
+                    cursorColor = Color(0xFF3B82F6)
                 ),
-                placeholder = { Text("Enter amount (e.g., 50.00)", color = Color(0xFF4B5563)) } // Updated placeholder
+                placeholder = { Text("Enter amount (e.g., 50.00)", color = Color(0xFF4B5563), fontSize = 14.sp) }
             )
         }
 
@@ -818,15 +1043,15 @@ fun RecordExpensesScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Date",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF1F2937), // Dark gray
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                color = Color(0xFF1F2937),
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(100.dp)
                     .padding(end = 8.dp)
             )
             Box(
@@ -837,24 +1062,27 @@ fun RecordExpensesScreen(
                 OutlinedTextField(
                     value = dateOfTransaction,
                     onValueChange = { },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     enabled = false,
                     readOnly = true,
-                    placeholder = { Text("Select date (YYYY-MM-DD)", color = Color(0xFF4B5563)) }, // Added placeholder
+                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                    placeholder = { Text("Select date (YYYY-MM-DD)", color = Color(0xFF4B5563), fontSize = 14.sp) },
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = Color(0xFF1F2937), // Dark gray
-                        disabledBorderColor = Color(0xFFE5E7EB), // Light gray
-                        disabledPlaceholderColor = Color(0xFF4B5563), // Darker gray
-                        disabledLabelColor = Color(0xFF4B5563), // Darker gray
-                        disabledLeadingIconColor = Color(0xFF4B5563), // Darker gray
-                        disabledTrailingIconColor = Color(0xFF4B5563) // Darker gray
+                        disabledTextColor = Color(0xFF1F2937),
+                        disabledBorderColor = Color(0xFFE5E7EB),
+                        disabledPlaceholderColor = Color(0xFF4B5563),
+                        disabledLabelColor = Color(0xFF4B5563),
+                        disabledLeadingIconColor = Color(0xFF4B5563),
+                        disabledTrailingIconColor = Color(0xFF4B5563)
                     ),
                     trailingIcon = {
                         IconButton(onClick = { datePickerDialog.show() }) {
                             Icon(
                                 imageVector = Icons.Default.DateRange,
                                 contentDescription = "Select date",
-                                tint = Color(0xFF3B82F6) // Blue 500
+                                tint = Color(0xFF8A5B6E)
                             )
                         }
                     }
@@ -866,36 +1094,38 @@ fun RecordExpensesScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             verticalAlignment = Alignment.Top
         ) {
             Text(
                 text = "Remarks",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF1F2937), // Dark gray
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                color = Color(0xFF1F2937),
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(100.dp)
                     .padding(end = 8.dp, top = 16.dp)
             )
             OutlinedTextField(
                 value = remarks,
                 onValueChange = { remarks = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(80.dp),
                 maxLines = 3,
-                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937)), // Dark gray
+                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937), fontSize = 14.sp),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = Color(0xFF3B82F6), // Blue 500
-                    unfocusedBorderColor = Color(0xFFE5E7EB), // Light gray
-                    cursorColor = Color(0xFF3B82F6) // Blue 500
+                    focusedBorderColor = Color(0xFF3B82F6),
+                    unfocusedBorderColor = Color(0xFFE5E7EB),
+                    cursorColor = Color(0xFF3B82F6)
                 ),
-                placeholder = { Text("Enter remarks (e.g., Lunch at Cafe)", color = Color(0xFF4B5563)) } // Added placeholder
+                placeholder = { Text("Enter remarks (e.g., Lunch at Cafe)", color = Color(0xFF4B5563), fontSize = 14.sp) }
             )
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
@@ -922,20 +1152,36 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp)
+                    .height(40.dp)
                     .padding(end = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF3B82F6), // Blue 500
-                    contentColor = Color(0xFFFFFFFF) // White
+                    containerColor = Color.Transparent
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Text(
-                    text = "Take Photo",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Take Photo",
+                        fontSize = 14.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
             Button(
                 onClick = {
@@ -963,20 +1209,36 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp)
+                    .height(40.dp)
                     .padding(start = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF3B82F6), // Blue 500
-                    contentColor = Color(0xFFFFFFFF) // White
+                    containerColor = Color.Transparent
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Text(
-                    text = "Pick from Gallery",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Pick from Gallery",
+                        fontSize = 14.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 
@@ -984,8 +1246,8 @@ fun RecordExpensesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .padding(bottom = 12.dp),
+                    .weight(2f)
+                    .padding(bottom = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -994,7 +1256,7 @@ fun RecordExpensesScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(12.dp))
-                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)) // Blue 500
+                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
                         .clickable {
                             expenseImageBitmap = bitmap
                             showFullScreenImage = true
@@ -1011,8 +1273,9 @@ fun RecordExpensesScreen(
                     contentScale = ContentScale.Fit
                 )
             }
-        } ?: Spacer(modifier = Modifier.weight(1f))
+        } ?: Spacer(modifier = Modifier.weight(2f))
 
+        // Add Expense Button
         Button(
             onClick = {
                 if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
@@ -1028,7 +1291,7 @@ fun RecordExpensesScreen(
                             amount = amountValue,
                             dateOfTransaction = dateOfTransaction,
                             remarks = remarks,
-                            imagePaths = selectedImageUri?.let { listOf(it.toString()) }, // Fix: Wrap URI in a list
+                            imagePaths = selectedImageUri?.let { listOf(it.toString()) },
                             createdAt = timestamp
                         )
                         if (!authRepository.isAuthenticated()) {
@@ -1118,51 +1381,82 @@ fun RecordExpensesScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .padding(bottom = 12.dp),
+                .height(40.dp)
+                .padding(bottom = 8.dp),
             enabled = !isAddingExpense,
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF3B82F6), // Blue 500
-                contentColor = Color(0xFFFFFFFF), // White
-                disabledContainerColor = Color(0xFF3B82F6).copy(alpha = 0.5f), // Blue 500
-                disabledContentColor = Color(0xFFFFFFFF).copy(alpha = 0.5f) // White
+                containerColor = Color.Transparent
             ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            contentPadding = PaddingValues(0.dp)
         ) {
-            if (isAddingExpense) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = Color(0xFFFFFFFF), // White
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = "Add Expense",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                            start = Offset(0f, 0f),
+                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isAddingExpense) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Add Expense",
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 
+        // View Expenses Button
         Button(
             onClick = { navController.navigate("list_expenses") },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .padding(bottom = 12.dp),
+                .height(40.dp)
+                .padding(bottom = 8.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF3B82F6), // Blue 500
-                contentColor = Color(0xFFFFFFFF) // White
+                containerColor = Color.Transparent
             ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            contentPadding = PaddingValues(0.dp)
         ) {
-            Text(
-                text = "View Expenses",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                            start = Offset(0f, 0f),
+                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "View Expenses",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
