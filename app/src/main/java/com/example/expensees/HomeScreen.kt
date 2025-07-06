@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import android.util.Log
-import com.example.expensees.R
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,18 +103,10 @@ fun HomeScreen(
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
 
-    // Updated color list with unique colors for each category
     val colorList = listOf(
-        Color(0xFF6B4E38), // Brown
-        Color(0xFFE7685D), // Coral Red
-        Color(0xFFFBBD92), // Light Peach
-        Color(0xFF4CAF50), // Green
-        Color(0xFF2196F3), // Blue
-        Color(0xFFFF9800), // Orange
-        Color(0xFFE28743), // orange
-        Color(0xFF009688), // Teal
-        Color(0xFFFF5722), // Deep Orange
-        Color(0xFF607D8B)  // Blue Grey
+        Color(0xFF6B4E38), Color(0xFFE7685D), Color(0xFFFBBD92), Color(0xFF4CAF50),
+        Color(0xFF2196F3), Color(0xFFFF9800), Color(0xFFE28743), Color(0xFF009688),
+        Color(0xFFFF5722), Color(0xFF607D8B)
     )
     val categoryColors = categories.zip(colorList).toMap()
 
@@ -141,7 +133,6 @@ fun HomeScreen(
         }
     }
 
-    // Pre-fetch token to avoid null token issue
     var token by remember { mutableStateOf<String?>(null) }
     var tokenFetchFailed by remember { mutableStateOf(false) }
     var retryCount by remember { mutableStateOf(0) }
@@ -346,7 +337,7 @@ fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 50.dp, bottom = 16.dp),
+                    .padding(top = 50.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
@@ -379,6 +370,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f)
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -396,7 +388,7 @@ fun HomeScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp)
+                        .padding(vertical = 8.dp)
                         .clip(RoundedCornerShape(12.dp)),
                     color = Color.Transparent
                 ) {
@@ -522,7 +514,7 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(260.dp)
+                            .height(220.dp) // Increased chart height
                             .padding(8.dp)
                     )
                 }
@@ -534,31 +526,33 @@ fun HomeScreen(
                     },
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
+                        fontSize = 18.sp // Increased font size
                     ),
                     color = selectedChartCategory?.let { categoryColors[it] } ?: Color(0xFF1F2937),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 6.dp), // Increased padding
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(6.dp)) // Increased spacer
                 Column(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f) // Constrain the column
                 ) {
                     Text(
                         text = "Your Top 5 Expenses",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 18.sp
+                            fontSize = 16.sp // Increased font size
                         ),
                         color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 6.dp) // Increased padding
                     )
                     Column(
                         modifier = Modifier
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp) // Increased spacing
                     ) {
                         categoryTotals.forEachIndexed { index, (category, amount) ->
                             val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
@@ -589,7 +583,7 @@ fun HomeScreen(
                                             categoryColor.copy(alpha = 0.3f),
                                             RoundedCornerShape(8.dp)
                                         )
-                                        .padding(12.dp)
+                                        .padding(8.dp) // Increased padding
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -598,26 +592,26 @@ fun HomeScreen(
                                         Surface(
                                             shape = CircleShape,
                                             color = categoryColor,
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(24.dp) // Increased circle size
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
                                                     text = "${index + 1}",
-                                                    style = MaterialTheme.typography.labelLarge,
+                                                    style = MaterialTheme.typography.labelMedium, // Larger text
                                                     color = Color.White,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
-                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(8.dp)) // Increased spacer
                                         Column(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text(
                                                 text = category ?: "Unknown",
-                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                style = MaterialTheme.typography.bodyMedium.copy(
                                                     fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 16.sp
+                                                    fontSize = 14.sp // Increased font size
                                                 ),
                                                 color = Color(0xFF1F2937),
                                                 maxLines = 1,
@@ -625,7 +619,9 @@ fun HomeScreen(
                                             )
                                             Text(
                                                 text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontSize = 12.sp // Increased font size
+                                                ),
                                                 color = Color(0xFF4B5563),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -637,9 +633,9 @@ fun HomeScreen(
                                             } else {
                                                 "0.00%"
                                             },
-                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                            style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp
+                                                fontSize = 14.sp // Increased font size
                                             ),
                                             color = categoryColor,
                                             maxLines = 1,
@@ -652,11 +648,10 @@ fun HomeScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 16.dp, top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 NavigationButton(
@@ -665,14 +660,14 @@ fun HomeScreen(
                     onClick = onRecordExpensesClick,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 NavigationButton(
                     icon = Icons.Default.RequestQuote,
                     label = "Request",
                     onClick = { navController.navigate("fund_request") },
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 NavigationButton(
                     icon = Icons.Default.Assignment,
                     label = "Report",

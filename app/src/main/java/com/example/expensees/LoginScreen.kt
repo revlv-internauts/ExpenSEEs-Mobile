@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -353,6 +354,7 @@ fun CustomTextField(
         label = "field_scale"
     )
 
+    val keyboardController = LocalSoftwareKeyboardController.current
     var isPasswordVisible by remember { mutableStateOf(false) }
 
     Column {
@@ -393,11 +395,13 @@ fun CustomTextField(
                 ),
                 keyboardActions = KeyboardActions(
                     onNext = {
-                        if (nextFocusRequester != null) {
-                            nextFocusRequester.requestFocus()
-                        }
+                        keyboardController?.hide()
+                        nextFocusRequester?.requestFocus()
                     },
-                    onDone = { onEnter?.invoke() }
+                    onDone = {
+                        keyboardController?.hide()
+                        onEnter?.invoke()
+                    }
                 ),
                 visualTransformation = if (isPassword && !isPasswordVisible) PasswordVisualTransformation() else visualTransformation,
                 placeholder = {
