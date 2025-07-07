@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import android.util.Log
-
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +76,11 @@ fun HomeScreen(
         maximumFractionDigits = 2
         isGroupingUsed = true
     }
+
+    // Fetch username and email from SharedPreferences
+    val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+    val username by remember { mutableStateOf(prefs.getString("username", "User") ?: "User") }
+    val email by remember { mutableStateOf(prefs.getString("email", "user@example.com") ?: "user@example.com") }
 
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
@@ -167,123 +172,97 @@ fun HomeScreen(
         gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color(0xFFF5F5F5),
-                drawerContentColor = Color(0xFF1F2937),
-                modifier = Modifier.pointerInput(Unit) {
-                    var startX = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { offset ->
-                            startX = offset.x
-                        },
-                        onDragEnd = {
-                            if (drawerState.isOpen) {
-                                scope.launch {
-                                    drawerState.close()
+                modifier = Modifier
+                    .fillMaxWidth(0.75f)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                if (drawerState.isOpen && dragAmount < 0) {
+                                    scope.launch {
+                                        drawerState.close()
+                                    }
+                                    change.consume()
                                 }
                             }
-                        },
-                        onHorizontalDrag = { _, dragAmount ->
-                            if (drawerState.isOpen && dragAmount < 0) {
-                                scope.launch {
-                                    drawerState.close()
-                                }
-                            }
-                        }
-                    )
-                }
+                        )
+                    }
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(16.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
+                            .padding(top = 50.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
                             shape = CircleShape,
-                            modifier = Modifier.size(56.dp),
-                            color = Color(0xFFD6D8DA)
+                            modifier = Modifier.size(40.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "A",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = Color(0xFF1F2937),
+                                    text = username.firstOrNull()?.uppercase() ?: "U",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text(
-                                text = "User Profile",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF1F2937)
+                                text = username,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "user@example.com",
+                                text = email,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF4B5563)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        color = Color(0xFFE5E7EB)
-                    )
-                    TextButton(
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        label = { Text("Reset Password") },
+                        selected = false,
                         onClick = {
                             navController.navigate("reset_password")
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Reset Password",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6),
-                            fontSize = 16.sp
-                        )
-                    }
-                    TextButton(
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Palette, contentDescription = null) },
+                        label = { Text("Theme") },
+                        selected = false,
                         onClick = {
                             Toast.makeText(context, "Theme clicked", Toast.LENGTH_SHORT).show()
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Theme",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6),
-                            fontSize = 16.sp
-                        )
-                    }
-                    TextButton(
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        label = { Text("About") },
+                        selected = false,
                         onClick = {
                             Toast.makeText(context, "About clicked", Toast.LENGTH_SHORT).show()
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "About",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6),
-                            fontSize = 16.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
                     Button(
                         onClick = {
                             scope.launch {
@@ -292,37 +271,49 @@ fun HomeScreen(
                             }
                         },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 56.dp)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .fillMaxWidth(0.6f)
+                            .padding(vertical = 12.dp)
+                            .align(Alignment.CenterHorizontally),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent
                         ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp
+                        )
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
                                     brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                        colors = listOf(Color(0xFF4A2E3F), Color(0xFF6B4E56)),
                                         start = Offset(0f, 0f),
                                         end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
                                 )
-                                .padding(12.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(vertical = 10.dp, horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Logout",
-                                fontSize = 16.sp,
+                                text = "Sign Out",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White,
-                                fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -514,7 +505,7 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp) // Increased chart height
+                            .height(220.dp)
                             .padding(8.dp)
                     )
                 }
@@ -533,28 +524,28 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(vertical = 6.dp),
                     textAlign = TextAlign.Center,
-                    maxLines = 1, // Limit to one line
-                    overflow = TextOverflow.Ellipsis // Add ellipsis if text is too long
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(6.dp)) // Increased spacer
+                Spacer(modifier = Modifier.height(6.dp))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f) // Constrain the column
+                        .weight(1f)
                 ) {
                     Text(
                         text = "Your Top 5 Expenses",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp // Increased font size
+                            fontSize = 16.sp
                         ),
                         color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 6.dp) // Increased padding
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                     Column(
                         modifier = Modifier
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp) // Increased spacing
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         categoryTotals.forEachIndexed { index, (category, amount) ->
                             val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
@@ -585,7 +576,7 @@ fun HomeScreen(
                                             categoryColor.copy(alpha = 0.3f),
                                             RoundedCornerShape(8.dp)
                                         )
-                                        .padding(8.dp) // Increased padding
+                                        .padding(8.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -594,18 +585,18 @@ fun HomeScreen(
                                         Surface(
                                             shape = CircleShape,
                                             color = categoryColor,
-                                            modifier = Modifier.size(24.dp) // Increased circle size
+                                            modifier = Modifier.size(24.dp)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
                                                     text = "${index + 1}",
-                                                    style = MaterialTheme.typography.labelMedium, // Larger text
+                                                    style = MaterialTheme.typography.labelMedium,
                                                     color = Color.White,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp)) // Increased spacer
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Column(
                                             modifier = Modifier.weight(1f)
                                         ) {
@@ -613,7 +604,7 @@ fun HomeScreen(
                                                 text = category ?: "Unknown",
                                                 style = MaterialTheme.typography.bodyMedium.copy(
                                                     fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 14.sp // Increased font size
+                                                    fontSize = 14.sp
                                                 ),
                                                 color = Color(0xFF1F2937),
                                                 maxLines = 1,
@@ -622,7 +613,7 @@ fun HomeScreen(
                                             Text(
                                                 text = "₱${numberFormat.format(amount.coerceAtLeast(0.0))}",
                                                 style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontSize = 12.sp // Increased font size
+                                                    fontSize = 12.sp
                                                 ),
                                                 color = Color(0xFF4B5563),
                                                 maxLines = 1,
@@ -637,7 +628,7 @@ fun HomeScreen(
                                             },
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp // Increased font size
+                                                fontSize = 14.sp
                                             ),
                                             color = categoryColor,
                                             maxLines = 1,
@@ -809,7 +800,7 @@ fun HomeScreen(
                                         legend: { display: false },
                                         title: {
                                             display: true,
-                                            text: 'Transaction Amounts (Log Scale)',
+                                            text: 'Transaction Amounts',
                                             color: '#1F2937',
                                             font: { size: 16, weight: 'bold' },
                                             align: 'center'
@@ -1435,7 +1426,7 @@ fun HomeScreen(
 
 @Composable
 fun NavigationButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier

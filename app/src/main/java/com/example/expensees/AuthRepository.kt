@@ -45,7 +45,6 @@ class AuthRepository(
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     }
 
-    // Login with username or email and password
     suspend fun login(usernameOrEmail: String, password: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -68,6 +67,8 @@ class AuthRepository(
                             .putString("auth_token", signInResponse.token)
                             .putString("user_id", signInResponse.user_Id)
                             .putString("refresh_token", signInResponse.refreshToken)
+                            .putString("username", signInResponse.username)
+                            .putString("email", signInResponse.email)
                             .apply()
                         // Verify token storage
                         val savedToken = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
@@ -90,7 +91,6 @@ class AuthRepository(
                             Log.d("AuthRepository", "Expenses fetched successfully after login")
                         }.onFailure { e ->
                             Log.e("AuthRepository", "Failed to fetch expenses after login: ${e.message}")
-                            // Not failing login due to expense fetch failure
                         }
                         Result.success(Unit)
                     } ?: Result.failure(Exception("Empty response body"))
@@ -507,7 +507,6 @@ class AuthRepository(
         }
     }
 
-    // Refresh access token using refresh token
     private suspend fun refreshToken(refreshToken: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -525,6 +524,8 @@ class AuthRepository(
                                 .putString("auth_token", signInResponse.token)
                                 .putString("user_id", signInResponse.user_Id)
                                 .putString("refresh_token", signInResponse.refreshToken)
+                                .putString("username", signInResponse.username)
+                                .putString("email", signInResponse.email)
                                 .apply()
                             Log.d("AuthRepository", "Token refreshed successfully: new token=${signInResponse.token.take(20)}..., new refreshToken=${signInResponse.refreshToken?.take(20) ?: "null"}...")
                             Result.success(Unit)

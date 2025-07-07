@@ -61,7 +61,9 @@ data class SignInRequest(
 data class SignInResponse(
     @SerializedName("access_token") val token: String?,
     @SerializedName("user_id") val user_Id: String?,
-    @SerializedName("refresh_token") val refreshToken: String?
+    @SerializedName("refresh_token") val refreshToken: String?,
+    @SerializedName("username") val username: String?,
+    @SerializedName("email") val email: String?
 )
 
 data class ErrorResponse(
