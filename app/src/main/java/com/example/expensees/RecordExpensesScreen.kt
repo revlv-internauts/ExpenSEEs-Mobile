@@ -213,7 +213,7 @@ fun RecordExpensesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(end = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -232,13 +232,13 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Grant Permission",
                                     color = Color.White,
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
@@ -248,7 +248,7 @@ fun RecordExpensesScreen(
                             onClick = { showPermissionRationale = false },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(start = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -267,13 +267,13 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Cancel",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
@@ -332,7 +332,7 @@ fun RecordExpensesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(end = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -351,13 +351,13 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Log In",
                                     color = Color.White,
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
@@ -367,7 +367,7 @@ fun RecordExpensesScreen(
                             onClick = { showAuthErrorDialog = false },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(start = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -386,13 +386,13 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Cancel",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
@@ -535,7 +535,7 @@ fun RecordExpensesScreen(
                             onClick = { showInfoDialog = true },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(end = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -554,26 +554,23 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Info",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
                             }
                         }
                         Button(
-                            onClick = {
-                                showExpenseDialog = false
-                                selectedExpense = null
-                            },
+                            onClick = { showExpenseDialog = false; selectedExpense = null },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(48.dp)
                                 .padding(start = 8.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -592,13 +589,13 @@ fun RecordExpensesScreen(
                                         ),
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "Close",
                                     color = Color(0xFF3B82F6),
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center
                                 )
@@ -683,7 +680,7 @@ fun RecordExpensesScreen(
                         },
                         modifier = Modifier
                             .align(Alignment.End)
-                            .height(40.dp),
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Transparent
@@ -701,13 +698,13 @@ fun RecordExpensesScreen(
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 )
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Close",
                                 color = Color(0xFF3B82F6),
-                                fontSize = 14.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
                             )
@@ -916,17 +913,23 @@ fun RecordExpensesScreen(
                     tint = Color(0xFF1F2937)
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = "ExpenSEEs",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
-                ),
-                color = Color(0xFF1F2937),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Record Expense",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
+                    ),
+                    color = Color(0xFF1F2937),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
         }
         HorizontalDivider(
             modifier = Modifier.padding(bottom = 12.dp),
@@ -1152,7 +1155,7 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .height(48.dp)
                     .padding(end = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -1171,12 +1174,12 @@ fun RecordExpensesScreen(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Take Photo",
-                        fontSize = 14.sp,
+                        fontSize = 16.sp,
                         color = Color.White,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -1209,7 +1212,7 @@ fun RecordExpensesScreen(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .height(48.dp)
                     .padding(start = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -1228,12 +1231,12 @@ fun RecordExpensesScreen(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Pick from Gallery",
-                        fontSize = 14.sp,
+                        fontSize = 16.sp,
                         color = Color.White,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -1381,7 +1384,7 @@ fun RecordExpensesScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(40.dp)
+                .height(56.dp)
                 .padding(bottom = 8.dp),
             enabled = !isAddingExpense,
             shape = RoundedCornerShape(12.dp),
@@ -1401,7 +1404,7 @@ fun RecordExpensesScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (isAddingExpense) {
@@ -1413,7 +1416,7 @@ fun RecordExpensesScreen(
                 } else {
                     Text(
                         text = "Add Expense",
-                        fontSize = 12.sp,
+                        fontSize = 16.sp,
                         color = Color.White,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -1427,7 +1430,7 @@ fun RecordExpensesScreen(
             onClick = { navController.navigate("list_expenses") },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(40.dp)
+                .height(56.dp)
                 .padding(bottom = 8.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
@@ -1446,12 +1449,12 @@ fun RecordExpensesScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "View Expenses",
-                    fontSize = 12.sp,
+                    fontSize = 16.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center
