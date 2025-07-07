@@ -232,7 +232,6 @@ fun ExpenseListScreen(
             IconButton(
                 onClick = { navController.navigate("home") },
                 modifier = Modifier
-                    .background(Color(0xFFE5E7EB), CircleShape)
                     .size(40.dp)
             ) {
                 Icon(

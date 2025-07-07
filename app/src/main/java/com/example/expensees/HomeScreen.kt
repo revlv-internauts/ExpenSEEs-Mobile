@@ -334,7 +334,6 @@ fun HomeScreen(
                 IconButton(
                     onClick = { scope.launch { drawerState.open() } },
                     modifier = Modifier
-                        .background(Color(0xFFE5E7EB), CircleShape)
                         .size(40.dp)
                 ) {
                     Icon(
@@ -712,10 +711,6 @@ fun HomeScreen(
                                 onClick = { selectedCategory = null },
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .background(
-                                        Color(0xFFE5E7EB),
-                                        CircleShape
-                                    )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -1407,10 +1402,6 @@ fun HomeScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
-                            .background(
-                                Color(0xFFE5E7EB),
-                                CircleShape
-                            )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,

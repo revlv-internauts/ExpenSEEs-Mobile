@@ -353,7 +353,6 @@ fun FundRequest(
                     IconButton(
                         onClick = { navController.popBackStack() },
                         modifier = Modifier
-                            .background(Color(0xFFE5E7EB), CircleShape)
                             .size(40.dp)
                     ) {
                         Icon(
@@ -416,7 +415,6 @@ fun FundRequest(
                         onClick = { showDialog = true },
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0xFFE5E7EB))
                             .size(40.dp)
                     ) {
                         Icon(
