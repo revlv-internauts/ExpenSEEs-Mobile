@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,13 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -63,29 +65,35 @@ fun ResetPassword(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFEEECE1))
+            .background(Color(0xFFF5F5F5))
             .windowInsetsPadding(WindowInsets(0, 0, 0, 0)),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
+                .padding(horizontal = 16.dp, vertical = 50.dp),
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Reset Your Password",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 32.dp)
+                text = "Reset Password",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 20.sp
+                ),
+                color = Color(0xFF1F2937),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp),
+                textAlign = TextAlign.Center
             )
 
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = { newPassword = it },
                 label = { Text("New Password") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 200.dp),
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
@@ -108,75 +116,73 @@ fun ResetPassword(
                 )
             }
 
-            Box(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
-                    .scale(scale)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(12.dp),
-                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                    )
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.secondary
-                            )
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .alpha(if (isResetComplete) 0.5f else 1f)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        enabled = !isLoading && !isResetComplete
-                    ) {
-                        if (newPassword.isBlank() || confirmPassword.isBlank()) {
-                            errorMessage = "Please fill all fields"
-                        } else if (newPassword != confirmPassword) {
-                            errorMessage = "Passwords do not match"
-                        } else {
-                            coroutineScope.launch {
-                                isLoading = true
-                                delay(1500L)
-                                isLoading = false
-                                isResetComplete = true
-                                errorMessage = null
-                                Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
-                            }
+                    .height(48.dp)
+                    .scale(scale),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.Transparent,
+                shadowElevation = 4.dp,
+                onClick = {
+                    if (newPassword.isBlank() || confirmPassword.isBlank()) {
+                        errorMessage = "Please fill all fields"
+                    } else if (newPassword != confirmPassword) {
+                        errorMessage = "Passwords do not match"
+                    } else {
+                        coroutineScope.launch {
+                            isLoading = true
+                            delay(1500L)
+                            isLoading = false
+                            isResetComplete = true
+                            errorMessage = null
+                            Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
                         }
                     }
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
+                }
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else if (!isResetComplete) {
-                    Text(
-                        text = "Reset Password",
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                    )
-                } else {
-                    Text(
-                        text = "Reset Complete",
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            )
+                        )
+                        .alpha(if (isResetComplete) 0.5f else 1f)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else if (!isResetComplete) {
+                        Text(
+                            text = "Reset Password",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            text = "Reset Complete",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
 
-        // Back button in top-left corner
+        // Back button aligned with HomeScreen's navigation profile button
         IconButton(
             onClick = {
                 navController.navigate("home") {
@@ -185,12 +191,14 @@ fun ResetPassword(
             },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
+                .padding(start = 16.dp, top = 50.dp)
+                .background(Color(0xFFE5E7EB), CircleShape)
+                .size(40.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.ArrowBack,
                 contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.primary
+                tint = Color(0xFF1F2937)
             )
         }
     }

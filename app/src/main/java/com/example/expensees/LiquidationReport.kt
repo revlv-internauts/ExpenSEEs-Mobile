@@ -5,7 +5,9 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -66,6 +67,16 @@ fun LiquidationReport(
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = remember { mutableStateMapOf<Int, MutableList<Expense>>() }
+
+    LaunchedEffect(selectedBudget) {
+        if (selectedBudget == null) {
+            selectedExpensesMap.clear() // Clear the map when no budget is selected
+        } else {
+            // Optionally, clear only entries not relevant to the new budget
+            selectedExpensesMap.clear()
+        }
+    }
+
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
@@ -98,10 +109,11 @@ fun LiquidationReport(
     )
     val categoryColors = categories.zip(colorList).toMap()
 
+    // Adjusted status colors for a matte appearance
     val statusColors = mapOf(
-        BudgetStatus.PENDING to Color(0xFFFFCA28),
-        BudgetStatus.APPROVED to Color(0xFF4CAF50),
-        BudgetStatus.DENIED to Color(0xFFF44336)
+        BudgetStatus.PENDING to Color(0xFFD4A017), // Less vibrant yellow
+        BudgetStatus.APPROVED to Color(0xFF388E3C), // Less vibrant green
+        BudgetStatus.DENIED to Color(0xFFD32F2F)  // Less vibrant red
     )
 
     val textColors = mapOf(
@@ -151,17 +163,13 @@ fun LiquidationReport(
     }
 
     fun calculateTotalRemainingBalance(): Double {
-        return authRepository.submittedBudgets.sumOf { budget ->
-            budget.expenses.withIndex().sumOf { (index, expense) ->
+        selectedBudget?.let { budget ->
+            return budget.expenses.withIndex().sumOf { (index, expense) ->
                 val budgetedAmount = expense.quantity * expense.amountPerUnit
-                val actualExpenseTotal = if (budget == selectedBudget) {
-                    selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-                } else {
-                    0.0
-                }
+                val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
                 budgetedAmount - actualExpenseTotal
             }
-        }
+        } ?: return 0.0
     }
 
     val totalRemainingBalance by derivedStateOf {
@@ -330,31 +338,21 @@ fun LiquidationReport(
                         .height(56.dp)
                         .padding(vertical = 8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent
+                        containerColor = Color(0xFF734656)
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 2.dp
+                    )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                    start = Offset(0f, 0f),
-                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                )
-                            )
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Retry",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Text(
+                        text = "Retry",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
                 }
             } else if (authRepository.submittedBudgets.isEmpty()) {
                 Box(
@@ -365,7 +363,7 @@ fun LiquidationReport(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No budget requests submitted yet.",
+                        text = "No budget requests submitted PURPLE submitted yet.",
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp
@@ -389,6 +387,8 @@ fun LiquidationReport(
                     val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
                     val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
                     val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
+
+                    // Pending Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.PENDING },
                         modifier = Modifier
@@ -396,36 +396,26 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFFD4A017), // Matte yellow
+                            disabledContainerColor = Color(0xFFD4A017).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        enabled = pendingCount > 0
+                        enabled = pendingCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            statusColors[BudgetStatus.PENDING] ?: Color(0xFF734656),
-                                            (statusColors[BudgetStatus.PENDING] ?: Color(0xFF734656)).copy(alpha = 0.8f)
-                                        ),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Pending Budgets ($pendingCount)",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Pending Budgets ($pendingCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
+
+                    // Approved Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.APPROVED },
                         modifier = Modifier
@@ -433,36 +423,26 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFF388E3C), // Matte green
+                            disabledContainerColor = Color(0xFF388E3C).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        enabled = approvedCount > 0
+                        enabled = approvedCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            statusColors[BudgetStatus.APPROVED] ?: Color(0xFF734656),
-                                            (statusColors[BudgetStatus.APPROVED] ?: Color(0xFF734656)).copy(alpha = 0.8f)
-                                        ),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Approved Budgets ($approvedCount)",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Approved Budgets ($approvedCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
+
+                    // Denied Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.DENIED },
                         modifier = Modifier
@@ -470,36 +450,26 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFFD32F2F), // Matte red
+                            disabledContainerColor = Color(0xFFD32F2F).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        enabled = deniedCount > 0
+                        enabled = deniedCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            statusColors[BudgetStatus.DENIED] ?: Color(0xFF734656),
-                                            (statusColors[BudgetStatus.DENIED] ?: Color(0xFF734656)).copy(alpha = 0.8f)
-                                        ),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Denied Budgets ($deniedCount)",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Denied Budgets ($deniedCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
+
+                    // View All Budgets Button
                     Button(
                         onClick = { showAllBudgets = true },
                         modifier = Modifier
@@ -507,31 +477,21 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFF4C2F3A) // Matte version of 0xFF5D3A49
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "View All Budgets",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "View All Budgets",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 } else if (showAllBudgets) {
                     Text(
@@ -550,31 +510,21 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(bottom = 8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFF734656)
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Back to Categories",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Back to Categories",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
                     if (authRepository.submittedBudgets.isEmpty()) {
                         Box(
@@ -719,31 +669,21 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(bottom = 8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
+                            containerColor = Color(0xFF734656)
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Back to Categories",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "Back to Categories",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
                     }
                     val filteredBudgets = authRepository.submittedBudgets.filter { it.status == category }
                     if (filteredBudgets.isEmpty()) {
@@ -1062,10 +1002,6 @@ fun LiquidationReport(
                                                 },
                                                 modifier = Modifier
                                                     .size(36.dp)
-                                                    .background(
-                                                        Color(0xFFE5E7EB),
-                                                        CircleShape
-                                                    )
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Add,
@@ -1084,11 +1020,7 @@ fun LiquidationReport(
                                                     ).show()
                                                 },
                                                 modifier = Modifier
-                                                    .size(36.dp)
-                                                    .background(
-                                                        Color(0xFFE5E7EB),
-                                                        CircleShape
-                                                    ),
+                                                    .size(36.dp),
                                                 enabled = selectedExpensesMap[index]?.isNotEmpty() ?: false
                                             ) {
                                                 Icon(
@@ -1139,9 +1071,9 @@ fun LiquidationReport(
                         ) {
                             Text(
                                 text = if (totalRemainingBalance >= 0) {
-                                    "Total Remaining Credit (All Budgets): ₱${numberFormat.format(totalRemainingBalance)}"
+                                    "Total Remaining Credit: ₱${numberFormat.format(totalRemainingBalance)}"
                                 } else {
-                                    "Total Over Budget (All Budgets): ₱${numberFormat.format(-totalRemainingBalance)}"
+                                    "Total Over Budget: ₱${numberFormat.format(-totalRemainingBalance)}"
                                 },
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
@@ -1169,31 +1101,21 @@ fun LiquidationReport(
                                 .height(56.dp)
                                 .padding(horizontal = 4.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent
+                                containerColor = Color(0xFFE5E7EB),
+                                contentColor = Color(0xFF3B82F6)
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(0.dp)
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        )
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = "Back to Budgets",
-                                    fontSize = 16.sp,
-                                    color = Color(0xFF3B82F6),
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                            Text(
+                                text = "Back to Budgets",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
                         }
                         Button(
                             onClick = {
@@ -1206,8 +1128,7 @@ fun LiquidationReport(
                                     val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
                                     budgetedAmount - actualExpenseTotal
                                 }
-                                reportBuilder.append("**Total Remaining Balance (This Budget)**: ₱${numberFormat.format(budgetRemainingBalance)}\n")
-                                reportBuilder.append("**Total Remaining Balance (All Budgets)**: ₱${numberFormat.format(totalRemainingBalance)}\n\n")
+                                reportBuilder.append("**Total Remaining Balance**: ₱${numberFormat.format(budgetRemainingBalance)}\n\n")
                                 reportBuilder.append("## Expense Details\n\n")
 
                                 budget.expenses.forEachIndexed { index, expense ->
@@ -1249,41 +1170,31 @@ fun LiquidationReport(
                                 .height(56.dp)
                                 .padding(horizontal = 4.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent
+                                containerColor = Color(0xFF734656)
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(0.dp)
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        )
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.RequestQuote,
-                                        contentDescription = "Generate Report",
-                                        modifier = Modifier.size(20.dp),
-                                        tint = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Generate Report",
-                                        fontSize = 16.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.RequestQuote,
+                                    contentDescription = "Generate Report",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Generate Report",
+                                    fontSize = 16.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
@@ -1508,26 +1419,24 @@ fun LiquidationReport(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(
+                            OutlinedButton(
                                 onClick = {
                                     showExpenseSelectionDialog = false
                                     currentExpenseItem = null
                                     checkedExpenses.clear()
                                 },
                                 modifier = Modifier
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .padding(end = 8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = Color(0xFF3B82F6)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text(
                                     text = "Close",
-                                    color = Color(0xFF3B82F6),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -1537,58 +1446,61 @@ fun LiquidationReport(
                                     val expenseList = selectedExpensesMap.getOrPut(currentExpenseItem!!.second) { mutableListOf() }
                                     expenseList.clear()
                                     val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
-                                    expenseList.addAll(newSelections)
-                                    selectedExpensesMap[currentExpenseItem!!.second] = expenseList
-                                    if (newSelections.isNotEmpty()) {
+                                    // Check for conflicts with other budgets
+                                    val conflictingExpenses = newSelections.filter { expense ->
+                                        selectedExpensesMap.any { (idx, exps) ->
+                                            idx != currentExpenseItem!!.second && exps.contains(expense)
+                                        }
+                                    }
+                                    if (conflictingExpenses.isNotEmpty()) {
                                         Toast.makeText(
                                             context,
-                                            "${newSelections.size} receipt(s) selected",
-                                            Toast.LENGTH_SHORT
+                                            "Cannot select receipts already used in other budgets",
+                                            Toast.LENGTH_LONG
                                         ).show()
+                                    } else {
+                                        expenseList.addAll(newSelections)
+                                        selectedExpensesMap[currentExpenseItem!!.second] = expenseList
+                                        if (newSelections.isNotEmpty()) {
+                                            Toast.makeText(
+                                                context,
+                                                "${newSelections.size} receipt(s) selected",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        showExpenseSelectionDialog = false
+                                        currentExpenseItem = null
+                                        checkedExpenses.clear()
                                     }
-                                    showExpenseSelectionDialog = false
-                                    currentExpenseItem = null
-                                    checkedExpenses.clear()
                                 },
                                 modifier = Modifier
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .padding(start = 8.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent
+                                    containerColor = Color(0xFF734656),
+                                    disabledContainerColor = Color(0xFF734656).copy(alpha = 0.5f)
                                 ),
-                                contentPadding = PaddingValues(0.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 enabled = filteredExpenses.isNotEmpty()
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                                start = Offset(0f, 0f),
-                                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                            )
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Confirm",
-                                            modifier = Modifier.size(24.dp),
-                                            tint = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Confirm",
-                                            fontSize = 16.sp,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Confirm",
+                                        modifier = Modifier.size(24.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Confirm",
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -1668,22 +1580,19 @@ fun LiquidationReport(
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
-                        TextButton(
+                        OutlinedButton(
                             onClick = { showReportDialog = false },
                             modifier = Modifier
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF3B82F6)
+                            ),
+                            border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
                                 text = "Close",
-                                color = Color(0xFF3B82F6),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold
                             )

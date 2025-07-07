@@ -125,7 +125,8 @@ fun FundRequest(
         focusedLabelColor = Color(0xFF3B82F6),
         unfocusedLabelColor = Color(0xFF4B5563),
         focusedTextColor = Color(0xFF1F2937),
-        unfocusedTextColor = Color(0xFF1F2937)
+        unfocusedTextColor = Color(0xFF1F2937),
+        cursorColor = Color(0xFF3B82F6)
     )
 
     ModalNavigationDrawer(
@@ -198,12 +199,17 @@ fun FundRequest(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Text(
-                            text = "Theme",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color(0xFF3B82F6),
-                            fontSize = 16.sp
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Theme",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color(0xFF3B82F6),
+                                fontSize = 16.sp
+                            )
+                        }
                     }
                     TextButton(
                         onClick = { /* Handle About click */ },
@@ -239,9 +245,11 @@ fun FundRequest(
                                         colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
                                         start = Offset(0f, 0f),
                                         end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    )
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
                                 )
-                                .padding(12.dp)
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Logout",
@@ -298,16 +306,18 @@ fun FundRequest(
                                             modifier = Modifier
                                                 .background(
                                                     brush = Brush.linearGradient(
-                                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
                                                         start = Offset(0f, 0f),
                                                         end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                                    )
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp)
                                                 )
-                                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = label,
-                                                color = Color.White,
+                                                color = Color(0xFF3B82F6),
                                                 style = MaterialTheme.typography.labelLarge.copy(
                                                     fontSize = 16.sp,
                                                     fontWeight = FontWeight.SemiBold
@@ -568,7 +578,31 @@ fun FundRequest(
                 ) {
                     Button(
                         onClick = {
-                            if (budgetName.isNotBlank() && expenses.isNotEmpty()) {
+                            if (budgetName.isBlank() && expenses.isEmpty()) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Please enter a budget name and add at least one expense",
+                                        actionLabel = "OK",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            } else if (budgetName.isBlank()) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Please enter a budget name",
+                                        actionLabel = "OK",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            } else if (expenses.isEmpty()) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Please add at least one expense",
+                                        actionLabel = "OK",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            } else {
                                 val submittedBudgetName = budgetName
                                 val budget = SubmittedBudget(
                                     budgetId = null,
@@ -607,33 +641,47 @@ fun FundRequest(
                             }
                         },
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .height(56.dp)
                             .padding(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF3B82F6), // Choose a soft color instead of transparent
-                            contentColor = Color.White
+                            containerColor = Color.Transparent
                         ),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.RequestQuote,
-                                contentDescription = "Request",
-                                modifier = Modifier.size(20.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Request",
-                                fontSize = 16.sp,
-                                color = Color.White
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RequestQuote,
+                                    contentDescription = "Request",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Request",
+                                    fontSize = 16.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -677,7 +725,7 @@ fun FundRequest(
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 20.sp
                                     ),
-                                    color = Color(0xFF3B82F6)
+                                    color = Color(0xFF1F2937)
                                 )
                                 IconButton(
                                     onClick = { showDialog = false },
@@ -818,24 +866,40 @@ fun FundRequest(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                TextButton(
+                                Button(
                                     onClick = { showDialog = false },
                                     modifier = Modifier
-                                        .background(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                                start = Offset(0f, 0f),
-                                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(end = 8.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Transparent
+                                    ),
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text(
-                                        text = "Close",
-                                        color = Color(0xFF3B82F6),
-                                        fontSize = 16.sp
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                                    start = Offset(0f, 0f),
+                                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                                ),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Close",
+                                            color = Color(0xFF3B82F6),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
                                 }
                                 Button(
                                     onClick = {
@@ -856,7 +920,9 @@ fun FundRequest(
                                         }
                                     },
                                     modifier = Modifier
-                                        .height(48.dp),
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(start = 8.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color.Transparent
@@ -872,9 +938,11 @@ fun FundRequest(
                                                     colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
                                                     start = Offset(0f, 0f),
                                                     end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                                )
+                                                ),
+                                                shape = RoundedCornerShape(12.dp)
                                             )
-                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Row(
                                             horizontalArrangement = Arrangement.Center,
@@ -891,7 +959,7 @@ fun FundRequest(
                                                 text = "Add",
                                                 fontSize = 16.sp,
                                                 color = Color.White,
-                                                fontWeight = FontWeight.SemiBold
+                                                fontWeight = FontWeight.Medium
                                             )
                                         }
                                     }

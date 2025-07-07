@@ -526,13 +526,15 @@ fun HomeScreen(
                     },
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp // Increased font size
+                        fontSize = 18.sp
                     ),
                     color = selectedChartCategory?.let { categoryColors[it] } ?: Color(0xFF1F2937),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp), // Increased padding
-                    textAlign = TextAlign.Center
+                        .padding(vertical = 6.dp),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1, // Limit to one line
+                    overflow = TextOverflow.Ellipsis // Add ellipsis if text is too long
                 )
                 Spacer(modifier = Modifier.height(6.dp)) // Increased spacer
                 Column(
