@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RequestQuote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +48,7 @@ import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +79,7 @@ fun FundRequest(
         isGroupingUsed = true
     }
 
-    // Categories and colors (aligned with HomeScreen)
+    // Categories and colors
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
@@ -103,6 +107,17 @@ fun FundRequest(
             repeat(expenses.size) { add(Animatable(0f)) }
         }
     }
+    val animatedOffset = remember {
+        mutableStateListOf<Animatable<Float, *>>().apply {
+            repeat(expenses.size) { add(Animatable(0f)) }
+        }
+    }
+    val animatedAlpha = remember {
+        mutableStateListOf<Animatable<Float, *>>().apply {
+            repeat(expenses.size) { add(Animatable(1f)) }
+        }
+    }
+
     LaunchedEffect(expenses.size) {
         animatedScale.forEachIndexed { index, animatable ->
             launch {
@@ -454,79 +469,167 @@ fun FundRequest(
                         items(expenses) { expense ->
                             val index = expenses.indexOf(expense)
                             val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                            val categoryColor = categoryColors[expense.category] ?: Color(0xFF6B4E38)
-                            Surface(
+                            val offset by animatedOffset.getOrNull(index)?.asState() ?: remember { mutableStateOf(0f) }
+                            val alpha by animatedAlpha.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                            var dragOffset by remember { mutableStateOf(0f) }
+                            val swipeThreshold = 150f // Pixels to swipe to trigger delete
+
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .scale(scale)
-                                    .clickable { /* Handle click if needed */ },
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color.Transparent
+                                    .offset(x = offset.dp)
+                                    .alpha(alpha)
                             ) {
+                                // Delete background
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .height(80.dp)
                                         .background(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(
-                                                    categoryColor.copy(alpha = 0.1f),
-                                                    categoryColor.copy(alpha = 0.03f)
-                                                ),
-                                                start = Offset(0f, 0f),
-                                                end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                            )
-                                        )
-                                        .border(
-                                            1.dp,
-                                            categoryColor.copy(alpha = 0.3f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp)
+                                            color = Color(0xFFE7685D).copy(alpha = (abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f)),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ),
+                                    contentAlignment = Alignment.CenterEnd
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = categoryColor,
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "${index + 1}",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .padding(end = 16.dp)
+                                            .size(24.dp)
+                                            .alpha((abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f))
+                                    )
+                                }
+
+                                // Expense card
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .scale(scale)
+                                        .offset(x = dragOffset.dp)
+                                        .pointerInput(Unit) {
+                                            detectHorizontalDragGestures(
+                                                onDragEnd = {
+                                                    if (abs(dragOffset) > swipeThreshold) {
+                                                        coroutineScope.launch {
+                                                            animatedScale.getOrNull(index)?.animateTo(
+                                                                targetValue = 0.5f,
+                                                                animationSpec = tween(200)
+                                                            )
+                                                            animatedAlpha.getOrNull(index)?.animateTo(
+                                                                targetValue = 0f,
+                                                                animationSpec = tween(200)
+                                                            )
+                                                            val deletedExpense = expenses[index]
+                                                            expenses.removeAt(index)
+                                                            animatedScale.removeAt(index)
+                                                            animatedOffset.removeAt(index)
+                                                            animatedAlpha.removeAt(index)
+                                                            snackbarHostState.showSnackbar(
+                                                                message = "${deletedExpense.category} removed",
+                                                                actionLabel = "Undo",
+                                                                duration = SnackbarDuration.Short
+                                                            ).also { result ->
+                                                                if (result == SnackbarResult.ActionPerformed) {
+                                                                    expenses.add(index, deletedExpense)
+                                                                    animatedScale.add(index, Animatable(0f))
+                                                                    animatedOffset.add(index, Animatable(0f))
+                                                                    animatedAlpha.add(index, Animatable(0f))
+                                                                    launch {
+                                                                        animatedScale[index].animateTo(
+                                                                            targetValue = 1f,
+                                                                            animationSpec = tween(400)
+                                                                        )
+                                                                        animatedAlpha[index].animateTo(
+                                                                            targetValue = 1f,
+                                                                            animationSpec = tween(400)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        coroutineScope.launch {
+                                                            animatedOffset.getOrNull(index)?.animateTo(
+                                                                targetValue = 0f,
+                                                                animationSpec = tween(200)
+                                                            )
+                                                        }
+                                                        dragOffset = 0f
+                                                    }
+                                                },
+                                                onHorizontalDrag = { _, dragAmount ->
+                                                    dragOffset = (dragOffset + dragAmount).coerceIn(-swipeThreshold, swipeThreshold / 2)
+                                                    coroutineScope.launch {
+                                                        animatedOffset.getOrNull(index)?.animateTo(
+                                                            targetValue = dragOffset,
+                                                            animationSpec = spring(
+                                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                stiffness = Spring.StiffnessMediumLow
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                        },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color.Transparent
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(
+                                                        (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
+                                                        (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
+                                                    ),
+                                                    start = Offset(0f, 0f),
+                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                                                 )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column(
-                                            modifier = Modifier.weight(1f)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = expense.category,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 14.sp
-                                                ),
-                                                color = Color(0xFF1F2937),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontSize = 12.sp
-                                                ),
-                                                color = Color(0xFF4B5563),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (expense.remarks.isNotBlank()) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = "${index + 1}",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
                                                 Text(
-                                                    text = "Remarks: ${expense.remarks}",
+                                                    text = expense.category,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 14.sp
+                                                    ),
+                                                    color = Color(0xFF1F2937),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
                                                     style = MaterialTheme.typography.bodySmall.copy(
                                                         fontSize = 12.sp
                                                     ),
@@ -534,18 +637,29 @@ fun FundRequest(
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
+                                                if (expense.remarks.isNotBlank()) {
+                                                    Text(
+                                                        text = "Remarks: ${expense.remarks}",
+                                                        style = MaterialTheme.typography.bodySmall.copy(
+                                                            fontSize = 12.sp
+                                                        ),
+                                                        color = Color(0xFF4B5563),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
                                             }
+                                            Text(
+                                                text = "Qty: ${expense.quantity}",
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                ),
+                                                color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
-                                        Text(
-                                            text = "Qty: ${expense.quantity}",
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            ),
-                                            color = categoryColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
                                     }
                                 }
                             }
@@ -910,6 +1024,9 @@ fun FundRequest(
                                                     remarks = remarks
                                                 )
                                             )
+                                            animatedScale.add(Animatable(0f))
+                                            animatedOffset.add(Animatable(0f))
+                                            animatedAlpha.add(Animatable(1f))
                                             category = ""
                                             quantity = ""
                                             amountPerUnit = ""

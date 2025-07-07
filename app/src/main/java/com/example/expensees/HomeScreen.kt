@@ -966,7 +966,8 @@ fun HomeScreen(
                                             end = Offset(Float.POSITIVE_INFINITY, 0f)
                                         )
                                     )
-                                    .padding(12.dp)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center // Added to center the text
                             ) {
                                 Text(
                                     text = "Close",
@@ -1011,7 +1012,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF3B82F6),
+                            color = Color(0xFF734656),
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         selectedImagePath?.let { imagePath ->
@@ -1041,7 +1042,7 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 1.5.dp,
-                                                Color(0xFF3B82F6),
+                                                Color(0xFF734656),
                                                 RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
@@ -1082,7 +1083,7 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             1.5.dp,
-                                            Color(0xFF3B82F6),
+                                            Color(0xFF734656),
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable { showFullScreenImage = true },
@@ -1122,29 +1123,51 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            TextButton(
+                            Button(
                                 onClick = { showInfoDialog = true },
                                 modifier = Modifier
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .width(120.dp)
+                                    .height(40.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(
+                                    defaultElevation = 4.dp,
+                                    pressedElevation = 8.dp
+                                ),
+                                contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text(
-                                    text = "Info",
-                                    color = Color(0xFF3B82F6),
-                                    fontSize = 16.sp,
-                                    textAlign = TextAlign.Center
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                                start = Offset(0f, 0f),
+                                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Info",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
-                            TextButton(
+                            Button(
                                 onClick = {
                                     showExpenseDialog = false
                                     selectedTransaction = null
@@ -1152,23 +1175,181 @@ fun HomeScreen(
                                     selectedImagePath = null
                                 },
                                 modifier = Modifier
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .width(120.dp)
+                                    .height(40.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(
+                                    defaultElevation = 4.dp,
+                                    pressedElevation = 8.dp
+                                ),
+                                contentPadding = PaddingValues(0.dp)
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                                start = Offset(0f, 0f),
+                                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Close",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showFullScreenImage) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showFullScreenImage = false
+                        selectedTransaction = null
+                        expenseImageBitmap = null
+                        selectedImagePath = null
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF1F2937)), // Maintained dark background
+                        contentAlignment = Alignment.Center
+                    ) {
+                        selectedImagePath?.let { imagePath ->
+                            var imageLoadFailed by remember { mutableStateOf(false) }
+                            if (tokenFetchFailed) {
                                 Text(
-                                    text = "Close",
-                                    color = Color(0xFF3B82F6),
-                                    fontSize = 16.sp,
-                                    textAlign = TextAlign.Center
+                                    text = "Authentication error: Please log in again",
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                    color = Color.White,
+                                    modifier = Modifier
+                                )
+                            } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
+                                val bitmap = try {
+                                    val uri = Uri.parse(imagePath)
+                                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                } catch (e: Exception) {
+                                    Log.e("HomeScreen", "Failed to load local full-screen image: $imagePath, error: ${e.message}")
+                                    null
+                                }
+                                bitmap?.let {
+                                    Image(
+                                        bitmap = it.asImageBitmap(),
+                                        contentDescription = "Full screen expense photo",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                2.dp,
+                                                Color(0xFF734656), // Matches homepage theme
+                                                RoundedCornerShape(12.dp)
+                                            ),
+                                        contentScale = ContentScale.FillBounds // Changed to remove white space
+                                    )
+                                } ?: run {
+                                    imageLoadFailed = true
+                                    Text(
+                                        text = "No image available",
+                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                        color = Color.White,
+                                        modifier = Modifier
+                                    )
+                                }
+                            } else {
+                                val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
+                                Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: $token")
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(fullImageUrl)
+                                        .apply {
+                                            if (token != null) {
+                                                addHeader("Authorization", "Bearer $token")
+                                            } else {
+                                                imageLoadFailed = true
+                                            }
+                                        }
+                                        .diskCacheKey(fullImageUrl)
+                                        .memoryCacheKey(fullImageUrl)
+                                        .build(),
+                                    contentDescription = "Full screen expense photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(
+                                            2.dp,
+                                            Color(0xFF734656), // Matches homepage theme
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentScale = ContentScale.FillBounds, // Changed to remove white space
+                                    onError = { error ->
+                                        imageLoadFailed = true
+                                        scope.launch {
+                                            Log.e("HomeScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                            Toast.makeText(context, "Failed to load full screen image: ${error.result.throwable.message}", Toast.LENGTH_LONG).show()
+                                            if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                retryCount++
+                                                val tokenResult = authRepository.getValidToken()
+                                                if (tokenResult.isSuccess) {
+                                                    token = tokenResult.getOrNull()
+                                                    Log.d("HomeScreen", "Retry token fetched: $token")
+                                                } else {
+                                                    tokenFetchFailed = true
+                                                    Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("login") {
+                                                        popUpTo("home") { inclusive = true }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onSuccess = {
+                                        Log.d("HomeScreen", "Successfully loaded full-screen server image: $fullImageUrl")
+                                    }
                                 )
                             }
+                        } ?: Text(
+                            text = "No image available",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                            color = Color.White,
+                            modifier = Modifier
+                        )
+                        IconButton(
+                            onClick = {
+                                showFullScreenImage = false
+                                selectedTransaction = null
+                                expenseImageBitmap = null
+                                selectedImagePath = null
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close image",
+                                tint = Color.White
+                            )
                         }
                     }
                 }
@@ -1320,10 +1501,10 @@ fun HomeScreen(
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            Color(0xFF3B82F6),
+                                            categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38), // Matches category theme
                                             RoundedCornerShape(12.dp)
                                         ),
-                                    contentScale = ContentScale.Fit
+                                    contentScale = ContentScale.Crop
                                 )
                             } ?: run {
                                 imageLoadFailed = true
@@ -1356,10 +1537,10 @@ fun HomeScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         2.dp,
-                                        Color(0xFF3B82F6),
+                                        categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38), // Matches category theme
                                         RoundedCornerShape(12.dp)
                                     ),
-                                contentScale = ContentScale.Fit,
+                                contentScale = ContentScale.Crop, // Changed to remove white space
                                 onError = { error ->
                                     imageLoadFailed = true
                                     scope.launch {
