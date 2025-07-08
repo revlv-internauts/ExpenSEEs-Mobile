@@ -66,7 +66,6 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 modifier = modifier
             )
         }
-
         composable("record_expenses") {
             RecordExpensesScreen(
                 navController = navController,
@@ -90,7 +89,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
             ExpenseListScreen(
                 navController = navController,
                 expenses = authRepository.userExpenses,
-                authRepository = authRepository, // Added authRepository parameter
+                authRepository = authRepository,
                 onDeleteExpenses = { expensesToDelete ->
                     scope.launch {
                         try {
@@ -116,6 +115,29 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 navController = navController,
                 authRepository = authRepository
             )
+        }
+        composable("detailed_liquidation_report/{budgetId}") { backStackEntry ->
+            val budgetId = backStackEntry.arguments?.getString("budgetId")
+            val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
+            if (budget != null) {
+                DetailedLiquidationReport(
+                    budget = budget,
+                    selectedExpensesMap = authRepository.submittedBudgets
+                        .find { it.budgetId == budgetId }
+                        ?.let { selectedBudget ->
+                            selectedBudget.expenses.withIndex().associate { (index, _) ->
+                                index to (authRepository.userExpenses.filter { expense ->
+                                    expense.category == selectedBudget.expenses[index].category
+                                })
+                            }
+                        } ?: emptyMap(),
+                    navController = navController,
+                    modifier = modifier
+                )
+            } else {
+                Toast.makeText(context, "Budget not found", Toast.LENGTH_SHORT).show()
+                navController.popBackStack()
+            }
         }
         composable("reset_password") {
             ResetPassword(

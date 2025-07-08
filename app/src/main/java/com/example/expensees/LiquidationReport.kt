@@ -45,6 +45,7 @@ import com.example.expensees.models.Expense
 import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.OffsetDateTime
@@ -172,7 +173,10 @@ fun LiquidationReport(
         } ?: return 0.0
     }
 
+// Ensure totalRemainingBalance recomputes when selectedExpensesMap changes
     val totalRemainingBalance by derivedStateOf {
+        // Force dependency on selectedExpensesMap entries
+        selectedExpensesMap.entries.size
         calculateTotalRemainingBalance()
     }
 
@@ -1093,107 +1097,104 @@ fun LiquidationReport(
                             .padding(bottom = 16.dp, top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { selectedBudget = null },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
                                 .padding(horizontal = 4.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFE5E7EB),
-                                contentColor = Color(0xFF3B82F6)
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF1F2937), // Dark gray text for contrast
+                                disabledContentColor = Color(0xFF1F2937).copy(alpha = 0.5f)
                             ),
+                            border = BorderStroke(1.dp, Color(0xFF734656)), // Maroon border
                             shape = RoundedCornerShape(12.dp),
                             elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 2.dp
+                                defaultElevation = 0.dp, // No elevation for outlined button
+                                pressedElevation = 0.dp
                             )
                         ) {
                             Text(
                                 text = "Back to Budgets",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF1F2937) // Ensure text color matches
                             )
                         }
                         Button(
                             onClick = {
-                                val reportBuilder = StringBuilder()
-                                reportBuilder.append("# Liquidation Report: ${budget.name}\n\n")
-                                reportBuilder.append("**Status**: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}\n")
-                                reportBuilder.append("**Total Budgeted Amount**: ₱${numberFormat.format(budget.total)}\n")
-                                val budgetRemainingBalance = budget.expenses.withIndex().sumOf { (index, expense) ->
-                                    val budgetedAmount = expense.quantity * expense.amountPerUnit
-                                    val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-                                    budgetedAmount - actualExpenseTotal
-                                }
-                                reportBuilder.append("**Total Remaining Balance**: ₱${numberFormat.format(budgetRemainingBalance)}\n\n")
-                                reportBuilder.append("## Expense Details\n\n")
-
-                                budget.expenses.forEachIndexed { index, expense ->
-                                    val actualExpenseTotal = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-                                    val budgetedAmount = expense.quantity * expense.amountPerUnit
-                                    val remainingBalance = budgetedAmount - actualExpenseTotal
-
-                                    reportBuilder.append("### ${expense.category}\n")
-                                    reportBuilder.append("- **Budgeted Amount**: ₱${numberFormat.format(budgetedAmount)}\n")
-                                    reportBuilder.append("- **Quantity**: ${expense.quantity}\n")
-                                    reportBuilder.append("- **Unit Price**: ₱${numberFormat.format(expense.amountPerUnit)}\n")
-                                    reportBuilder.append("- **Actual Expenses**: ₱${numberFormat.format(actualExpenseTotal)}\n")
-                                    reportBuilder.append("- **Remaining Balance**: ₱${numberFormat.format(remainingBalance)}\n")
-                                    if (expense.remarks.isNotBlank()) {
-                                        reportBuilder.append("- **Remarks**: ${expense.remarks}\n")
-                                    }
-                                    selectedExpensesMap[index]?.let { selectedExpenses ->
-                                        if (selectedExpenses.isNotEmpty()) {
-                                            reportBuilder.append("- **Uploaded Receipts**:\n")
-                                            selectedExpenses.forEach { selected ->
-                                                reportBuilder.append("  - ${selected.remarks ?: "No remarks"}: ₱${numberFormat.format(selected.amount)} (Date: ${selected.dateOfTransaction?.let { OffsetDateTime.parse(it).format(dateFormatter) } ?: "Unknown"})\n")
+                                if (selectedExpensesMap.isEmpty() || selectedExpensesMap.all { it.value.isEmpty() }) {
+                                    Toast.makeText(
+                                        context,
+                                        "Please upload at least one receipt to generate the report",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    isLoading = true
+                                    coroutineScope.launch {
+                                        try {
+                                            delay(2000)
+                                            navController.navigate("detailed_liquidation_report/${budget.budgetId}") {
+                                                launchSingleTop = true
                                             }
+                                            Toast.makeText(
+                                                context,
+                                                "Viewing Liquidation Report for ${budget.name}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } finally {
+                                            isLoading = false
                                         }
                                     }
-                                    reportBuilder.append("\n")
                                 }
-
-                                reportContent = reportBuilder.toString()
-                                generatedReports.add(reportContent)
-                                showReportDialog = true
-                                Toast.makeText(
-                                    context,
-                                    "Liquidation Report Generated for ${budget.name}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
                             },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
                                 .padding(horizontal = 4.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF734656)
+                                containerColor = Color(0xFF734656),
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFF734656).copy(alpha = 0.5f),
+                                disabledContentColor = Color.White.copy(alpha = 0.5f)
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 2.dp
-                            )
+                            enabled = !isLoading
                         ) {
                             Row(
                                 horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.animateContentSize()
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.RequestQuote,
-                                    contentDescription = "Generate Report",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Generate Report",
-                                    fontSize = 16.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Generating...",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.RequestQuote,
+                                        contentDescription = "Generate Report",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Generate Report",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }
@@ -1442,8 +1443,6 @@ fun LiquidationReport(
                             }
                             Button(
                                 onClick = {
-                                    val expenseList = selectedExpensesMap.getOrPut(currentExpenseItem!!.second) { mutableListOf() }
-                                    expenseList.clear()
                                     val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
                                     // Check for conflicts with other budgets
                                     val conflictingExpenses = newSelections.filter { expense ->
@@ -1458,7 +1457,8 @@ fun LiquidationReport(
                                             Toast.LENGTH_LONG
                                         ).show()
                                     } else {
-                                        expenseList.addAll(newSelections)
+                                        // Create a new list instance to ensure state change detection
+                                        val expenseList = mutableListOf<Expense>().apply { addAll(newSelections) }
                                         selectedExpensesMap[currentExpenseItem!!.second] = expenseList
                                         if (newSelections.isNotEmpty()) {
                                             Toast.makeText(
@@ -1466,6 +1466,9 @@ fun LiquidationReport(
                                                 "${newSelections.size} receipt(s) selected",
                                                 Toast.LENGTH_SHORT
                                             ).show()
+                                        } else {
+                                            // Remove the key if no expenses are selected to ensure state update
+                                            selectedExpensesMap.remove(currentExpenseItem!!.second)
                                         }
                                         showExpenseSelectionDialog = false
                                         currentExpenseItem = null
@@ -1500,6 +1503,11 @@ fun LiquidationReport(
                                         color = Color.White,
                                         fontWeight = FontWeight.SemiBold
                                     )
+                                }
+                            }
+                            LaunchedEffect(selectedExpensesMap) {
+                                snapshotFlow { selectedExpensesMap.entries.toList() }.collect {
+                                    println("selectedExpensesMap updated: $it")
                                 }
                             }
                         }

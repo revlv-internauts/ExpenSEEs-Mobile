@@ -78,8 +78,7 @@ fun ForgotPassword(
                         }
                     },
                     modifier = Modifier
-                        .background(Color(0xFFE5E7EB), CircleShape)
-                        .size(40.dp)
+                        .size(40.dp) // Removed .background(Color(0xFFE5E7EB), CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
