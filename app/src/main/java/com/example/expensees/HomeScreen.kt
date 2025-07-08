@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -57,7 +58,9 @@ import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.text.SimpleDateFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +78,11 @@ fun HomeScreen(
         minimumFractionDigits = 2
         maximumFractionDigits = 2
         isGroupingUsed = true
+    }
+
+    BackHandler(enabled = true) {
+        // Minimize the app instead of logging out or navigating
+        (context as? Activity)?.moveTaskToBack(true)
     }
 
     // Fetch username and email from SharedPreferences
@@ -169,23 +177,32 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false,
+        gesturesEnabled = true, // Allows clicking outside to close
+        modifier = Modifier.pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, dragAmount ->
+                    if (drawerState.isOpen && dragAmount < 0) {
+                        // Allow swipe left to close when drawer is open
+                        scope.launch {
+                            drawerState.close()
+                        }
+                        change.consume()
+                    } else if (!drawerState.isOpen && dragAmount > 0) {
+                        // Block swipe right when drawer is closed
+                        change.consume()
+                    }
+                },
+                onDragStart = { offset ->
+                    // Log or handle initial drag direction if needed (no consumption here)
+                    if (!drawerState.isOpen && offset.x > 0) {
+                        println("Detected swipe-right start, but handled in onHorizontalDrag")
+                    }
+                }
+            )
+        },
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onHorizontalDrag = { change, dragAmount ->
-                                if (drawerState.isOpen && dragAmount < 0) {
-                                    scope.launch {
-                                        drawerState.close()
-                                    }
-                                    change.consume()
-                                }
-                            }
-                        )
-                    }
+                modifier = Modifier.fillMaxWidth(0.75f)
             ) {
                 Column(
                     modifier = Modifier
@@ -234,7 +251,7 @@ fun HomeScreen(
                     }
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Lock, contentDescription = "Reset Password Icon") },
                         label = { Text("Reset Password") },
                         selected = false,
                         onClick = {
@@ -244,7 +261,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Palette, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Palette, contentDescription = "Theme Icon") },
                         label = { Text("Theme") },
                         selected = false,
                         onClick = {
@@ -254,7 +271,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Info, contentDescription = "About Icon") },
                         label = { Text("About") },
                         selected = false,
                         onClick = {
@@ -1388,38 +1405,143 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Column(
-                            modifier = Modifier.verticalScroll(rememberScrollState())
+                            modifier = Modifier.verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "Category: ${selectedTransaction?.category ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Text(
-                                text = "Amount: ₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Text(
-                                text = "Date of Transaction: ${selectedTransaction?.dateOfTransaction ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Text(
-                                text = "Created At: ${selectedTransaction?.createdAt ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Text(
-                                text = "Remarks: ${selectedTransaction?.remarks ?: "N/A"}",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Category:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.4f)
+                                )
+                                Text(
+                                    text = selectedTransaction?.category ?: "N/A",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Amount:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.4f)
+                                )
+                                Text(
+                                    text = "₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Date of Transaction:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.4f)
+                                )
+                                Text(
+                                    text = selectedTransaction?.dateOfTransaction ?: "N/A",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Created At:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.4f)
+                                )
+                                Text(
+                                    text = selectedTransaction?.createdAt?.let { createdAt ->
+                                        try {
+                                            val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
+                                            val outputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+                                            val date = inputFormat.parse(createdAt)
+                                            outputFormat.format(date)
+                                        } catch (e: Exception) {
+                                            createdAt
+                                        }
+                                    } ?: "N/A",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Remarks:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.4f)
+                                )
+                                Text(
+                                    text = selectedTransaction?.remarks ?: "N/A",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Normal
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.weight(0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         TextButton(

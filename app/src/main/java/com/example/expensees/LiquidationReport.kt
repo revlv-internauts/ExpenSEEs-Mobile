@@ -391,7 +391,6 @@ fun LiquidationReport(
                     val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
                     val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
 
-                    // Pending Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.PENDING },
                         modifier = Modifier
@@ -399,8 +398,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFD4A017), // Matte yellow
-                            disabledContainerColor = Color(0xFFD4A017).copy(alpha = 0.5f)
+                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
+                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = pendingCount > 0,
@@ -418,7 +417,7 @@ fun LiquidationReport(
                         )
                     }
 
-                    // Approved Budgets Button
+// Approved Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.APPROVED },
                         modifier = Modifier
@@ -426,8 +425,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF388E3C), // Matte green
-                            disabledContainerColor = Color(0xFF388E3C).copy(alpha = 0.5f)
+                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
+                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = approvedCount > 0,
@@ -445,7 +444,7 @@ fun LiquidationReport(
                         )
                     }
 
-                    // Denied Budgets Button
+// Denied Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.DENIED },
                         modifier = Modifier
@@ -453,8 +452,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFD32F2F), // Matte red
-                            disabledContainerColor = Color(0xFFD32F2F).copy(alpha = 0.5f)
+                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
+                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = deniedCount > 0,
@@ -472,7 +471,7 @@ fun LiquidationReport(
                         )
                     }
 
-                    // View All Budgets Button
+// View All Budgets Button
                     Button(
                         onClick = { showAllBudgets = true },
                         modifier = Modifier
@@ -480,7 +479,7 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4C2F3A) // Matte version of 0xFF5D3A49
+                            containerColor = Color(0xFFBC1823) // Updated to #BC1823
                         ),
                         shape = RoundedCornerShape(12.dp),
                         elevation = ButtonDefaults.buttonElevation(
@@ -1319,7 +1318,10 @@ fun LiquidationReport(
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .scale(1f),
+                                            .scale(1f)
+                                            .clickable(enabled = !isUsed || (checkedExpenses[expense] ?: false)) {
+                                                checkedExpenses[expense] = !(checkedExpenses[expense] ?: false)
+                                            },
                                         shape = RoundedCornerShape(8.dp),
                                         color = Color.Transparent
                                     ) {
