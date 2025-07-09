@@ -307,16 +307,32 @@ class AuthRepository(
                     return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
                 }
 
+                // Log input values for debugging
+                Log.d("AuthRepository", "Validating expense: dateOfTransaction=${expense.dateOfTransaction}, createdAt=${expense.createdAt}")
+
                 // Validate date formats
                 try {
                     expense.dateOfTransaction?.let {
-                        SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it)
-                            ?: throw IllegalArgumentException("Invalid dateOfTransaction format: $it")
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                        dateFormat.isLenient = false // Strict parsing
+                        dateFormat.parse(it)
+                            ?: throw IllegalArgumentException("Invalid dateOfTransaction format: $it, expected yyyy-MM-dd")
                     } ?: throw IllegalArgumentException("dateOfTransaction is required")
                     expense.createdAt?.let {
-                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-                            timeZone = TimeZone.getTimeZone("UTC")
-                        }.parse(it) ?: throw IllegalArgumentException("Invalid createdAt format: $it")
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+                        dateFormat.timeZone = TimeZone.getTimeZone("UTC")
+                        dateFormat.isLenient = false // Strict parsing
+                        try {
+                            dateFormat.parse(it)
+                                ?: throw IllegalArgumentException("Invalid createdAt format: $it, expected yyyy-MM-dd'T'HH:mm:ss'Z'")
+                        } catch (e: Exception) {
+                            // Try alternative format without literal 'Z'
+                            val altFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                            altFormat.timeZone = TimeZone.getTimeZone("UTC")
+                            altFormat.isLenient = false
+                            altFormat.parse(it)
+                                ?: throw IllegalArgumentException("Invalid createdAt format: $it, tried yyyy-MM-dd'T'HH:mm:ss'Z' and yyyy-MM-dd'T'HH:mm:ss")
+                        }
                     } ?: throw IllegalArgumentException("createdAt is required")
                 } catch (e: Exception) {
                     Log.e("AuthRepository", "Date validation error: ${e.message}", e)
@@ -342,7 +358,6 @@ class AuthRepository(
                             Log.e("AuthRepository", "Invalid URI scheme: ${uri.scheme} for URI: $uriString")
                             return@let null
                         }
-                        // Verify URI accessibility
                         try {
                             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                                 if (!cursor.moveToFirst()) {
@@ -360,7 +375,6 @@ class AuthRepository(
                             return@let null
                         }
                         inputStream.use { input ->
-                            // Create temp file
                             val tempFile = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
                             Log.d("AuthRepository", "Creating temp file: ${tempFile.absolutePath}")
                             tempFile.outputStream().use { output ->
@@ -382,7 +396,7 @@ class AuthRepository(
                                 Compressor.compress(context, tempFile)
                             } catch (e: Exception) {
                                 Log.w("AuthRepository", "Compression failed: ${e.message}, using original file")
-                                tempFile // Fallback to original file
+                                tempFile
                             }
                             try {
                                 val bytes = imageFile.readBytes()
@@ -403,12 +417,11 @@ class AuthRepository(
                                 }.toMediaTypeOrNull()
                                 Log.d("AuthRepository", "Image part created: fieldName=files, fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
                                 MultipartBody.Part.createFormData(
-                                    "files", // Matches server expectation
+                                    "files",
                                     fileName,
                                     bytes.toRequestBody(mediaType)
                                 )
                             } finally {
-                                // Delete temp file
                                 if (imageFile.exists()) {
                                     try {
                                         imageFile.delete()
@@ -426,6 +439,7 @@ class AuthRepository(
                 }
 
                 Log.d("AuthRepository", "Adding expense: category=${expense.category}, amount=${expense.amount}, dateOfTransaction=${expense.dateOfTransaction}, remarks=${expense.remarks}, createdAt=${expense.createdAt}, hasImage=${imagePart != null}")
+                Log.d("AuthRepository", "Sending createdAt to server: ${expense.createdAt}")
 
                 Log.d("AuthRepository", "Sending multipart request to /api/expenses with token: Bearer ${token.take(20)}...")
                 val response = apiService.addExpense(
@@ -439,6 +453,9 @@ class AuthRepository(
                 )
 
                 Log.d("AuthRepository", "Add expense response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
+                response.body()?.let { returnedExpense ->
+                    Log.d("AuthRepository", "Server returned createdAt: ${returnedExpense.createdAt}")
+                }
                 if (response.isSuccessful) {
                     response.body()?.let { returnedExpense ->
                         Log.d("AuthRepository", "Server returned expense with imagePaths: ${returnedExpense.imagePaths}")

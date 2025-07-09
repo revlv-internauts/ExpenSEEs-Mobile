@@ -160,27 +160,15 @@ fun ExpenseListScreen(
         } catch (e: DateTimeParseException) {
             false
         }
-    }.let { filtered ->
-        if (showAllExpenses) {
-            if (selectedSortCategory != null) {
-                filtered.sortedBy { expense -> expense.category }
-            } else {
-                filtered.sortedByDescending { expense ->
-                    try {
-                        LocalDate.parse(expense.createdAt, dateFormatter)
-                    } catch (e: DateTimeParseException) {
-                        LocalDate.MIN // Fallback to ensure sorting stability
-                    }
-                }
-            }
-        } else {
-            if (selectedSortCategory != null) {
-                filtered.sortedBy { expense -> expense.category }
-            } else {
-                filtered // Maintain original order when not showing all expenses
+    }.sortedWith(
+        compareByDescending<Expense> { expense ->
+            try {
+                LocalDate.parse(expense.dateOfTransaction, dateFormatter)
+            } catch (e: DateTimeParseException) {
+                LocalDate.MIN // Fallback for invalid dates
             }
         }
-    }
+    )
 
     // Category colors and icons
     val categories = listOf(

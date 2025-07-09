@@ -662,7 +662,23 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Created At: ${selectedExpense?.createdAt ?: "N/A"}",
+                            text = "Created At: ${
+                                selectedExpense?.createdAt?.let { utcTime ->
+                                    try {
+                                        val utcFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                                            timeZone = TimeZone.getTimeZone("UTC")
+                                        }
+                                        val localFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
+                                            timeZone = TimeZone.getDefault() // Use device's local timezone (e.g., UTC+8 for Philippines)
+                                        }
+                                        val date = utcFormat.parse(utcTime)
+                                        date?.let { localFormat.format(it) } ?: "N/A"
+                                    } catch (e: Exception) {
+                                        Log.e("RecordExpensesScreen", "Failed to parse createdAt: ${e.message}")
+                                        "N/A"
+                                    }
+                                } ?: "N/A"
+                            }",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                             color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -1280,7 +1296,9 @@ fun RecordExpensesScreen(
                                 dateOfTransaction = dateOfTransaction.takeIf { it.isNotBlank() },
                                 remarks = remarks.takeIf { it.isNotBlank() },
                                 imagePaths = selectedImageUri?.let { listOf(it.toString()) },
-                                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+                                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                                    timeZone = TimeZone.getDefault()
+                                }.format(Date())
                             )
                         },
                     contentScale = ContentScale.Fit
@@ -1294,9 +1312,11 @@ fun RecordExpensesScreen(
                 if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
                     val amountValue = amount.toDoubleOrNull()
                     if (amountValue != null) {
-                        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-                            timeZone = TimeZone.getTimeZone("UTC")
-                        }.format(Date())
+                        // Use device's local time for createdAt
+                        val localFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                            timeZone = TimeZone.getDefault()
+                        }
+                        val timestamp = localFormat.format(Date())
                         Log.d("RecordExpensesScreen", "Selected image URI: $selectedImageUri")
                         val newExpense = Expense(
                             expenseId = null,

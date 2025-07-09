@@ -165,12 +165,13 @@ fun DetailedLiquidationReport(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 stickyHeader {
+
                     // Table Header
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color(0xFFF1F5F9))
-                            .padding(horizontal = 4.dp, vertical = 12.dp), // Added minimal horizontal padding
+                            .padding(horizontal = 4.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -180,17 +181,8 @@ fun DetailedLiquidationReport(
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF111827),
-                            modifier = Modifier.weight(2.5f)
-                        )
-                        Text(
-                            text = "Requested",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
-                            color = Color(0xFF111827),
-                            modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End
+                            modifier = Modifier.weight(2.5f),
+                            textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Actual",
@@ -200,7 +192,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Qty",
@@ -210,7 +202,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Total",
@@ -220,7 +212,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Balance",
@@ -230,7 +222,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Center
                         )
                     }
                     Divider(
@@ -239,6 +231,7 @@ fun DetailedLiquidationReport(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+                // Expense Items
                 items(budget.expenses.withIndex().toList()) { (index, expense) ->
                     val requestedBudget = expense.quantity * expense.amountPerUnit
                     val actualPrice = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
@@ -247,7 +240,7 @@ fun DetailedLiquidationReport(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 12.dp), // Match header padding for consistency
+                            .padding(horizontal = 4.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -258,16 +251,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(2.5f),
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "₱${numberFormat.format(requestedBudget)}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp
-                            ),
-                            color = Color(0xFF6B7280),
-                            modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
@@ -277,7 +261,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
@@ -287,7 +271,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
@@ -297,7 +281,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
@@ -307,7 +291,7 @@ fun DetailedLiquidationReport(
                             ),
                             color = if (balance >= 0) Color(0xFF16A34A) else Color(0xFFDC2626),
                             modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                     }
