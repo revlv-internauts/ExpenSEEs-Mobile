@@ -391,6 +391,7 @@ fun LiquidationReport(
                     val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
                     val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
 
+                    // Pending Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.PENDING },
                         modifier = Modifier
@@ -398,8 +399,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
-                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = pendingCount > 0,
@@ -425,8 +426,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
-                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = approvedCount > 0,
@@ -452,8 +453,8 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFBC1823), // Updated to #BC1823
-                            disabledContainerColor = Color(0xFFBC1823).copy(alpha = 0.5f)
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         enabled = deniedCount > 0,
@@ -479,7 +480,7 @@ fun LiquidationReport(
                             .height(56.dp)
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFBC1823) // Updated to #BC1823
+                            containerColor = Color(0xFF78495B)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         elevation = ButtonDefaults.buttonElevation(

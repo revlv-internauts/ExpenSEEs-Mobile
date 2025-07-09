@@ -59,9 +59,25 @@ import java.text.NumberFormat
 import java.util.Locale
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import java.text.SimpleDateFormat
+import android.app.DownloadManager
+import android.os.Build
+import android.os.Environment
+import androidx.annotation.RequiresApi
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import java.io.File
+import java.io.FileOutputStream
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 
+
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -79,6 +95,8 @@ fun HomeScreen(
         maximumFractionDigits = 2
         isGroupingUsed = true
     }
+
+    val themeColor = Color(0xFF734656)
 
     BackHandler(enabled = true) {
         // Minimize the app instead of logging out or navigating
@@ -1145,8 +1163,9 @@ fun HomeScreen(
                             Button(
                                 onClick = { showInfoDialog = true },
                                 modifier = Modifier
-                                    .width(120.dp)
-                                    .height(40.dp),
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .padding(horizontal = 4.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Transparent
@@ -1186,14 +1205,99 @@ fun HomeScreen(
                             }
                             Button(
                                 onClick = {
+                                    selectedImagePath?.let { imagePath ->
+                                        scope.launch {
+                                            try {
+                                                if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
+                                                    // Handle local image download
+                                                    val uri = Uri.parse(imagePath)
+                                                    val inputStream = context.contentResolver.openInputStream(uri)
+                                                    val fileName = "Expense_${selectedTransaction?.expenseId}_${System.currentTimeMillis()}.jpg"
+                                                    val outputFile = File(
+                                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                                                        fileName
+                                                    )
+                                                    inputStream?.use { input ->
+                                                        FileOutputStream(outputFile).use { output ->
+                                                            input.copyTo(output)
+                                                        }
+                                                    }
+                                                    Toast.makeText(context, "Image saved to Downloads: $fileName", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    // Handle server image download
+                                                    val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
+                                                    val fileName = "Expense_${selectedTransaction?.expenseId}_${System.currentTimeMillis()}.jpg"
+                                                    val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                                    val request = DownloadManager.Request(Uri.parse(fullImageUrl)).apply {
+                                                        if (token != null) {
+                                                            addRequestHeader("Authorization", "Bearer $token")
+                                                        }
+                                                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                                                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                        setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
+                                                    }
+                                                    downloadManager.enqueue(request)
+                                                    Toast.makeText(context, "Downloading image to Downloads: $fileName", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("HomeScreen", "Failed to download image: ${e.message}")
+                                                Toast.makeText(context, "Failed to download image: ${e.message}", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    } ?: Toast.makeText(context, "No image available to download", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .padding(horizontal = 4.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(
+                                    defaultElevation = 4.dp,
+                                    pressedElevation = 8.dp
+                                ),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                                start = Offset(0f, 0f),
+                                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Download",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = {
                                     showExpenseDialog = false
                                     selectedTransaction = null
                                     expenseImageBitmap = null
                                     selectedImagePath = null
                                 },
                                 modifier = Modifier
-                                    .width(120.dp)
-                                    .height(40.dp),
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .padding(horizontal = 4.dp),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Transparent
@@ -1236,6 +1340,7 @@ fun HomeScreen(
                 }
             }
 
+
             if (showFullScreenImage) {
                 AlertDialog(
                     onDismissRequest = {
@@ -1245,22 +1350,33 @@ fun HomeScreen(
                         selectedImagePath = null
                     },
                     modifier = Modifier.fillMaxSize(),
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false
+                    )
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF1F2937)), // Maintained dark background
+                            .background(Color.Black), // Set background to black to remove white space
                         contentAlignment = Alignment.Center
                     ) {
                         selectedImagePath?.let { imagePath ->
                             var imageLoadFailed by remember { mutableStateOf(false) }
+                            // State for zoom and pan
+                            var scale by remember { mutableStateOf(1f) }
+                            var offset by remember { mutableStateOf(Offset.Zero) }
+                            val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+                                scale = (scale * zoomChange).coerceIn(1f, 5f) // Limit zoom between 1x and 5x
+                                offset += offsetChange
+                            }
+
                             if (tokenFetchFailed) {
                                 Text(
                                     text = "Authentication error: Please log in again",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color.White,
-                                    modifier = Modifier
+                                    color = Color.White, // White text for visibility on black background
+                                    modifier = Modifier.padding(16.dp)
                                 )
                             } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
                                 val bitmap = try {
@@ -1276,13 +1392,20 @@ fun HomeScreen(
                                         contentDescription = "Full screen expense photo",
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .transformable(state = transformableState)
+                                            .graphicsLayer(
+                                                scaleX = scale,
+                                                scaleY = scale,
+                                                translationX = offset.x,
+                                                translationY = offset.y
+                                            )
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 2.dp,
-                                                Color(0xFF734656), // Matches homepage theme
+                                                categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38),
                                                 RoundedCornerShape(12.dp)
                                             ),
-                                        contentScale = ContentScale.FillBounds // Changed to remove white space
+                                        contentScale = ContentScale.Fit // Use Fit to maintain aspect ratio
                                     )
                                 } ?: run {
                                     imageLoadFailed = true
@@ -1290,12 +1413,12 @@ fun HomeScreen(
                                         text = "No image available",
                                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                                         color = Color.White,
-                                        modifier = Modifier
+                                        modifier = Modifier.padding(16.dp)
                                     )
                                 }
                             } else {
                                 val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
-                                Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: $token")
+                                Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: ${token?.take(20)}...")
                                 AsyncImage(
                                     model = ImageRequest.Builder(context)
                                         .data(fullImageUrl)
@@ -1312,13 +1435,20 @@ fun HomeScreen(
                                     contentDescription = "Full screen expense photo",
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .transformable(state = transformableState)
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            Color(0xFF734656), // Matches homepage theme
+                                            categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38),
                                             RoundedCornerShape(12.dp)
                                         ),
-                                    contentScale = ContentScale.FillBounds, // Changed to remove white space
+                                    contentScale = ContentScale.Fit, // Use Fit to maintain aspect ratio
                                     onError = { error ->
                                         imageLoadFailed = true
                                         scope.launch {
@@ -1329,7 +1459,7 @@ fun HomeScreen(
                                                 val tokenResult = authRepository.getValidToken()
                                                 if (tokenResult.isSuccess) {
                                                     token = tokenResult.getOrNull()
-                                                    Log.d("HomeScreen", "Retry token fetched: $token")
+                                                    Log.d("HomeScreen", "Retry token fetched: ${token?.take(20)}...")
                                                 } else {
                                                     tokenFetchFailed = true
                                                     Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
@@ -1349,7 +1479,7 @@ fun HomeScreen(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                             color = Color.White,
-                            modifier = Modifier
+                            modifier = Modifier.padding(16.dp)
                         )
                         IconButton(
                             onClick = {
@@ -1361,11 +1491,12 @@ fun HomeScreen(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(16.dp)
+                                .background(Color(0xFFE5E7EB), CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close image",
-                                tint = Color.White
+                                tint = Color(0xFF1F2937)
                             )
                         }
                     }
@@ -1373,21 +1504,20 @@ fun HomeScreen(
             }
         }
         if (showInfoDialog && selectedTransaction != null) {
-            AlertDialog(
+            Dialog(
                 onDismissRequest = {
                     showInfoDialog = false
                     selectedTransaction = null
                     expenseImageBitmap = null
                     selectedImagePath = null
                 },
-                modifier = Modifier
-                    .fillMaxWidth(0.95f)
-                    .clip(RoundedCornerShape(16.dp)),
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .clip(RoundedCornerShape(16.dp)),
                     color = Color(0xFFF5F5F5),
-                    shape = RoundedCornerShape(16.dp),
                     shadowElevation = 8.dp
                 ) {
                     Column(
@@ -1398,153 +1528,74 @@ fun HomeScreen(
                         Text(
                             text = "Expense Details",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp
                             ),
-                            color = Color(0xFF3B82F6),
+                            color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
-                        Column(
-                            modifier = Modifier.verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Category:",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.4f)
-                                )
-                                Text(
-                                    text = selectedTransaction?.category ?: "N/A",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Amount:",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.4f)
-                                )
-                                Text(
-                                    text = "₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Date of Transaction:",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.4f)
-                                )
-                                Text(
-                                    text = selectedTransaction?.dateOfTransaction ?: "N/A",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Created At:",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.4f)
-                                )
-                                Text(
-                                    text = selectedTransaction?.createdAt?.let { createdAt ->
-                                        try {
-                                            val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
-                                            val outputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-                                            val date = inputFormat.parse(createdAt)
-                                            outputFormat.format(date)
-                                        } catch (e: Exception) {
-                                            createdAt
-                                        }
-                                    } ?: "N/A",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Remarks:",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.4f)
-                                )
-                                Text(
-                                    text = selectedTransaction?.remarks ?: "N/A",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    modifier = Modifier.weight(0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Category: ")
+                                    }
+                                    append("${selectedTransaction?.category ?: "N/A"}")
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Amount: ")
+                                    }
+                                    append("₱${numberFormat.format(selectedTransaction?.amount?.coerceAtLeast(0.0) ?: 0.0)}")
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Date of Transaction: ")
+                                    }
+                                    append("${selectedTransaction?.dateOfTransaction ?: "N/A"}")
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Created At: ")
+                                    }
+                                    append(selectedTransaction?.createdAt?.let {
+                                        val dateTime = java.time.LocalDateTime.parse(it)
+                                        dateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                                    } ?: "N/A")
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Remarks: ")
+                                    }
+                                    append("${selectedTransaction?.remarks ?: "N/A"}")
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color(0xFF1F2937),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
-                        TextButton(
+                        Button(
                             onClick = {
                                 showInfoDialog = false
                                 selectedTransaction = null
@@ -1553,22 +1604,35 @@ fun HomeScreen(
                             },
                             modifier = Modifier
                                 .align(Alignment.End)
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(
-                                text = "Close",
-                                color = Color(0xFF3B82F6),
-                                fontSize = 16.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Close",
+                                    color = themeColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -1583,27 +1647,32 @@ fun HomeScreen(
                     selectedImagePath = null
                 },
                 modifier = Modifier.fillMaxSize(),
-                properties = DialogProperties(usePlatformDefaultWidth = false)
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFF5F5F5))
-                        .padding(
-                            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-                            start = 16.dp,
-                            end = 16.dp
-                        ),
+                        .background(Color.Black), // Set background to black to remove white space
                     contentAlignment = Alignment.Center
                 ) {
                     selectedImagePath?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
+                        // State for zoom and pan
+                        var scale by remember { mutableStateOf(1f) }
+                        var offset by remember { mutableStateOf(Offset.Zero) }
+                        val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+                            scale = (scale * zoomChange).coerceIn(1f, 5f) // Limit zoom between 1x and 5x
+                            offset += offsetChange
+                        }
+
                         if (tokenFetchFailed) {
                             Text(
                                 text = "Authentication error: Please log in again",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                color = Color(0xFF4B5563),
+                                color = Color.White, // White text for visibility on black background
                                 modifier = Modifier.padding(16.dp)
                             )
                         } else if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
@@ -1620,26 +1689,33 @@ fun HomeScreen(
                                     contentDescription = "Full screen expense photo",
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .transformable(state = transformableState)
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(
                                             2.dp,
-                                            categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38), // Matches category theme
+                                            categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38),
                                             RoundedCornerShape(12.dp)
                                         ),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit // Use Fit to maintain aspect ratio
                                 )
                             } ?: run {
                                 imageLoadFailed = true
                                 Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                                    color = Color(0xFF4B5563),
+                                    color = Color.White,
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
                         } else {
                             val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
-                            Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: $token")
+                            Log.d("HomeScreen", "Loading full-screen server image: $fullImageUrl with token: ${token?.take(20)}...")
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(fullImageUrl)
@@ -1656,13 +1732,20 @@ fun HomeScreen(
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .transformable(state = transformableState)
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offset.x,
+                                        translationY = offset.y
+                                    )
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         2.dp,
-                                        categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38), // Matches category theme
+                                        categoryColors[selectedTransaction?.category] ?: Color(0xFF6B4E38),
                                         RoundedCornerShape(12.dp)
                                     ),
-                                contentScale = ContentScale.Crop, // Changed to remove white space
+                                contentScale = ContentScale.Fit, // Use Fit to maintain aspect ratio
                                 onError = { error ->
                                     imageLoadFailed = true
                                     scope.launch {
@@ -1673,7 +1756,7 @@ fun HomeScreen(
                                             val tokenResult = authRepository.getValidToken()
                                             if (tokenResult.isSuccess) {
                                                 token = tokenResult.getOrNull()
-                                                Log.d("HomeScreen", "Retry token fetched: $token")
+                                                Log.d("HomeScreen", "Retry token fetched: ${token?.take(20)}...")
                                             } else {
                                                 tokenFetchFailed = true
                                                 Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
@@ -1692,7 +1775,7 @@ fun HomeScreen(
                     } ?: Text(
                         text = "No image available",
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFF4B5563),
+                        color = Color.White,
                         modifier = Modifier.padding(16.dp)
                     )
                     IconButton(
@@ -1705,6 +1788,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp)
+                            .background(Color(0xFFE5E7EB), CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
