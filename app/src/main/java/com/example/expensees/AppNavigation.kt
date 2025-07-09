@@ -9,10 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.expensees.models.Expense
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.screens.*
@@ -25,6 +25,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
     val submittedBudgets = remember { mutableStateListOf<SubmittedBudget>() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val liquidationViewModel: LiquidationViewModel = viewModel() // Hoist ViewModel here
 
     NavHost(navController = navController, startDestination = "loading") {
         composable("loading") {
@@ -113,7 +114,9 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         composable("liquidation_Report") {
             LiquidationReport(
                 navController = navController,
-                authRepository = authRepository
+                authRepository = authRepository,
+                viewModel = liquidationViewModel, // Pass the same ViewModel instance
+                modifier = modifier
             )
         }
         composable("detailed_liquidation_report/{budgetId}") { backStackEntry ->
@@ -122,15 +125,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
             if (budget != null) {
                 DetailedLiquidationReport(
                     budget = budget,
-                    selectedExpensesMap = authRepository.submittedBudgets
-                        .find { it.budgetId == budgetId }
-                        ?.let { selectedBudget ->
-                            selectedBudget.expenses.withIndex().associate { (index, _) ->
-                                index to (authRepository.userExpenses.filter { expense ->
-                                    expense.category == selectedBudget.expenses[index].category
-                                })
-                            }
-                        } ?: emptyMap(),
+                    selectedExpensesMap = liquidationViewModel.selectedExpensesMap, // Use ViewModel's map
                     navController = navController,
                     modifier = modifier
                 )

@@ -37,9 +37,7 @@ fun DetailedLiquidationReport(
         isGroupingUsed = true
     }
     val totalBudgeted = budget.total
-    val totalActual = budget.expenses.withIndex().sumOf { (index, _) ->
-        selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-    }
+    val totalActual = selectedExpensesMap.values.flatten().sumOf { it.amount }
     val totalRemaining = totalBudgeted - totalActual
 
     // Status colors for consistency
@@ -94,8 +92,8 @@ fun DetailedLiquidationReport(
                 .padding(
                     top = innerPadding.calculateTopPadding(),
                     bottom = innerPadding.calculateBottomPadding(),
-                    start = 8.dp, // Added minimal side padding
-                    end = 8.dp    // Added minimal side padding
+                    start = 8.dp,
+                    end = 8.dp
                 ),
             horizontalAlignment = Alignment.Start
         ) {
@@ -149,7 +147,7 @@ fun DetailedLiquidationReport(
             }
 
             Text(
-                text = "Expense Details",
+                text = "Selected Receipt Details",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 20.sp
@@ -165,7 +163,6 @@ fun DetailedLiquidationReport(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 stickyHeader {
-
                     // Table Header
                     Row(
                         modifier = Modifier
@@ -181,47 +178,27 @@ fun DetailedLiquidationReport(
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF111827),
-                            modifier = Modifier.weight(2.5f),
+                            modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Actual",
+                            text = "Receipt Description",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF111827),
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(3f),
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Qty",
+                            text = "Amount",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF111827),
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Total",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
-                            color = Color(0xFF111827),
-                            modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Balance",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
-                            color = Color(0xFF111827),
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -231,12 +208,9 @@ fun DetailedLiquidationReport(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                // Expense Items
-                items(budget.expenses.withIndex().toList()) { (index, expense) ->
-                    val requestedBudget = expense.quantity * expense.amountPerUnit
-                    val actualPrice = selectedExpensesMap[index]?.sumOf { it.amount } ?: 0.0
-                    val total = actualPrice
-                    val balance = requestedBudget - total
+                items(selectedExpensesMap.entries.sortedBy { it.key }.flatMap { (index, expenses) ->
+                    expenses.map { expense -> index to expense }
+                }) { (index, expense) ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -244,53 +218,33 @@ fun DetailedLiquidationReport(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = expense.category,
+                            text = budget.expenses.getOrNull(index)?.category ?: "Unknown",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             ),
                             color = Color(0xFF111827),
-                            modifier = Modifier.weight(2.5f),
+                            modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
-                            text = "₱${numberFormat.format(actualPrice)}",
+                            text = expense.remarks ?: "No remarks",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF6B7280),
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(3f),
                             textAlign = TextAlign.Center,
                             maxLines = 1
                         )
                         Text(
-                            text = "${expense.quantity}",
+                            text = "₱${numberFormat.format(expense.amount)}",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = 14.sp
                             ),
                             color = Color(0xFF6B7280),
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "₱${numberFormat.format(total)}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp
-                            ),
-                            color = Color(0xFF6B7280),
-                            modifier = Modifier.weight(1.5f),
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "₱${numberFormat.format(balance)}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp
-                            ),
-                            color = if (balance >= 0) Color(0xFF16A34A) else Color(0xFFDC2626),
-                            modifier = Modifier.weight(1.5f),
+                            modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center,
                             maxLines = 1
                         )
@@ -298,6 +252,24 @@ fun DetailedLiquidationReport(
                     Divider(color = Color(0xFFE5E7EB), thickness = 0.5.dp)
                 }
                 item {
+                    if (selectedExpensesMap.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No receipts selected.",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 18.sp
+                                ),
+                                color = Color(0xFF4B5563),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Column(
                         modifier = Modifier
@@ -307,6 +279,15 @@ fun DetailedLiquidationReport(
                     ) {
                         Text(
                             text = "Total Budgeted: ₱${numberFormat.format(totalBudgeted)}",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            ),
+                            color = Color(0xFF111827)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Total Selected Receipts: ₱${numberFormat.format(totalActual)}",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 18.sp

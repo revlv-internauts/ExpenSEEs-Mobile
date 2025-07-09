@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,7 +31,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,15 +49,34 @@ import java.text.NumberFormat
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
-@RequiresApi(Build.VERSION_CODES.O)
+// ViewModel to hold selectedExpensesMap state
+class LiquidationViewModel : ViewModel() {
+    val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
+
+    fun clearSelections() {
+        selectedExpensesMap.clear()
+    }
+
+    fun updateSelections(index: Int, expenses: List<Expense>) {
+        selectedExpensesMap[index] = mutableListOf<Expense>().apply { addAll(expenses) }
+        if (expenses.isEmpty()) {
+            selectedExpensesMap.remove(index)
+        }
+    }
+}
+
 @SuppressLint("UnrememberedMutableState")
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiquidationReport(
     modifier: Modifier = Modifier,
     navController: NavController,
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    viewModel: LiquidationViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -67,14 +84,11 @@ fun LiquidationReport(
     var selectedCategory by remember { mutableStateOf<BudgetStatus?>(null) }
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
-    val selectedExpensesMap = remember { mutableStateMapOf<Int, MutableList<Expense>>() }
+    val selectedExpensesMap = viewModel.selectedExpensesMap // Use ViewModel's map
 
     LaunchedEffect(selectedBudget) {
         if (selectedBudget == null) {
-            selectedExpensesMap.clear() // Clear the map when no budget is selected
-        } else {
-            // Optionally, clear only entries not relevant to the new budget
-            selectedExpensesMap.clear()
+            viewModel.clearSelections() // Clear the map when no budget is selected
         }
     }
 
@@ -97,24 +111,17 @@ fun LiquidationReport(
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
     val colorList = listOf(
-        Color(0xFF6B4E38), // Brown
-        Color(0xFFE7685D), // Coral Red
-        Color(0xFFFBBD92), // Light Peach
-        Color(0xFF4CAF50), // Green
-        Color(0xFF2196F3), // Blue
-        Color(0xFFFF9800), // Orange
-        Color(0xFFE28743), // Orange
-        Color(0xFF009688), // Teal
-        Color(0xFFFF5722), // Deep Orange
-        Color(0xFF607D8B)  // Blue Grey
+        Color(0xFF6B4E38), Color(0xFFE7685D), Color(0xFFFBBD92), Color(0xFF4CAF50),
+        Color(0xFF2196F3), Color(0xFFFF9800), Color(0xFFE28743), Color(0xFF009688),
+        Color(0xFFFF5722), Color(0xFF607D8B)
     )
     val categoryColors = categories.zip(colorList).toMap()
 
-    // Adjusted status colors for a matte appearance
+    // Status colors
     val statusColors = mapOf(
-        BudgetStatus.PENDING to Color(0xFFD4A017), // Less vibrant yellow
-        BudgetStatus.APPROVED to Color(0xFF388E3C), // Less vibrant green
-        BudgetStatus.DENIED to Color(0xFFD32F2F)  // Less vibrant red
+        BudgetStatus.PENDING to Color(0xFFD4A017),
+        BudgetStatus.APPROVED to Color(0xFF388E3C),
+        BudgetStatus.DENIED to Color(0xFFD32F2F)
     )
 
     val textColors = mapOf(
@@ -173,9 +180,7 @@ fun LiquidationReport(
         } ?: return 0.0
     }
 
-// Ensure totalRemainingBalance recomputes when selectedExpensesMap changes
     val totalRemainingBalance by derivedStateOf {
-        // Force dependency on selectedExpensesMap entries
         selectedExpensesMap.entries.size
         calculateTotalRemainingBalance()
     }
@@ -239,7 +244,6 @@ fun LiquidationReport(
                 .padding(top = innerPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -366,7 +370,7 @@ fun LiquidationReport(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No budget requests submitted PURPLE submitted yet.",
+                        text = "No budget requests submitted yet.",
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp
@@ -386,12 +390,10 @@ fun LiquidationReport(
                         color = Color(0xFF1F2937),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
-                    // Category Buttons
                     val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
                     val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
                     val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
 
-                    // Pending Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.PENDING },
                         modifier = Modifier
@@ -418,7 +420,6 @@ fun LiquidationReport(
                         )
                     }
 
-// Approved Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.APPROVED },
                         modifier = Modifier
@@ -445,7 +446,6 @@ fun LiquidationReport(
                         )
                     }
 
-// Denied Budgets Button
                     Button(
                         onClick = { selectedCategory = BudgetStatus.DENIED },
                         modifier = Modifier
@@ -472,7 +472,6 @@ fun LiquidationReport(
                         )
                     }
 
-// View All Budgets Button
                     Button(
                         onClick = { showAllBudgets = true },
                         modifier = Modifier
@@ -1015,7 +1014,7 @@ fun LiquidationReport(
                                             Spacer(modifier = Modifier.width(4.dp))
                                             IconButton(
                                                 onClick = {
-                                                    selectedExpensesMap[index] = mutableListOf()
+                                                    viewModel.updateSelections(index, emptyList())
                                                     Toast.makeText(
                                                         context,
                                                         "All receipts removed for ${expense.category}",
@@ -1032,7 +1031,7 @@ fun LiquidationReport(
                                                     tint = if (selectedExpensesMap[index]?.isNotEmpty() ?: false)
                                                         Color(0xFFF44336)
                                                     else
-                                                        Color(0xFF4B5563).copy(alpha = 0.38f)
+                                                        Color(0xFF4B5563).copy(alpha = 0.5f)
                                                 )
                                             }
                                         }
@@ -1104,22 +1103,22 @@ fun LiquidationReport(
                                 .height(56.dp)
                                 .padding(horizontal = 4.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF1F2937), // Dark gray text for contrast
+                                contentColor = Color(0xFF1F2937),
                                 disabledContentColor = Color(0xFF1F2937).copy(alpha = 0.5f)
                             ),
-                            border = BorderStroke(1.dp, Color(0xFF734656)), // Maroon border
+                            border = BorderStroke(1.dp, Color(0xFF734656)),
                             shape = RoundedCornerShape(12.dp),
                             elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 0.dp, // No elevation for outlined button
+                                defaultElevation = 0.dp,
                                 pressedElevation = 0.dp
                             )
                         ) {
                             Text(
-                                text = "Back to Budgets",
+                                text = "Back to Categories",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 textAlign = TextAlign.Center,
-                                color = Color(0xFF1F2937) // Ensure text color matches
+                                color = Color(0xFF1F2937)
                             )
                         }
                         Button(
@@ -1128,20 +1127,20 @@ fun LiquidationReport(
                                     Toast.makeText(
                                         context,
                                         "Please upload at least one receipt to generate the report",
-                                        Toast.LENGTH_SHORT
+                                        Toast.LENGTH_LONG
                                     ).show()
                                 } else {
                                     isLoading = true
                                     coroutineScope.launch {
                                         try {
-                                            delay(2000)
-                                            navController.navigate("detailed_liquidation_report/${budget.budgetId}") {
-                                                launchSingleTop = true
-                                            }
+                                            delay(1000)
+                                            // Log the selectedExpensesMap to verify its contents
+                                            println("Navigating to DetailedLiquidationReport with selectedExpensesMap: $selectedExpensesMap")
+                                            navController.navigate("detailed_liquidation_report/${budget.budgetId}")
                                             Toast.makeText(
                                                 context,
                                                 "Viewing Liquidation Report for ${budget.name}",
-                                                Toast.LENGTH_SHORT
+                                                Toast.LENGTH_LONG
                                             ).show()
                                         } finally {
                                             isLoading = false
@@ -1209,6 +1208,7 @@ fun LiquidationReport(
                 filteredExpenses.forEach { expense ->
                     checkedExpenses[expense] = selectedExpensesMap[currentExpenseItem!!.second]?.contains(expense) ?: false
                 }
+                println("Dialog initialized with checkedExpenses: ${checkedExpenses.filter { it.value }.keys}")
             }
 
             val currentIndex = currentExpenseItem!!.second
@@ -1320,7 +1320,9 @@ fun LiquidationReport(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .scale(1f)
-                                            .clickable(enabled = !isUsed || (checkedExpenses[expense] ?: false)) {
+                                            .clickable(
+                                                enabled = !isUsed || (checkedExpenses[expense] ?: false)
+                                            ) {
                                                 checkedExpenses[expense] = !(checkedExpenses[expense] ?: false)
                                             },
                                         shape = RoundedCornerShape(8.dp),
@@ -1416,101 +1418,99 @@ fun LiquidationReport(
                                     }
                                 }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    showExpenseSelectionDialog = false
-                                    currentExpenseItem = null
-                                    checkedExpenses.clear()
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .padding(end = 8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = Color(0xFF3B82F6)
-                                ),
-                                border = BorderStroke(1.dp, Color(0xFF3B82F6)),
-                                shape = RoundedCornerShape(12.dp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = "Close",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Button(
-                                onClick = {
-                                    val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
-                                    // Check for conflicts with other budgets
-                                    val conflictingExpenses = newSelections.filter { expense ->
-                                        selectedExpensesMap.any { (idx, exps) ->
-                                            idx != currentExpenseItem!!.second && exps.contains(expense)
-                                        }
-                                    }
-                                    if (conflictingExpenses.isNotEmpty()) {
-                                        Toast.makeText(
-                                            context,
-                                            "Cannot select receipts already used in other budgets",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    } else {
-                                        // Create a new list instance to ensure state change detection
-                                        val expenseList = mutableListOf<Expense>().apply { addAll(newSelections) }
-                                        selectedExpensesMap[currentExpenseItem!!.second] = expenseList
-                                        if (newSelections.isNotEmpty()) {
-                                            Toast.makeText(
-                                                context,
-                                                "${newSelections.size} receipt(s) selected",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        } else {
-                                            // Remove the key if no expenses are selected to ensure state update
-                                            selectedExpensesMap.remove(currentExpenseItem!!.second)
-                                        }
+                                OutlinedButton(
+                                    onClick = {
                                         showExpenseSelectionDialog = false
                                         currentExpenseItem = null
                                         checkedExpenses.clear()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .padding(start = 8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF734656),
-                                    disabledContainerColor = Color(0xFF734656).copy(alpha = 0.5f)
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = filteredExpenses.isNotEmpty()
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(end = 8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(0xFF3B82F6)
+                                    ),
+                                    border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Confirm",
-                                        modifier = Modifier.size(24.dp),
-                                        tint = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Confirm",
+                                        text = "Close",
                                         fontSize = 16.sp,
-                                        color = Color.White,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
-                            }
-                            LaunchedEffect(selectedExpensesMap) {
-                                snapshotFlow { selectedExpensesMap.entries.toList() }.collect {
-                                    println("selectedExpensesMap updated: $it")
+                                Button(
+                                    onClick = {
+                                        val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
+                                        println("Confirming selections: $newSelections")
+                                        val conflictingExpenses = newSelections.filter { expense ->
+                                            selectedExpensesMap.any { (idx, exps) ->
+                                                idx != currentExpenseItem!!.second && exps.contains(expense)
+                                            }
+                                        }
+                                        if (conflictingExpenses.isNotEmpty()) {
+                                            Toast.makeText(
+                                                context,
+                                                "Cannot select receipts already used in other budgets",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            viewModel.updateSelections(currentExpenseItem!!.second, newSelections)
+                                            println("Updated selectedExpensesMap: $selectedExpensesMap")
+                                            if (newSelections.isNotEmpty()) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "${newSelections.size} receipt(s) selected",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                viewModel.updateSelections(currentExpenseItem!!.second, emptyList())
+                                                Toast.makeText(
+                                                    context,
+                                                    "No receipts selected",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            showExpenseSelectionDialog = false
+                                            currentExpenseItem = null
+                                            checkedExpenses.clear()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(start = 8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF734656),
+                                        disabledContainerColor = Color(0xFF734656).copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = filteredExpenses.isNotEmpty()
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Confirm",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Confirm",
+                                            fontSize = 16.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }

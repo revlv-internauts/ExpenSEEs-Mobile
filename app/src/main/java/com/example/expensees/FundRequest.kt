@@ -31,7 +31,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +47,7 @@ import com.example.expensees.models.BudgetStatus
 import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
@@ -466,6 +469,7 @@ fun FundRequest(
                             .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // Inside LazyColumn items block
                         items(expenses) { expense ->
                             val index = expenses.indexOf(expense)
                             val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
@@ -473,6 +477,7 @@ fun FundRequest(
                             val alpha by animatedAlpha.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
                             var dragOffset by remember { mutableStateOf(0f) }
                             val swipeThreshold = 150f // Pixels to swipe to trigger delete
+                            val hapticFeedback = LocalHapticFeedback.current // For haptic feedback
 
                             Box(
                                 modifier = Modifier
@@ -480,7 +485,7 @@ fun FundRequest(
                                     .offset(x = offset.dp)
                                     .alpha(alpha)
                             ) {
-                                // Delete background
+                                // Delete background for swipe
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -510,45 +515,14 @@ fun FundRequest(
                                         .offset(x = dragOffset.dp)
                                         .pointerInput(Unit) {
                                             detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    // Optional: Perform haptic feedback on drag start
+                                                    hapticFeedback.performHapticFeedback(
+                                                        HapticFeedbackType.LongPress)
+                                                },
                                                 onDragEnd = {
-                                                    if (abs(dragOffset) > swipeThreshold) {
-                                                        coroutineScope.launch {
-                                                            animatedScale.getOrNull(index)?.animateTo(
-                                                                targetValue = 0.5f,
-                                                                animationSpec = tween(200)
-                                                            )
-                                                            animatedAlpha.getOrNull(index)?.animateTo(
-                                                                targetValue = 0f,
-                                                                animationSpec = tween(200)
-                                                            )
-                                                            val deletedExpense = expenses[index]
-                                                            expenses.removeAt(index)
-                                                            animatedScale.removeAt(index)
-                                                            animatedOffset.removeAt(index)
-                                                            animatedAlpha.removeAt(index)
-                                                            snackbarHostState.showSnackbar(
-                                                                message = "${deletedExpense.category} removed",
-                                                                actionLabel = "Undo",
-                                                                duration = SnackbarDuration.Short
-                                                            ).also { result ->
-                                                                if (result == SnackbarResult.ActionPerformed) {
-                                                                    expenses.add(index, deletedExpense)
-                                                                    animatedScale.add(index, Animatable(0f))
-                                                                    animatedOffset.add(index, Animatable(0f))
-                                                                    animatedAlpha.add(index, Animatable(0f))
-                                                                    launch {
-                                                                        animatedScale[index].animateTo(
-                                                                            targetValue = 1f,
-                                                                            animationSpec = tween(400)
-                                                                        )
-                                                                        animatedAlpha[index].animateTo(
-                                                                            targetValue = 1f,
-                                                                            animationSpec = tween(400)
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
+                                                    if (dragOffset < -swipeThreshold) { // Only trigger on left swipe
+                                                        deleteExpense(index, expenses, animatedScale, animatedOffset, animatedAlpha, snackbarHostState, coroutineScope)
                                                     } else {
                                                         coroutineScope.launch {
                                                             animatedOffset.getOrNull(index)?.animateTo(
@@ -560,7 +534,8 @@ fun FundRequest(
                                                     }
                                                 },
                                                 onHorizontalDrag = { _, dragAmount ->
-                                                    dragOffset = (dragOffset + dragAmount).coerceIn(-swipeThreshold, swipeThreshold / 2)
+                                                    // Only allow left swipe (negative offset)
+                                                    dragOffset = (dragOffset + dragAmount).coerceIn(-swipeThreshold, 0f)
                                                     coroutineScope.launch {
                                                         animatedOffset.getOrNull(index)?.animateTo(
                                                             targetValue = dragOffset,
@@ -570,12 +545,17 @@ fun FundRequest(
                                                             )
                                                         )
                                                     }
+                                                    // Trigger haptic feedback when crossing threshold
+                                                    if (dragOffset < -swipeThreshold && dragOffset + dragAmount >= -swipeThreshold) {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    }
                                                 }
                                             )
                                         },
                                     shape = RoundedCornerShape(8.dp),
                                     color = Color.Transparent
                                 ) {
+                                    // Rest of the Surface content (same as original)
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1082,6 +1062,55 @@ fun FundRequest(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// Helper function to handle expense deletion
+private fun deleteExpense(
+    index: Int,
+    expenses: MutableList<ExpenseItem>,
+    animatedScale: MutableList<Animatable<Float, *>>,
+    animatedOffset: MutableList<Animatable<Float, *>>,
+    animatedAlpha: MutableList<Animatable<Float, *>>,
+    snackbarHostState: SnackbarHostState,
+    coroutineScope: CoroutineScope
+) {
+    coroutineScope.launch {
+        animatedScale.getOrNull(index)?.animateTo(
+            targetValue = 0.5f,
+            animationSpec = tween(200)
+        )
+        animatedAlpha.getOrNull(index)?.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(200)
+        )
+        val deletedExpense = expenses[index]
+        expenses.removeAt(index)
+        animatedScale.removeAt(index)
+        animatedOffset.removeAt(index)
+        animatedAlpha.removeAt(index)
+        snackbarHostState.showSnackbar(
+            message = "${deletedExpense.category} removed",
+            actionLabel = "Undo",
+            duration = SnackbarDuration.Short
+        ).also { result ->
+            if (result == SnackbarResult.ActionPerformed) {
+                expenses.add(index, deletedExpense)
+                animatedScale.add(index, Animatable(0f))
+                animatedOffset.add(index, Animatable(0f))
+                animatedAlpha.add(index, Animatable(0f))
+                launch {
+                    animatedScale[index].animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(400)
+                    )
+                    animatedAlpha[index].animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(400)
+                    )
                 }
             }
         }
