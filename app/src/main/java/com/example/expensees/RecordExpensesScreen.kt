@@ -17,6 +17,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -107,28 +108,34 @@ fun RecordExpensesScreen(
         )
     }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success && selectedImageUri != null) {
-            selectedImageBitmap = try {
-                BitmapFactory.decodeStream(context.contentResolver.openInputStream(selectedImageUri!!))
-            } catch (e: Exception) {
-                Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
-                null
+    val takePictureLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success && selectedImageUri != null) {
+                selectedImageBitmap = try {
+                    BitmapFactory.decodeStream(
+                        context.contentResolver.openInputStream(
+                            selectedImageUri!!
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
+                    null
+                }
             }
         }
-    }
 
-    val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            selectedImageUri = it
-            selectedImageBitmap = try {
-                BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
-            } catch (e: Exception) {
-                Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
-                null
+    val pickImageLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let {
+                selectedImageUri = it
+                selectedImageBitmap = try {
+                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(it))
+                } catch (e: Exception) {
+                    Log.e("RecordExpensesScreen", "Failed to decode image: ${e.message}", e)
+                    null
+                }
             }
         }
-    }
 
     val multiplePermissionsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -139,11 +146,13 @@ fun RecordExpensesScreen(
                     createImageUri(context)?.let { uri ->
                         selectedImageUri = uri
                         takePictureLauncher.launch(uri)
-                    } ?: Toast.makeText(context, "Error creating image file", Toast.LENGTH_LONG).show()
+                    } ?: Toast.makeText(context, "Error creating image file", Toast.LENGTH_LONG)
+                        .show()
                 } else {
                     Toast.makeText(context, "Camera permission denied", Toast.LENGTH_LONG).show()
                 }
             }
+
             "storage" -> {
                 val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     Manifest.permission.READ_MEDIA_IMAGES
@@ -210,6 +219,7 @@ fun RecordExpensesScreen(
                                     } else {
                                         Manifest.permission.READ_EXTERNAL_STORAGE
                                     }
+
                                     else -> ""
                                 }
                                 multiplePermissionsLauncher.launch(arrayOf(permission))
@@ -330,7 +340,9 @@ fun RecordExpensesScreen(
                                 showAuthErrorDialog = false
                                 authRepository.logout()
                                 navController.navigate("login") {
-                                    popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
                                 }
                             },
                             modifier = Modifier
@@ -469,9 +481,17 @@ fun RecordExpensesScreen(
                         } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
                             val bitmap = try {
                                 val uri = Uri.parse(imagePath)
-                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                BitmapFactory.decodeStream(
+                                    context.contentResolver.openInputStream(
+                                        uri
+                                    )
+                                )
                             } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Failed to load receipt image: ${e.message}, imagePath: $imagePath", e)
+                                Log.e(
+                                    "RecordExpensesScreen",
+                                    "Failed to load receipt image: ${e.message}, imagePath: $imagePath",
+                                    e
+                                )
                                 null
                             }
                             bitmap?.let {
@@ -482,7 +502,11 @@ fun RecordExpensesScreen(
                                         .fillMaxWidth()
                                         .weight(1f)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
+                                        .border(
+                                            1.5.dp,
+                                            Color(0xFF3B82F6),
+                                            RoundedCornerShape(12.dp)
+                                        )
                                         .clickable {
                                             expenseImageBitmap = it
                                             showFullScreenImage = true
@@ -504,7 +528,15 @@ fun RecordExpensesScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(fullImageUrl)
-                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .addHeader(
+                                        "Authorization",
+                                        "Bearer ${
+                                            context.getSharedPreferences(
+                                                "auth_prefs",
+                                                Context.MODE_PRIVATE
+                                            ).getString("auth_token", "")
+                                        }"
+                                    )
                                     .build(),
                                 contentDescription = "${selectedExpense?.category ?: ""} receipt",
                                 modifier = Modifier
@@ -515,10 +547,17 @@ fun RecordExpensesScreen(
                                     .clickable { showFullScreenImage = true },
                                 contentScale = ContentScale.Fit,
                                 onError = {
-                                    Log.e("RecordExpensesScreen", "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                    Log.e(
+                                        "RecordExpensesScreen",
+                                        "Failed to load server image: $fullImageUrl, error: ${it.result.throwable.message}"
+                                    )
                                     imageLoadFailed = true
                                     scope.launch {
-                                        Toast.makeText(context, "Failed to load receipt image", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to load receipt image",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 }
                             )
@@ -650,7 +689,12 @@ fun RecordExpensesScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = "Amount: ₱${String.format("%.2f", selectedExpense?.amount ?: 0.0)}",
+                            text = "Amount: ₱${
+                                String.format(
+                                    "%.2f",
+                                    selectedExpense?.amount ?: 0.0
+                                )
+                            }",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                             color = Color(0xFF1F2937),
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -665,16 +709,26 @@ fun RecordExpensesScreen(
                             text = "Created At: ${
                                 selectedExpense?.createdAt?.let { utcTime ->
                                     try {
-                                        val utcFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                                        val utcFormat = SimpleDateFormat(
+                                            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                                            Locale.US
+                                        ).apply {
                                             timeZone = TimeZone.getTimeZone("UTC")
                                         }
-                                        val localFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
-                                            timeZone = TimeZone.getDefault() // Use device's local timezone (e.g., UTC+8 for Philippines)
+                                        val localFormat = SimpleDateFormat(
+                                            "yyyy-MM-dd HH:mm:ss",
+                                            Locale.US
+                                        ).apply {
+                                            timeZone =
+                                                TimeZone.getDefault() // Use device's local timezone (e.g., UTC+8 for Philippines)
                                         }
                                         val date = utcFormat.parse(utcTime)
                                         date?.let { localFormat.format(it) } ?: "N/A"
                                     } catch (e: Exception) {
-                                        Log.e("RecordExpensesScreen", "Failed to parse createdAt: ${e.message}")
+                                        Log.e(
+                                            "RecordExpensesScreen",
+                                            "Failed to parse createdAt: ${e.message}"
+                                        )
                                         "N/A"
                                     }
                                 } ?: "N/A"
@@ -749,7 +803,8 @@ fun RecordExpensesScreen(
                     .background(Color(0xFFF5F5F5))
                     .padding(
                         top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                        bottom = WindowInsets.navigationBars.asPaddingValues()
+                            .calculateBottomPadding(),
                         start = 16.dp,
                         end = 16.dp
                     ),
@@ -768,9 +823,17 @@ fun RecordExpensesScreen(
                         expense.imagePaths?.firstOrNull()?.let { imagePath ->
                             val bitmap = try {
                                 val uri = Uri.parse(imagePath)
-                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                BitmapFactory.decodeStream(
+                                    context.contentResolver.openInputStream(
+                                        uri
+                                    )
+                                )
                             } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Failed to load full screen image: ${e.message}, imagePath: $imagePath", e)
+                                Log.e(
+                                    "RecordExpensesScreen",
+                                    "Failed to load full screen image: ${e.message}, imagePath: $imagePath",
+                                    e
+                                )
                                 null
                             }
                             bitmap?.let {
@@ -801,11 +864,22 @@ fun RecordExpensesScreen(
                     } else {
                         expense.imagePaths?.firstOrNull()?.let { imagePath ->
                             val fullImageUrl = "${ApiConfig.BASE_URL}$imagePath"
-                            Log.d("RecordExpensesScreen", "Loading full-screen server image: $fullImageUrl")
+                            Log.d(
+                                "RecordExpensesScreen",
+                                "Loading full-screen server image: $fullImageUrl"
+                            )
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(fullImageUrl)
-                                    .addHeader("Authorization", "Bearer ${context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE).getString("auth_token", "")}")
+                                    .addHeader(
+                                        "Authorization",
+                                        "Bearer ${
+                                            context.getSharedPreferences(
+                                                "auth_prefs",
+                                                Context.MODE_PRIVATE
+                                            ).getString("auth_token", "")
+                                        }"
+                                    )
                                     .build(),
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
@@ -814,10 +888,17 @@ fun RecordExpensesScreen(
                                     .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.Fit,
                                 onError = {
-                                    Log.e("RecordExpensesScreen", "Failed to load server full screen image: $fullImageUrl, error: ${it.result.throwable.message}")
+                                    Log.e(
+                                        "RecordExpensesScreen",
+                                        "Failed to load server full screen image: $fullImageUrl, error: ${it.result.throwable.message}"
+                                    )
                                     imageLoadFailed = true
                                     scope.launch {
-                                        Toast.makeText(context, "Failed to load full screen image", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to load full screen image",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 }
                             )
@@ -863,25 +944,49 @@ fun RecordExpensesScreen(
                 fetchResult.onSuccess {
                     Log.d("RecordExpensesScreen", "Expenses fetched successfully")
                     if (pendingExpense != null) {
-                        Log.d("RecordExpensesScreen", "Retrying pending expense: ${Gson().toJson(pendingExpense)}")
+                        Log.d(
+                            "RecordExpensesScreen",
+                            "Retrying pending expense: ${Gson().toJson(pendingExpense)}"
+                        )
                         val result = authRepository.addExpense(pendingExpense!!)
                         result.onSuccess { returnedExpense ->
-                            Log.d("RecordExpensesScreen", "Pending expense added: expenseId=${returnedExpense.expenseId}")
+                            Log.d(
+                                "RecordExpensesScreen",
+                                "Pending expense added: expenseId=${returnedExpense.expenseId}"
+                            )
                             if (returnedExpense.expenseId?.startsWith("local_") != true) {
                                 pendingExpense = null
                             }
-                            Toast.makeText(context, "Expense synced successfully", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Expense synced successfully",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }.onFailure { e ->
-                            Log.e("RecordExpensesScreen", "Failed to sync pending expense: ${e.message}", e)
+                            Log.e(
+                                "RecordExpensesScreen",
+                                "Failed to sync pending expense: ${e.message}",
+                                e
+                            )
                             when {
                                 e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
                                     showAuthErrorDialog = true
                                 }
+
                                 e.message?.contains("No internet connection") == true -> {
-                                    Toast.makeText(context, "No internet connection, expense saved locally", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(
+                                        context,
+                                        "No internet connection, expense saved locally",
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
+
                                 else -> {
-                                    Toast.makeText(context, "Failed to sync expense: ${e.message}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to sync expense: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             }
                         }
@@ -892,603 +997,743 @@ fun RecordExpensesScreen(
                         e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
                             showAuthErrorDialog = true
                         }
+
                         e.message?.contains("No internet connection") == true -> {
-                            Toast.makeText(context, "No internet connection, showing local expenses", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                "No internet connection, showing local expenses",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
+
                         else -> {
-                            Toast.makeText(context, "Failed to fetch expenses: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                "Failed to fetch expenses: ${e.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                 }
             }
         } else {
             Log.d("RecordExpensesScreen", "Not authenticated, showing local expenses")
-            Toast.makeText(context, "Not logged in, showing local expenses", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Not logged in, showing local expenses", Toast.LENGTH_LONG)
+                .show()
         }
     }
-
-    Column(
+    val focusManager = LocalFocusManager.current
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .clickable(
+                onClick = { focusManager.clearFocus() },
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            )
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 50.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(
-                onClick = { navController.navigate("home") },
-                modifier = Modifier
-                    .size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back to home",
-                    tint = Color(0xFF1F2937)
-                )
-            }
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center
+                    .padding(top = 50.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Record Expense",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
-                    ),
-                    color = Color(0xFF1F2937),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-            }
-        }
-        HorizontalDivider(
-            modifier = Modifier.padding(bottom = 12.dp),
-            color = Color(0xFFE5E7EB)
-        )
-
-        // Category Input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Category",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
-                color = Color(0xFF1F2937),
-                modifier = Modifier
-                    .width(100.dp)
-                    .padding(end = 8.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { expanded = !expanded }
-            ) {
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = { },
+                IconButton(
+                    onClick = { navController.navigate("home") },
+                    modifier = Modifier
+                        .size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back to home",
+                        tint = Color(0xFF1F2937)
+                    )
+                }
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    enabled = false,
-                    readOnly = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
-                    placeholder = { Text("Select a category", color = Color(0xFF4B5563), fontSize = 14.sp) },
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = Color(0xFF1F2937),
-                        disabledBorderColor = Color(0xFFE5E7EB),
-                        disabledPlaceholderColor = Color(0xFF4B5563),
-                        disabledLabelColor = Color(0xFF4B5563),
-                        disabledLeadingIconColor = Color(0xFF4B5563),
-                        disabledTrailingIconColor = Color(0xFF4B5563)
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { expanded = !expanded }) {
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Record Expense",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 12.dp),
+                color = Color(0xFFE5E7EB)
+            )
+
+            // Category Input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Category",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                    color = Color(0xFF1F2937),
+                    modifier = Modifier
+                        .width(100.dp)
+                        .padding(end = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = { },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        enabled = false,
+                        readOnly = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                        placeholder = {
                             Text(
-                                text = if (expanded) "▲" else "▼",
-                                color = Color(0xFF8A5B6E),
+                                "Select a category",
+                                color = Color(0xFF4B5563),
                                 fontSize = 14.sp
                             )
-                        }
-                    }
-                )
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF5F5F5))
-                ) {
-                    categories.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option, color = Color(0xFF1F2937), fontSize = 14.sp) },
-                            onClick = {
-                                category = option
-                                expanded = false
-                            },
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Amount Input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Amount",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
-                color = Color(0xFF1F2937),
-                modifier = Modifier
-                    .width(100.dp)
-                    .padding(end = 8.dp)
-            )
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { newValue ->
-                    if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                        amount = newValue
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937), fontSize = 14.sp),
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = Color(0xFF3B82F6),
-                    unfocusedBorderColor = Color(0xFFE5E7EB),
-                    cursorColor = Color(0xFF3B82F6)
-                ),
-                placeholder = { Text("Enter amount (e.g., 50.00)", color = Color(0xFF4B5563), fontSize = 14.sp) }
-            )
-        }
-
-        // Date Input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Date",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
-                color = Color(0xFF1F2937),
-                modifier = Modifier
-                    .width(100.dp)
-                    .padding(end = 8.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { datePickerDialog.show() }
-            ) {
-                OutlinedTextField(
-                    value = dateOfTransaction,
-                    onValueChange = { },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    enabled = false,
-                    readOnly = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
-                    placeholder = { Text("Select date (YYYY-MM-DD)", color = Color(0xFF4B5563), fontSize = 14.sp) },
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        disabledTextColor = Color(0xFF1F2937),
-                        disabledBorderColor = Color(0xFFE5E7EB),
-                        disabledPlaceholderColor = Color(0xFF4B5563),
-                        disabledLabelColor = Color(0xFF4B5563),
-                        disabledLeadingIconColor = Color(0xFF4B5563),
-                        disabledTrailingIconColor = Color(0xFF4B5563)
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { datePickerDialog.show() }) {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Select date",
-                                tint = Color(0xFF8A5B6E)
-                            )
-                        }
-                    }
-                )
-            }
-        }
-
-        // Remarks Input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Text(
-                text = "Remarks",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
-                color = Color(0xFF1F2937),
-                modifier = Modifier
-                    .width(100.dp)
-                    .padding(end = 8.dp, top = 16.dp)
-            )
-            val focusManager = LocalFocusManager.current
-            OutlinedTextField(
-                value = remarks,
-                onValueChange = { remarks = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(80.dp),
-                maxLines = 3,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
-                textStyle = LocalTextStyle.current.copy(color = Color(0xFF1F2937), fontSize = 14.sp),
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = Color(0xFF3B82F6),
-                    unfocusedBorderColor = Color(0xFFE5E7EB),
-                    cursorColor = Color(0xFF3B82F6)
-                ),
-                placeholder = { Text("Enter remarks (e.g., Lunch at Cafe)", color = Color(0xFF4B5563), fontSize = 14.sp) }
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                onClick = {
-                    permissionType = "camera"
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                        context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        if (ActivityCompat.shouldShowRequestPermissionRationale(
-                                context as Activity,
-                                Manifest.permission.CAMERA
-                            )
-                        ) {
-                            showPermissionRationale = true
-                        } else {
-                            multiplePermissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA))
-                        }
-                    } else {
-                        createImageUri(context)?.let { uri ->
-                            selectedImageUri = uri
-                            takePictureLauncher.launch(uri)
-                        } ?: Toast.makeText(context, "Error creating image file", Toast.LENGTH_LONG).show()
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .padding(end = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                ),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                start = Offset(0f, 0f),
-                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Take Photo",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-            Button(
-                onClick = {
-                    permissionType = "storage"
-                    val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        Manifest.permission.READ_MEDIA_IMAGES
-                    } else {
-                        Manifest.permission.READ_EXTERNAL_STORAGE
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                        context.checkSelfPermission(storagePermission) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        if (ActivityCompat.shouldShowRequestPermissionRationale(
-                                context as Activity,
-                                storagePermission
-                            )
-                        ) {
-                            showPermissionRationale = true
-                        } else {
-                            multiplePermissionsLauncher.launch(arrayOf(storagePermission))
-                        }
-                    } else {
-                        pickImageLauncher.launch("image/*")
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .padding(start = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                ),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                start = Offset(0f, 0f),
-                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Pick from Gallery",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-
-        selectedImageBitmap?.let { bitmap ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(2f)
-                    .padding(bottom = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Selected expense photo",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
-                        .clickable {
-                            expenseImageBitmap = bitmap
-                            showFullScreenImage = true
-                            selectedExpense = Expense(
-                                expenseId = "local_${System.currentTimeMillis()}",
-                                category = category.takeIf { it.isNotBlank() } ?: "N/A",
-                                amount = amount.toDoubleOrNull() ?: 0.0,
-                                dateOfTransaction = dateOfTransaction.takeIf { it.isNotBlank() },
-                                remarks = remarks.takeIf { it.isNotBlank() },
-                                imagePaths = selectedImageUri?.let { listOf(it.toString()) },
-                                createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-                                    timeZone = TimeZone.getDefault()
-                                }.format(Date())
-                            )
                         },
-                    contentScale = ContentScale.Fit
-                )
-            }
-        } ?: Spacer(modifier = Modifier.weight(2f))
-
-        // Add Expense Button
-        Button(
-            onClick = {
-                if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
-                    val amountValue = amount.toDoubleOrNull()
-                    if (amountValue != null) {
-                        // Use device's local time for createdAt
-                        val localFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-                            timeZone = TimeZone.getDefault()
-                        }
-                        val timestamp = localFormat.format(Date())
-                        Log.d("RecordExpensesScreen", "Selected image URI: $selectedImageUri")
-                        val newExpense = Expense(
-                            expenseId = null,
-                            category = category,
-                            amount = amountValue,
-                            dateOfTransaction = dateOfTransaction,
-                            remarks = remarks,
-                            imagePaths = selectedImageUri?.let { listOf(it.toString()) },
-                            createdAt = timestamp
-                        )
-                        if (!authRepository.isAuthenticated()) {
-                            Log.d("RecordExpensesScreen", "Not authenticated, saving locally: ${Gson().toJson(newExpense)}")
-                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                            authRepository.userExpenses.add(localExpense)
-                            pendingExpense = newExpense
-                            Toast.makeText(context, "Not logged in. Expense saved locally, please log in to sync.", Toast.LENGTH_LONG).show()
-                            showAuthErrorDialog = true
-                            remarks = ""
-                            amount = ""
-                            category = ""
-                            dateOfTransaction = ""
-                            selectedImageBitmap = null
-                            selectedImageUri = null
-                            return@Button
-                        }
-                        isAddingExpense = true
-                        scope.launch {
-                            try {
-                                Log.d("RecordExpensesScreen", "Attempting to add expense: ${Gson().toJson(newExpense)}")
-                                val result = authRepository.addExpense(newExpense)
-                                result.onSuccess { returnedExpense ->
-                                    Log.d("RecordExpensesScreen", "Expense added: expenseId=${returnedExpense.expenseId}, expense=${Gson().toJson(returnedExpense)}")
-                                    remarks = ""
-                                    amount = ""
-                                    category = ""
-                                    dateOfTransaction = ""
-                                    selectedImageBitmap = null
-                                    selectedImageUri = null
-                                    pendingExpense = null
-                                    if (selectedImageUri != null && returnedExpense.imagePaths.isNullOrEmpty()) {
-                                        Toast.makeText(context, "Expense added, but image upload failed. Please try again.", Toast.LENGTH_LONG).show()
-                                    } else {
-                                        Toast.makeText(context, "Expense added successfully", Toast.LENGTH_SHORT).show()
-                                    }
-                                }.onFailure { e ->
-                                    Log.e("RecordExpensesScreen", "Failed to add expense: ${e.message}", e)
-                                    when {
-                                        e.message?.contains("Unauthorized") == true || e.message?.contains("Not authenticated") == true -> {
-                                            Log.d("RecordExpensesScreen", "Authentication error, saving locally: ${Gson().toJson(newExpense)}")
-                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                                            authRepository.userExpenses.add(localExpense)
-                                            pendingExpense = newExpense
-                                            Toast.makeText(context, "Session expired. Expense saved locally, please log in to sync.", Toast.LENGTH_LONG).show()
-                                            showAuthErrorDialog = true
-                                        }
-                                        e.message?.contains("Invalid expense data") == true || e.message?.contains("Validation error") == true -> {
-                                            Toast.makeText(context, "Invalid data: check fields (e.g., date format) and try again", Toast.LENGTH_LONG).show()
-                                        }
-                                        e.message?.contains("missing expenseId") == true -> {
-                                            Toast.makeText(context, "Expense saved locally due to server issue. Try syncing later.", Toast.LENGTH_LONG).show()
-                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                                            authRepository.userExpenses.add(localExpense)
-                                            pendingExpense = newExpense
-                                        }
-                                        e.message?.contains("No internet connection") == true -> {
-                                            Toast.makeText(context, "No internet connection, expense saved locally", Toast.LENGTH_LONG).show()
-                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                                            authRepository.userExpenses.add(localExpense)
-                                            pendingExpense = newExpense
-                                        }
-                                        else -> {
-                                            Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
-                                            val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                                            authRepository.userExpenses.add(localExpense)
-                                            pendingExpense = newExpense
-                                        }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Log.e("RecordExpensesScreen", "Unexpected error: ${e.message}", e)
-                                Toast.makeText(context, "Failed to add expense: ${e.message}", Toast.LENGTH_LONG).show()
-                                val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
-                                authRepository.userExpenses.add(localExpense)
-                                pendingExpense = newExpense
-                            } finally {
-                                isAddingExpense = false
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            disabledTextColor = Color(0xFF1F2937),
+                            disabledBorderColor = Color(0xFFE5E7EB),
+                            disabledPlaceholderColor = Color(0xFF4B5563),
+                            disabledLabelColor = Color(0xFF4B5563),
+                            disabledLeadingIconColor = Color(0xFF4B5563),
+                            disabledTrailingIconColor = Color(0xFF4B5563)
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = { expanded = !expanded }) {
+                                Text(
+                                    text = if (expanded) "▲" else "▼",
+                                    color = Color(0xFF8A5B6E),
+                                    fontSize = 14.sp
+                                )
                             }
                         }
-                    } else {
-                        Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF5F5F5))
+                    ) {
+                        categories.forEach { option ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        option,
+                                        color = Color(0xFF1F2937),
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                onClick = {
+                                    category = option
+                                    expanded = false
+                                },
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
                     }
-                } else {
-                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(bottom = 8.dp),
-            enabled = !isAddingExpense,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Box(
+            }
+
+            // Amount Input
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                            start = Offset(0f, 0f),
-                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isAddingExpense) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
+                Text(
+                    text = "Amount",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                    color = Color(0xFF1F2937),
+                    modifier = Modifier
+                        .width(100.dp)
+                        .padding(end = 8.dp)
+                )
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                            amount = newValue
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    textStyle = LocalTextStyle.current.copy(
+                        color = Color(0xFF1F2937),
+                        fontSize = 14.sp
+                    ),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        unfocusedBorderColor = Color(0xFFE5E7EB),
+                        cursorColor = Color(0xFF3B82F6)
+                    ),
+                    placeholder = {
+                        Text(
+                            "Enter amount (e.g., 50.00)",
+                            color = Color(0xFF4B5563),
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+            }
+
+            // Date Input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Date",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                    color = Color(0xFF1F2937),
+                    modifier = Modifier
+                        .width(100.dp)
+                        .padding(end = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { datePickerDialog.show() }
+                ) {
+                    OutlinedTextField(
+                        value = dateOfTransaction,
+                        onValueChange = { },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        enabled = false,
+                        readOnly = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                        placeholder = {
+                            Text(
+                                "Select date (YYYY-MM-DD)",
+                                color = Color(0xFF4B5563),
+                                fontSize = 14.sp
+                            )
+                        },
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            disabledTextColor = Color(0xFF1F2937),
+                            disabledBorderColor = Color(0xFFE5E7EB),
+                            disabledPlaceholderColor = Color(0xFF4B5563),
+                            disabledLabelColor = Color(0xFF4B5563),
+                            disabledLeadingIconColor = Color(0xFF4B5563),
+                            disabledTrailingIconColor = Color(0xFF4B5563)
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = { datePickerDialog.show() }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select date",
+                                    tint = Color(0xFF8A5B6E)
+                                )
+                            }
+                        }
                     )
-                } else {
+                }
+            }
+
+            // Remarks Input
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = "Remarks",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                    color = Color(0xFF1F2937),
+                    modifier = Modifier
+                        .width(100.dp)
+                        .padding(end = 8.dp, top = 16.dp)
+                )
+                val focusManager = LocalFocusManager.current
+                OutlinedTextField(
+                    value = remarks,
+                    onValueChange = { remarks = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(80.dp),
+                    maxLines = 3,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() }
+                    ),
+                    textStyle = LocalTextStyle.current.copy(
+                        color = Color(0xFF1F2937),
+                        fontSize = 14.sp
+                    ),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        unfocusedBorderColor = Color(0xFFE5E7EB),
+                        cursorColor = Color(0xFF3B82F6)
+                    ),
+                    placeholder = {
+                        Text(
+                            "Enter remarks (e.g., Lunch at Cafe)",
+                            color = Color(0xFF4B5563),
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(
+                    onClick = {
+                        permissionType = "camera"
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                            context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                                    context as Activity,
+                                    Manifest.permission.CAMERA
+                                )
+                            ) {
+                                showPermissionRationale = true
+                            } else {
+                                multiplePermissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                            }
+                        } else {
+                            createImageUri(context)?.let { uri ->
+                                selectedImageUri = uri
+                                takePictureLauncher.launch(uri)
+                            } ?: Toast.makeText(
+                                context,
+                                "Error creating image file",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .padding(end = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Take Photo",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                Button(
+                    onClick = {
+                        permissionType = "storage"
+                        val storagePermission =
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                Manifest.permission.READ_MEDIA_IMAGES
+                            } else {
+                                Manifest.permission.READ_EXTERNAL_STORAGE
+                            }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                            context.checkSelfPermission(storagePermission) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                                    context as Activity,
+                                    storagePermission
+                                )
+                            ) {
+                                showPermissionRationale = true
+                            } else {
+                                multiplePermissionsLauncher.launch(arrayOf(storagePermission))
+                            }
+                        } else {
+                            pickImageLauncher.launch("image/*")
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .padding(start = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Pick from Gallery",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            selectedImageBitmap?.let { bitmap ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(2f)
+                        .padding(bottom = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Selected expense photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.5.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
+                            .clickable {
+                                expenseImageBitmap = bitmap
+                                showFullScreenImage = true
+                                selectedExpense = Expense(
+                                    expenseId = "local_${System.currentTimeMillis()}",
+                                    category = category.takeIf { it.isNotBlank() } ?: "N/A",
+                                    amount = amount.toDoubleOrNull() ?: 0.0,
+                                    dateOfTransaction = dateOfTransaction.takeIf { it.isNotBlank() },
+                                    remarks = remarks.takeIf { it.isNotBlank() },
+                                    imagePaths = selectedImageUri?.let { listOf(it.toString()) },
+                                    createdAt = SimpleDateFormat(
+                                        "yyyy-MM-dd'T'HH:mm:ss",
+                                        Locale.US
+                                    ).apply {
+                                        timeZone = TimeZone.getDefault()
+                                    }.format(Date())
+                                )
+                            },
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            } ?: Spacer(modifier = Modifier.weight(2f))
+
+            // Add Expense Button
+            Button(
+                onClick = {
+                    if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
+                        val amountValue = amount.toDoubleOrNull()
+                        if (amountValue != null) {
+                            // Use device's local time for createdAt
+                            val localFormat =
+                                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                                    timeZone = TimeZone.getDefault()
+                                }
+                            val timestamp = localFormat.format(Date())
+                            Log.d("RecordExpensesScreen", "Selected image URI: $selectedImageUri")
+                            val newExpense = Expense(
+                                expenseId = null,
+                                category = category,
+                                amount = amountValue,
+                                dateOfTransaction = dateOfTransaction,
+                                remarks = remarks,
+                                imagePaths = selectedImageUri?.let { listOf(it.toString()) },
+                                createdAt = timestamp
+                            )
+                            if (!authRepository.isAuthenticated()) {
+                                Log.d(
+                                    "RecordExpensesScreen",
+                                    "Not authenticated, saving locally: ${Gson().toJson(newExpense)}"
+                                )
+                                val localExpense =
+                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                authRepository.userExpenses.add(localExpense)
+                                pendingExpense = newExpense
+                                Toast.makeText(
+                                    context,
+                                    "Not logged in. Expense saved locally, please log in to sync.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                showAuthErrorDialog = true
+                                remarks = ""
+                                amount = ""
+                                category = ""
+                                dateOfTransaction = ""
+                                selectedImageBitmap = null
+                                selectedImageUri = null
+                                return@Button
+                            }
+                            isAddingExpense = true
+                            scope.launch {
+                                try {
+                                    Log.d(
+                                        "RecordExpensesScreen",
+                                        "Attempting to add expense: ${Gson().toJson(newExpense)}"
+                                    )
+                                    val result = authRepository.addExpense(newExpense)
+                                    result.onSuccess { returnedExpense ->
+                                        Log.d(
+                                            "RecordExpensesScreen",
+                                            "Expense added: expenseId=${returnedExpense.expenseId}, expense=${
+                                                Gson().toJson(returnedExpense)
+                                            }"
+                                        )
+                                        remarks = ""
+                                        amount = ""
+                                        category = ""
+                                        dateOfTransaction = ""
+                                        selectedImageBitmap = null
+                                        selectedImageUri = null
+                                        pendingExpense = null
+                                        if (selectedImageUri != null && returnedExpense.imagePaths.isNullOrEmpty()) {
+                                            Toast.makeText(
+                                                context,
+                                                "Expense added, but image upload failed. Please try again.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Expense added successfully",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }.onFailure { e ->
+                                        Log.e(
+                                            "RecordExpensesScreen",
+                                            "Failed to add expense: ${e.message}",
+                                            e
+                                        )
+                                        when {
+                                            e.message?.contains("Unauthorized") == true || e.message?.contains(
+                                                "Not authenticated"
+                                            ) == true -> {
+                                                Log.d(
+                                                    "RecordExpensesScreen",
+                                                    "Authentication error, saving locally: ${
+                                                        Gson().toJson(newExpense)
+                                                    }"
+                                                )
+                                                val localExpense =
+                                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                                authRepository.userExpenses.add(localExpense)
+                                                pendingExpense = newExpense
+                                                Toast.makeText(
+                                                    context,
+                                                    "Session expired. Expense saved locally, please log in to sync.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                showAuthErrorDialog = true
+                                            }
+
+                                            e.message?.contains("Invalid expense data") == true || e.message?.contains(
+                                                "Validation error"
+                                            ) == true -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Invalid data: check fields (e.g., date format) and try again",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+
+                                            e.message?.contains("missing expenseId") == true -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Expense saved locally due to server issue. Try syncing later.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                val localExpense =
+                                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                                authRepository.userExpenses.add(localExpense)
+                                                pendingExpense = newExpense
+                                            }
+
+                                            e.message?.contains("No internet connection") == true -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "No internet connection, expense saved locally",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                val localExpense =
+                                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                                authRepository.userExpenses.add(localExpense)
+                                                pendingExpense = newExpense
+                                            }
+
+                                            else -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Failed to add expense: ${e.message}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                val localExpense =
+                                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                                authRepository.userExpenses.add(localExpense)
+                                                pendingExpense = newExpense
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(
+                                        "RecordExpensesScreen",
+                                        "Unexpected error: ${e.message}",
+                                        e
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to add expense: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    val localExpense =
+                                        newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                    authRepository.userExpenses.add(localExpense)
+                                    pendingExpense = newExpense
+                                } finally {
+                                    isAddingExpense = false
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(bottom = 8.dp),
+                enabled = !isAddingExpense,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isAddingExpense) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Add Expense",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            // View Expenses Button
+            Button(
+                onClick = { navController.navigate("list_expenses") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(bottom = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = "Add Expense",
+                        text = "View Expenses",
                         fontSize = 16.sp,
                         color = Color.White,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
                     )
                 }
-            }
-        }
-
-        // View Expenses Button
-        Button(
-            onClick = { navController.navigate("list_expenses") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(bottom = 8.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                            start = Offset(0f, 0f),
-                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "View Expenses",
-                    fontSize = 16.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

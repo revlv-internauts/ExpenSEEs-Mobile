@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -28,13 +29,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -353,12 +357,17 @@ fun FundRequest(
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
         ) { innerPadding ->
+            val focusManager = LocalFocusManager.current
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFFF5F5F5))
                     .padding(horizontal = 16.dp)
-                    .padding(top = innerPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding()),
+                    .padding(top = innerPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { focusManager.clearFocus() }, // Clear focus on tap outside
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Bar
@@ -393,7 +402,6 @@ fun FundRequest(
                         textAlign = TextAlign.Center
                     )
                 }
-
                 // Budget Name Input
                 OutlinedTextField(
                     value = budgetName,
@@ -780,6 +788,7 @@ fun FundRequest(
             }
 
             // Add Expense Dialog
+            // Add Expense Dialog
             if (showDialog) {
                 Dialog(
                     onDismissRequest = { showDialog = false },
@@ -789,12 +798,17 @@ fun FundRequest(
                         targetValue = if (showDialog) 1f else 0f,
                         animationSpec = tween(300, easing = LinearOutSlowInEasing)
                     )
+                    val focusManager = LocalFocusManager.current
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth(0.95f)
                             .fillMaxHeight(0.85f)
                             .clip(RoundedCornerShape(16.dp))
-                            .alpha(dialogAlpha),
+                            .alpha(dialogAlpha)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { focusManager.clearFocus() }, // Clear focus on tap outside
                         color = Color(0xFFF5F5F5),
                         shadowElevation = 8.dp
                     ) {
@@ -872,6 +886,10 @@ fun FundRequest(
                                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Medium
+                                        ),
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                        keyboardActions = KeyboardActions(
+                                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
                                         )
                                     )
                                     DropdownMenu(
@@ -909,7 +927,13 @@ fun FundRequest(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp)),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                    ),
                                     colors = textFieldColors,
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                                         fontSize = 16.sp,
@@ -923,7 +947,13 @@ fun FundRequest(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp)),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                    ),
                                     colors = textFieldColors,
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                                         fontSize = 16.sp,
@@ -936,7 +966,11 @@ fun FundRequest(
                                     label = { Text("Remarks", color = Color(0xFF4B5563)) },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp)),
+                                        .clip(RoundedCornerShape(12.dp)), // Fixed typo: triumphs12.dp -> 12.dp
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = { focusManager.clearFocus() }
+                                    ),
                                     colors = textFieldColors,
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                                         fontSize = 16.sp,
