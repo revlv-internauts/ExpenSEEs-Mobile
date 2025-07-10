@@ -215,6 +215,11 @@ class AuthRepository(
         return withContext(Dispatchers.IO) {
             try {
                 Log.d("AuthRepository", "Adding expense in coroutineContext=${currentCoroutineContext()}")
+                // Validate image presence
+                if (expense.imagePaths.isNullOrEmpty()) {
+                    Log.e("AuthRepository", "No image provided for expense")
+                    return@withContext Result.failure(Exception("Image is required for expense"))
+                }
                 if (!isNetworkAvailable(context)) {
                     Log.e("AuthRepository", "No network connection, saving locally")
                     val localExpense = expense.copy(expenseId = "local_${System.currentTimeMillis()}")

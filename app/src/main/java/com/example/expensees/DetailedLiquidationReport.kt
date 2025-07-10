@@ -40,189 +40,126 @@ fun DetailedLiquidationReport(
     val totalActual = selectedExpensesMap.values.flatten().sumOf { it.amount }
     val totalRemaining = totalBudgeted - totalActual
 
-    // Status colors for consistency
     val statusColors = mapOf(
-        BudgetStatus.PENDING to Color(0xFFCA8A04), // Professional yellow
-        BudgetStatus.APPROVED to Color(0xFF16A34A), // Professional green
-        BudgetStatus.DENIED to Color(0xFFDC2626)  // Professional red
+        BudgetStatus.PENDING to Color(0xFFCA8A04),
+        BudgetStatus.APPROVED to Color(0xFF16A34A),
+        BudgetStatus.DENIED to Color(0xFFDC2626)
     )
 
     Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8FAFC)), // Light neutral background
+        modifier = modifier.fillMaxSize().background(Color(0xFFF8FAFC)),
         topBar = {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
                     .background(Color(0xFFF8FAFC)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back to Budgets",
-                        tint = Color(0xFF111827) // Darker neutral for contrast
-                    )
+                IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.size(36.dp)) {
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back to Budgets", tint = Color(0xFF111827))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Liquidation Report",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 26.sp
-                    ),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 26.sp),
                     color = Color(0xFF111827),
-                    modifier = Modifier
-                        .weight(1f)
-                        .offset(x = (-18).dp),
+                    modifier = Modifier.weight(1f).offset(x = (-18).dp),
                     textAlign = TextAlign.Center
                 )
             }
         }
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF8FAFC))
-                .padding(
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding(),
-                    start = 8.dp,
-                    end = 8.dp
-                ),
+            modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))
+                .padding(top = innerPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding(), start = 8.dp, end = 8.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            // Budget Info Section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                     Text(
                         text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        ),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium, fontSize = 14.sp),
                         color = Color(0xFF6B7280)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .background(statusColors[budget.status] ?: Color(0xFF6B7280))
-                    )
+                    Box(modifier = Modifier.size(14.dp).background(statusColors[budget.status] ?: Color(0xFF6B7280)))
                 }
                 Text(
                     text = budget.name,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
-                    ),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
                     color = Color(0xFF111827)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Total Cash Requested: ₱${numberFormat.format(totalBudgeted)}",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 16.sp
-                    ),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp),
                     color = Color(0xFF6B7280)
                 )
-                Divider(
-                    color = Color(0xFFE5E7EB),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+                Divider(color = Color(0xFFE5E7EB), thickness = 1.dp, modifier = Modifier.padding(top = 16.dp))
             }
 
             Text(
                 text = "Selected Receipt Details",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp
-                ),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp),
                 color = Color(0xFF111827),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 stickyHeader {
-                    // Table Header
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFFF1F5F9))
-                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                        modifier = Modifier.fillMaxWidth().background(Color(0xFFF1F5F9)).padding(horizontal = 4.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Category",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
+                            text = "Date",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Receipt Description",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
+                            text = "Category",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            color = Color(0xFF111827),
+                            modifier = Modifier.weight(2f),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Receipt",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(3f),
                             textAlign = TextAlign.Center
                         )
                         Text(
                             text = "Amount",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
                     }
-                    Divider(
-                        color = Color(0xFFE5E7EB),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Divider(color = Color(0xFFE5E7EB), thickness = 1.dp, modifier = Modifier.padding(top = 4.dp))
                 }
-                items(selectedExpensesMap.entries.sortedBy { it.key }.flatMap { (index, expenses) ->
-                    expenses.map { expense -> index to expense }
-                }) { (index, expense) ->
+                items(selectedExpensesMap.entries.sortedBy { it.key }.flatMap { (index, expenses) -> expenses.map { expense -> index to expense } }) { (index, expense) ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
+                            text = expense.dateOfTransaction ?: "N/A",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = Color(0xFF6B7280),
+                            modifier = Modifier.weight(2f),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                        Text(
                             text = budget.expenses.getOrNull(index)?.category ?: "Unknown",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, fontWeight = FontWeight.Medium),
                             color = Color(0xFF111827),
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center,
@@ -230,9 +167,7 @@ fun DetailedLiquidationReport(
                         )
                         Text(
                             text = expense.remarks ?: "No remarks",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp
-                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(3f),
                             textAlign = TextAlign.Center,
@@ -240,9 +175,7 @@ fun DetailedLiquidationReport(
                         )
                         Text(
                             text = "₱${numberFormat.format(expense.amount)}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 14.sp
-                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center,
@@ -253,45 +186,26 @@ fun DetailedLiquidationReport(
                 }
                 item {
                     if (selectedExpensesMap.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "No receipts selected.",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 18.sp
-                                ),
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium, fontSize = 18.sp),
                                 color = Color(0xFF4B5563),
                                 textAlign = TextAlign.Center
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "Total Budgeted: ₱${numberFormat.format(totalBudgeted)}",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 18.sp
-                            ),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 18.sp),
                             color = Color(0xFF111827)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Total Selected Receipts: ₱${numberFormat.format(totalActual)}",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 18.sp
-                            ),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 18.sp),
                             color = Color(0xFF111827)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -301,10 +215,7 @@ fun DetailedLiquidationReport(
                             } else {
                                 "Total Over Budget: ₱${numberFormat.format(-totalRemaining)}"
                             },
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 18.sp
-                            ),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 18.sp),
                             color = if (totalRemaining >= 0) Color(0xFF16A34A) else Color(0xFFDC2626)
                         )
                     }

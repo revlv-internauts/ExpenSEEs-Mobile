@@ -68,15 +68,19 @@ import java.time.format.DateTimeParseException
 import java.util.*
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
-import androidx.compose.ui.graphics.graphicsLayer
-import java.io.File
-import android.app.DownloadManager
-import android.os.Environment
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
+import java.io.File
+import android.app.DownloadManager
+import android.os.Environment
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.graphics.graphicsLayer
 import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,6 +108,7 @@ fun ExpenseListScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedSortCategory by remember { mutableStateOf<String?>(null) }
     var showAllExpenses by remember { mutableStateOf(false) }
+    var showCheckboxes by remember { mutableStateOf(false) } // State to control checkbox visibility
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -465,13 +470,26 @@ fun ExpenseListScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .scale(scale)
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null
-                        ) {
-                            selectedExpense = expense
-                            selectedImagePath = expense.imagePaths?.firstOrNull()
-                            showExpenseDialog = true
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (showCheckboxes) {
+                                        selectedExpenses = if (isSelected) {
+                                            selectedExpenses - expense
+                                        } else {
+                                            selectedExpenses + expense
+                                        }
+                                    } else {
+                                        selectedExpense = expense
+                                        selectedImagePath = expense.imagePaths?.firstOrNull()
+                                        showExpenseDialog = true
+                                    }
+                                },
+                                onLongPress = {
+                                    showCheckboxes = true
+                                    selectedExpenses = selectedExpenses + expense
+                                }
+                            )
                         }
                         .clip(RoundedCornerShape(16.dp)),
                     color = Color.White,
@@ -483,22 +501,29 @@ fun ExpenseListScreen(
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = isSelected,
-                            onCheckedChange = { checked ->
-                                selectedExpenses = if (checked) {
-                                    selectedExpenses + expense
-                                } else {
-                                    selectedExpenses - expense
-                                }
-                            },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = Color(0xFF734656),
-                                uncheckedColor = Color(0xFF4B5563),
-                                checkmarkColor = Color.White
-                            ),
-                            modifier = Modifier.padding(4.dp)
-                        )
+                        if (showCheckboxes) {
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { checked ->
+                                    selectedExpenses = if (checked) {
+                                        selectedExpenses + expense
+                                    } else {
+                                        selectedExpenses - expense
+                                    }
+                                    if (selectedExpenses.isEmpty()) {
+                                        showCheckboxes = false
+                                    }
+                                },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = Color(0xFF734656),
+                                    uncheckedColor = Color(0xFF4B5563),
+                                    checkmarkColor = Color.White
+                                ),
+                                modifier = Modifier.padding(4.dp)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.width(36.dp)) // Reserve space for checkbox
+                        }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Row(
@@ -700,7 +725,10 @@ fun ExpenseListScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { selectedExpenses = emptySet() },
+                    onClick = {
+                        selectedExpenses = emptySet()
+                        showCheckboxes = false
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(40.dp)
@@ -945,6 +973,7 @@ fun ExpenseListScreen(
                                         onDeleteExpenses(selectedExpenses.toList())
                                         selectedExpenses = emptySet()
                                         showDeleteDialog = false
+                                        showCheckboxes = false
                                         snackbarHostState.showSnackbar(
                                             message = "${selectedExpenses.size} expense(s) deleted successfully",
                                             duration = SnackbarDuration.Short
@@ -1503,7 +1532,7 @@ fun ExpenseListScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black), // Set background to black to avoid white space
+                    .background(Color.Black), // Black background for full-screen effect
                 contentAlignment = Alignment.Center
             ) {
                 selectedImagePath?.let { imagePath ->
@@ -1511,16 +1540,38 @@ fun ExpenseListScreen(
                     // State for zoom and pan
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
+                    // Track image and container size
+                    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+                    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+
                     val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-                        scale = (scale * zoomChange).coerceIn(1f, 5f) // Limit zoom between 1x and 5x
-                        offset += offsetChange
+                        // Update scale, limited between 1x and 5x
+                        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+
+                        // Calculate scaled image dimensions
+                        val scaledWidth = imageSize.width * newScale
+                        val scaledHeight = imageSize.height * newScale
+
+                        // Calculate maximum allowable offsets to keep image within bounds
+                        val maxX = maxOf(0f, (scaledWidth - containerSize.width) / 2f)
+                        val maxY = maxOf(0f, (scaledHeight - containerSize.height) / 2f)
+
+                        // Calculate new offset with the proposed change
+                        val newOffsetX = (offset.x + offsetChange.x).coerceIn(-maxX, maxX)
+                        val newOffsetY = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
+
+                        // Update state only if values change
+                        if (newScale != scale || newOffsetX != offset.x || newOffsetY != offset.y) {
+                            scale = newScale
+                            offset = Offset(newOffsetX, newOffsetY)
+                        }
                     }
 
                     if (tokenFetchFailed) {
                         Text(
                             text = "Authentication error: Please log in again",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color.White, // White text for visibility on black background
+                            color = Color.White,
                             modifier = Modifier.padding(16.dp)
                         )
                     } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
@@ -1550,7 +1601,11 @@ fun ExpenseListScreen(
                                         translationY = offset.y
                                     )
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(2.dp, themeColor, RoundedCornerShape(12.dp)),
+                                    .border(2.dp, themeColor, RoundedCornerShape(12.dp))
+                                    .onGloballyPositioned { coordinates ->
+                                        imageSize = coordinates.size
+                                        containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                    },
                                 contentScale = ContentScale.Fit
                             )
                         } ?: run {
@@ -1595,7 +1650,11 @@ fun ExpenseListScreen(
                                     translationY = offset.y
                                 )
                                 .clip(RoundedCornerShape(12.dp))
-                                .border(2.dp, themeColor, RoundedCornerShape(12.dp)),
+                                .border(2.dp, themeColor, RoundedCornerShape(12.dp))
+                                .onGloballyPositioned { coordinates ->
+                                    imageSize = coordinates.size
+                                    containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                },
                             contentScale = ContentScale.Fit,
                             onError = { error ->
                                 imageLoadFailed = true
@@ -1617,7 +1676,7 @@ fun ExpenseListScreen(
                                                 "ExpenseListScreen",
                                                 "Retry token fetched: ${token?.take(20)}..."
                                             )
-                                        } else {
+                                        }else {
                                             tokenFetchFailed = true
                                             Toast.makeText(
                                                 context,

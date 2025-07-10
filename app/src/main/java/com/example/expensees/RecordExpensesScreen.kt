@@ -1479,13 +1479,16 @@ fun RecordExpensesScreen(
             Button(
                 onClick = {
                     if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
+                        if (selectedImageUri == null) {
+                            Toast.makeText(context, "Please upload a receipt image", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         val amountValue = amount.toDoubleOrNull()
                         if (amountValue != null) {
                             // Use device's local time for createdAt
-                            val localFormat =
-                                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-                                    timeZone = TimeZone.getDefault()
-                                }
+                            val localFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                                timeZone = TimeZone.getDefault()
+                            }
                             val timestamp = localFormat.format(Date())
                             Log.d("RecordExpensesScreen", "Selected image URI: $selectedImageUri")
                             val newExpense = Expense(
@@ -1502,8 +1505,7 @@ fun RecordExpensesScreen(
                                     "RecordExpensesScreen",
                                     "Not authenticated, saving locally: ${Gson().toJson(newExpense)}"
                                 )
-                                val localExpense =
-                                    newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
+                                val localExpense = newExpense.copy(expenseId = "local_${System.currentTimeMillis()}")
                                 authRepository.userExpenses.add(localExpense)
                                 pendingExpense = newExpense
                                 Toast.makeText(
