@@ -62,6 +62,11 @@ import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -720,7 +725,7 @@ fun RecordExpensesScreen(
                                             Locale.US
                                         ).apply {
                                             timeZone =
-                                                TimeZone.getDefault() // Use device's local timezone (e.g., UTC+8 for Philippines)
+                                                TimeZone.getDefault()
                                         }
                                         val date = utcFormat.parse(utcTime)
                                         date?.let { localFormat.format(it) } ?: "N/A"
@@ -795,31 +800,50 @@ fun RecordExpensesScreen(
                 selectedExpense = null
                 expenseImageBitmap = null
             },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF5F5F5))
-                    .padding(
-                        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                        bottom = WindowInsets.navigationBars.asPaddingValues()
-                            .calculateBottomPadding(),
-                        start = 16.dp,
-                        end = 16.dp
-                    ),
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 selectedExpense?.let { expense ->
                     var imageLoadFailed by remember { mutableStateOf(false) }
-                    if (imageLoadFailed) {
-                        Text(
-                            text = "No image available",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF4B5563),
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    } else if (expense.expenseId?.startsWith("local_") == true) {
+                    // State for zoom and pan
+                    var scale by remember { mutableStateOf(1f) }
+                    var offset by remember { mutableStateOf(Offset.Zero) }
+                    // Track image and container size
+                    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+                    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+
+                    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+                        // Update scale, limited between 1x and 5x
+                        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+
+                        // Calculate scaled image dimensions
+                        val scaledWidth = imageSize.width * newScale
+                        val scaledHeight = imageSize.height * newScale
+
+                        // Calculate maximum allowable offsets to keep image within bounds
+                        val maxX = maxOf(0f, (scaledWidth - containerSize.width) / 2f)
+                        val maxY = maxOf(0f, (scaledHeight - containerSize.height) / 2f)
+
+                        // Calculate new offset with the proposed change
+                        val newOffsetX = (offset.x + offsetChange.x).coerceIn(-maxX, maxX)
+                        val newOffsetY = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
+
+                        // Update state only if values change
+                        if (newScale != scale || newOffsetX != offset.x || newOffsetY != offset.y) {
+                            scale = newScale
+                            offset = Offset(newOffsetX, newOffsetY)
+                        }
+                    }
+
+                    if (expense.expenseId?.startsWith("local_") == true) {
                         expense.imagePaths?.firstOrNull()?.let { imagePath ->
                             val bitmap = try {
                                 val uri = Uri.parse(imagePath)
@@ -842,8 +866,19 @@ fun RecordExpensesScreen(
                                     contentDescription = "Full screen expense photo",
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .transformable(state = transformableState)
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
                                         .clip(RoundedCornerShape(12.dp))
-                                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)),
+                                        .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
+                                        .onGloballyPositioned { coordinates ->
+                                            imageSize = coordinates.size
+                                            containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                        },
                                     contentScale = ContentScale.Fit
                                 )
                             } ?: run {
@@ -851,14 +886,14 @@ fun RecordExpensesScreen(
                                 Text(
                                     text = "No image available",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                    color = Color(0xFF4B5563),
+                                    color = Color.White,
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF4B5563),
+                            color = Color.White,
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
@@ -884,8 +919,19 @@ fun RecordExpensesScreen(
                                 contentDescription = "Full screen expense photo",
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .transformable(state = transformableState)
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offset.x,
+                                        translationY = offset.y
+                                    )
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp)),
+                                    .border(2.dp, Color(0xFF3B82F6), RoundedCornerShape(12.dp))
+                                    .onGloballyPositioned { coordinates ->
+                                        imageSize = coordinates.size
+                                        containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                    },
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     Log.e(
@@ -905,14 +951,14 @@ fun RecordExpensesScreen(
                         } ?: Text(
                             text = "No image available",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF4B5563),
+                            color = Color.White,
                             modifier = Modifier.padding(16.dp)
                         )
                     }
                 } ?: Text(
                     text = "No image available",
                     style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                    color = Color(0xFF4B5563),
+                    color = Color.White,
                     modifier = Modifier.padding(16.dp)
                 )
                 IconButton(

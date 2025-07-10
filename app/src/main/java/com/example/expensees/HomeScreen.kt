@@ -75,6 +75,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
 import java.io.File
 import java.io.FileOutputStream
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.math.max
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -99,11 +101,9 @@ fun HomeScreen(
     val themeColor = Color(0xFF734656)
 
     BackHandler(enabled = true) {
-        // Minimize the app instead of logging out or navigating
         (context as? Activity)?.moveTaskToBack(true)
     }
 
-    // Fetch username and email from SharedPreferences
     val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
     val username by remember { mutableStateOf(prefs.getString("username", "User") ?: "User") }
     val email by remember { mutableStateOf(prefs.getString("email", "user@example.com") ?: "user@example.com") }
@@ -195,23 +195,20 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true, // Allows clicking outside to close
+        gesturesEnabled = true,
         modifier = Modifier.pointerInput(Unit) {
             detectHorizontalDragGestures(
                 onHorizontalDrag = { change, dragAmount ->
                     if (drawerState.isOpen && dragAmount < 0) {
-                        // Allow swipe left to close when drawer is open
                         scope.launch {
                             drawerState.close()
                         }
                         change.consume()
                     } else if (!drawerState.isOpen && dragAmount > 0) {
-                        // Block swipe right when drawer is closed
                         change.consume()
                     }
                 },
                 onDragStart = { offset ->
-                    // Log or handle initial drag direction if needed (no consumption here)
                     if (!drawerState.isOpen && offset.x > 0) {
                         println("Detected swipe-right start, but handled in onHorizontalDrag")
                     }
@@ -715,7 +712,7 @@ fun HomeScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(0.95f)
-                        .fillMaxHeight(0.85f)
+                        .fillMaxHeight(0.95f)
                         .clip(RoundedCornerShape(16.dp))
                         .alpha(dialogAlpha),
                     color = Color(0xFFF5F5F5),
@@ -755,7 +752,99 @@ fun HomeScreen(
                             }
                         }
                         val transactionsForCategory = expenses.filter { it.category == selectedCategory }
-                        if (transactionsForCategory.isEmpty()) {
+                        // Month filter state
+                        var selectedMonth by remember { mutableStateOf<String?>(null) }
+                        val currentYear = LocalDate.now().year
+                        val monthOptions = remember {
+                            listOf(
+                                "All Months",
+                                "January $currentYear",
+                                "February $currentYear",
+                                "March $currentYear",
+                                "April $currentYear",
+                                "May $currentYear",
+                                "June $currentYear",
+                                "July $currentYear",
+                                "August $currentYear",
+                                "September $currentYear",
+                                "October $currentYear",
+                                "November $currentYear",
+                                "December $currentYear"
+                            )
+                        }
+                        var expanded by remember { mutableStateOf(false) }
+
+                        // Dropdown for month selection
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { expanded = !expanded }, // Clickable on entire area
+                            color = Color.Transparent, // Transparent surface
+                            shadowElevation = 0.dp // Remove card-like shadow
+                        ) {
+                            OutlinedTextField(
+                                value = selectedMonth ?: "All Months",
+                                onValueChange = {},
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = false, // Disable to prevent TextField from consuming clicks
+                                readOnly = true,
+                                label = { Text("Select Month") },
+                                trailingIcon = {
+                                    IconButton(onClick = { expanded = !expanded }) {
+                                        Icon(
+                                            imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                            contentDescription = "Toggle dropdown"
+                                        )
+                                    }
+                                },
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    focusedBorderColor = themeColor,
+                                    unfocusedBorderColor = Color(0xFF4B5563),
+                                    disabledBorderColor = Color(0xFF4B5563),
+                                    disabledTextColor = Color(0xFF1F2937),
+                                    disabledLabelColor = Color(0xFF4B5563),
+                                    containerColor = Color.Transparent // Transparent TextField background
+                                )
+                            )
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White)
+                            ) {
+                                monthOptions.forEach { month ->
+                                    DropdownMenuItem(
+                                        text = { Text(month) },
+                                        onClick = {
+                                            selectedMonth = if (month == "All Months") null else month
+                                            expanded = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
+                        // Filter transactions based on selected month
+                        val filteredTransactions = if (selectedMonth != null) {
+                            transactionsForCategory.filter { expense ->
+                                expense.dateOfTransaction?.let {
+                                    try {
+                                        val date = LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE)
+                                        date.format(DateTimeFormatter.ofPattern("MMMM yyyy")) == selectedMonth
+                                    } catch (e: Exception) {
+                                        false
+                                    }
+                                } ?: false
+                            }
+                        } else {
+                            transactionsForCategory
+                        }
+
+                        if (filteredTransactions.isEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -763,144 +852,154 @@ fun HomeScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "No transactions recorded for this category.",
+                                    text = "No transactions recorded for this period.",
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                                     color = Color(0xFF4B5563)
                                 )
                             }
                         } else {
                             val baseColor = categoryColors[selectedCategory]!!
-                            val transactionColors = transactionsForCategory.indices.map { index ->
+                            val transactionColors = filteredTransactions.indices.map { index ->
                                 val factor = 0.8f - (index * 0.1f).coerceAtMost(0.5f)
                                 "#${baseColor.copy(alpha = factor).toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}"
                             }
-                            val validTransactions = transactionsForCategory.filter { it.amount > 0 }
+                            val validTransactions = filteredTransactions.filter { it.amount > 0 }
                             val transactionData = validTransactions.map { it.amount }
                             val transactionLabels = validTransactions.mapIndexed { index, expense ->
                                 "'${(expense.remarks ?: "").replace("'", "\\'")}'"
                             }
 
-                            AndroidView(
-                                factory = { ctx ->
-                                    WebView(ctx).apply {
-                                        settings.javaScriptEnabled = true
-                                        setBackgroundColor(Color.Transparent.toArgb())
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(
+                                        2.dp,
+                                        Color(0xFF734656).copy(alpha = 0.3f),
+                                        RoundedCornerShape(16.dp)
+                                    ),
+                                color = Color.White,
+                                shadowElevation = 4.dp
+                            ) {
+                                AndroidView(
+                                    factory = { ctx ->
+                                        WebView(ctx).apply {
+                                            settings.javaScriptEnabled = true
+                                            setBackgroundColor(Color.Transparent.toArgb())
+                                            layoutParams = ViewGroup.LayoutParams(
+                                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.MATCH_PARENT
+                                            )
+                                        }
+                                    },
+                                    update = { webView ->
                                         try {
-                                            loadDataWithBaseURL(
+                                            webView.loadDataWithBaseURL(
                                                 null,
                                                 """
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-                        <style>
-                            html, body {
-                                margin: 0;
-                                padding: 0;
-                                background: transparent;
-                                height: 100%;
-                                width: 100%;
-                            }
-                            #transactionChart {
-                                width: 100%;
-                                height: 100%;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <canvas id="transactionChart"></canvas>
-                        <script>
-                            const transactionData = [${transactionData.joinToString { it.toString() }}];
-                            const ctx = document.getElementById('transactionChart').getContext('2d');
-                            const chart = new Chart(ctx, {
-                                type: 'bar',
-                                data: {
-                                    labels: [${transactionLabels.joinToString()}],
-                                    datasets: [{
-                                        data: transactionData,
-                                        backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
-                                        borderColor: '#D1D5DB',
-                                        borderWidth: 1
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: { display: false },
-                                        title: {
-                                            display: true,
-                                            text: 'Transaction Amounts',
-                                            color: '#1F2937',
-                                            font: { size: 16, weight: 'bold' },
-                                            align: 'center'
-                                        },
-                                        tooltip: {
-                                            enabled: true,
-                                            callbacks: {
-                                                label: function(context) {
-                                                    const value = context.raw || 0;
-                                                    return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+                            <style>
+                                html, body {
+                                    margin: 0;
+                                    padding: 0;
+                                    background: transparent;
+                                    height: 100%;
+                                    width: 100%;
+                                }
+                                #transactionChart {
+                                    width: 100%;
+                                    height: 100%;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <canvas id="transactionChart"></canvas>
+                            <script>
+                                const transactionData = [${transactionData.joinToString { it.toString() }}];
+                                const ctx = document.getElementById('transactionChart').getContext('2d');
+                                const chart = new Chart(ctx, {
+                                    type: 'bar',
+                                    data: {
+                                        labels: [${transactionLabels.joinToString()}],
+                                        datasets: [{
+                                            data: transactionData,
+                                            backgroundColor: [${transactionColors.joinToString() { "'$it'" }}],
+                                            borderColor: '#D1D5DB',
+                                            borderWidth: 1
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        plugins: {
+                                            legend: { display: false },
+                                            title: {
+                                                display: true,
+                                                text: 'Transaction Amounts',
+                                                color: '#1F2937',
+                                                font: { size: 16, weight: 'bold' },
+                                                align: 'center'
+                                            },
+                                            tooltip: {
+                                                enabled: true,
+                                                callbacks: {
+                                                    label: function(context) {
+                                                        const value = context.raw || 0;
+                                                        return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                    }
                                                 }
                                             }
-                                        }
-                                    },
-                                    scales: {
-                                        x: {
-                                            ticks: { display: false },
-                                            barPercentage: 0.8,
-                                            categoryPercentage: 0.9
                                         },
-                                        y: {
-                                            type: 'logarithmic',
-                                            min: 0.1,
-                                            ticks: {
-                                                callback: function(value) {
-                                                    return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                },
-                                                font: { size: 12 },
-                                                color: '#1F2937',
-                                                autoSkip: true,
-                                                maxTicksLimit: 6
+                                        scales: {
+                                            x: {
+                                                ticks: { display: false },
+                                                barPercentage: 0.8,
+                                                categoryPercentage: 0.9
+                                            },
+                                            y: {
+                                                type: 'logarithmic',
+                                                min: 0.1,
+                                                ticks: {
+                                                    callback: function(value) {
+                                                        return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                    },
+                                                    font: { size: 12 },
+                                                    color: '#1F2937',
+                                                    autoSkip: true,
+                                                    maxTicksLimit: 6
+                                                }
                                             }
+                                        },
+                                        animation: {
+                                            duration: 800,
+                                            easing: 'easeOutCubic'
+                                        },
+                                        hover: {
+                                            mode: 'nearest',
+                                            intersect: true,
+                                            animationDuration: 400
                                         }
-                                    },
-                                    animation: {
-                                        duration: 800,
-                                        easing: 'easeOutCubic'
-                                    },
-                                    hover: {
-                                        mode: 'nearest',
-                                        intersect: true,
-                                        animationDuration: 400
                                     }
-                                }
-                            });
-                        </script>
-                    </body>
-                    </html>
-                    """.trimIndent(),
+                                });
+                            </script>
+                        </body>
+                        </html>
+                        """.trimIndent(),
                                                 "text/html",
                                                 "UTF-8",
                                                 null
                                             )
                                         } catch (e: Exception) {
-                                            Toast.makeText(ctx, "Failed to load transaction chart", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Failed to load transaction chart", Toast.LENGTH_SHORT).show()
                                         }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(220.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        1.dp,
-                                        Color(0xFFE5E7EB),
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .padding(8.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                             Text(
                                 text = "Transaction Details",
                                 style = MaterialTheme.typography.titleMedium.copy(
@@ -908,15 +1007,15 @@ fun HomeScreen(
                                     fontSize = 18.sp
                                 ),
                                 color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                itemsIndexed(transactionsForCategory) { index, expense ->
+                                itemsIndexed(filteredTransactions) { index, expense ->
                                     val alpha by animateFloatAsState(
                                         targetValue = if (selectedCategory != null) 1f else 0f,
                                         animationSpec = tween(
@@ -936,12 +1035,12 @@ fun HomeScreen(
                                             },
                                         shape = RoundedCornerShape(8.dp),
                                         color = Color(0xFFF5F5F5),
-                                        shadowElevation = 4.dp
+                                        shadowElevation = 2.dp
                                     ) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(12.dp),
+                                                .padding(8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
@@ -949,16 +1048,16 @@ fun HomeScreen(
                                                     text = expense.remarks ?: "",
                                                     style = MaterialTheme.typography.bodyLarge.copy(
                                                         fontWeight = FontWeight.Medium,
-                                                        fontSize = 16.sp
+                                                        fontSize = 14.sp
                                                     ),
                                                     color = Color(0xFF1F2937),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = expense.dateOfTransaction ?: "",
-                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    style = MaterialTheme.typography.bodySmall,
                                                     color = Color(0xFF4B5563),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -968,7 +1067,7 @@ fun HomeScreen(
                                                 text = "₱${numberFormat.format(expense.amount.coerceAtLeast(0.0))}",
                                                 style = MaterialTheme.typography.bodyLarge.copy(
                                                     fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 16.sp
+                                                    fontSize = 14.sp
                                                 ),
                                                 color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
                                                 maxLines = 1,
@@ -996,7 +1095,7 @@ fun HomeScreen(
                                     .fillMaxWidth()
                                     .background(
                                         brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            colors = List(2) { Color(0xFF734656) },
                                             start = Offset(0f, 0f),
                                             end = Offset(Float.POSITIVE_INFINITY, 0f)
                                         )
@@ -1209,7 +1308,6 @@ fun HomeScreen(
                                         scope.launch {
                                             try {
                                                 if (selectedTransaction?.expenseId?.startsWith("local_") == true) {
-                                                    // Handle local image download
                                                     val uri = Uri.parse(imagePath)
                                                     val inputStream = context.contentResolver.openInputStream(uri)
                                                     val fileName = "Expense_${selectedTransaction?.expenseId}_${System.currentTimeMillis()}.jpg"
@@ -1224,7 +1322,6 @@ fun HomeScreen(
                                                     }
                                                     Toast.makeText(context, "Image saved to Downloads: $fileName", Toast.LENGTH_SHORT).show()
                                                 } else {
-                                                    // Handle server image download
                                                     val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedTransaction?.expenseId}/images"
                                                     val fileName = "Expense_${selectedTransaction?.expenseId}_${System.currentTimeMillis()}.jpg"
                                                     val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -1362,30 +1459,19 @@ fun HomeScreen(
                 ) {
                     selectedImagePath?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
-                        // State for zoom and pan
                         var scale by remember { mutableStateOf(1f) }
                         var offset by remember { mutableStateOf(Offset.Zero) }
-                        // Track image and container size
                         var imageSize by remember { mutableStateOf(IntSize.Zero) }
                         var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
                         val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-                            // Update scale, limited between 1x and 5x
                             val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-
-                            // Calculate scaled image dimensions
                             val scaledWidth = imageSize.width * newScale
                             val scaledHeight = imageSize.height * newScale
-
-                            // Calculate maximum allowable offsets to keep image within bounds
                             val maxX = maxOf(0f, (scaledWidth - containerSize.width) / 2f)
                             val maxY = maxOf(0f, (scaledHeight - containerSize.height) / 2f)
-
-                            // Calculate new offset with the proposed change
                             val newOffsetX = (offset.x + offsetChange.x).coerceIn(-maxX, maxX)
                             val newOffsetY = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
-
-                            // Update state only if values change
                             if (newScale != scale || newOffsetX != offset.x || newOffsetY != offset.y) {
                                 scale = newScale
                                 offset = Offset(newOffsetX, newOffsetY)

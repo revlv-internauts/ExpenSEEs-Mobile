@@ -1,6 +1,8 @@
 package com.example.expensees.screens
 
+import android.util.Log
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,13 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.RequestQuote
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,6 +67,46 @@ fun FundRequest(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Fetch budgets when the screen is loaded
+    LaunchedEffect(Unit) {
+        isLoading = true
+        errorMessage = null
+        try {
+            authRepository.syncLocalBudgets()
+            val result = authRepository.getBudgets()
+            result.onSuccess {
+                isLoading = false
+                Log.d("FundRequest", "Budgets fetched successfully: ${authRepository.submittedBudgets.size}")
+            }.onFailure { e ->
+                isLoading = false
+                errorMessage = e.message
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Failed to fetch budgets: ${e.message}",
+                        actionLabel = "Retry",
+                        duration = SnackbarDuration.Long
+                    ).let { result ->
+                        if (result == SnackbarResult.ActionPerformed) {
+                            authRepository.getBudgets()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            isLoading = false
+            errorMessage = e.message
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = "Unexpected error: ${e.message}",
+                    actionLabel = "OK",
+                    duration = SnackbarDuration.Long
+                )
+            }
+        }
+    }
 
     // Dialog state
     var category by remember { mutableStateOf("") }
@@ -79,7 +115,7 @@ fun FundRequest(
     var remarks by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
 
-    // Number formatter for comma-separated amounts
+    // Number formatter
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
@@ -92,16 +128,9 @@ fun FundRequest(
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
     )
     val colorList = listOf(
-        Color(0xFF6B4E38), // Brown
-        Color(0xFFE7685D), // Coral Red
-        Color(0xFFFBBD92), // Light Peach
-        Color(0xFF4CAF50), // Green
-        Color(0xFF2196F3), // Blue
-        Color(0xFFFF9800), // Orange
-        Color(0xFFE28743), // Orange
-        Color(0xFF009688), // Teal
-        Color(0xFFFF5722), // Deep Orange
-        Color(0xFF607D8B)  // Blue Grey
+        Color(0xFF6B4E38), Color(0xFFE7685D), Color(0xFFFBBD92), Color(0xFF4CAF50),
+        Color(0xFF2196F3), Color(0xFFFF9800), Color(0xFFE28743), Color(0xFF009688),
+        Color(0xFFFF5722), Color(0xFF607D8B)
     )
     val categoryColors = categories.zip(colorList).toMap()
 
@@ -140,7 +169,6 @@ fun FundRequest(
         }
     }
 
-    // Define common text field colors
     val textFieldColors = TextFieldDefaults.outlinedTextFieldColors(
         focusedBorderColor = Color(0xFF3B82F6),
         unfocusedBorderColor = Color(0xFFE5E7EB),
@@ -150,6 +178,33 @@ fun FundRequest(
         unfocusedTextColor = Color(0xFF1F2937),
         cursorColor = Color(0xFF3B82F6)
     )
+
+    // Define deleteExpense function inside the composable
+    fun deleteExpense(
+        index: Int,
+        expenses: MutableList<ExpenseItem>,
+        animatedScale: MutableList<Animatable<Float, *>>,
+        animatedOffset: MutableList<Animatable<Float, *>>,
+        animatedAlpha: MutableList<Animatable<Float, *>>,
+        snackbarHostState: SnackbarHostState,
+        coroutineScope: CoroutineScope
+    ) {
+        coroutineScope.launch {
+            animatedAlpha.getOrNull(index)?.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(200)
+            )
+            expenses.removeAt(index)
+            animatedScale.removeAt(index)
+            animatedOffset.removeAt(index)
+            animatedAlpha.removeAt(index)
+            snackbarHostState.showSnackbar(
+                message = "Expense deleted",
+                actionLabel = "OK",
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -164,6 +219,7 @@ fun FundRequest(
                         .fillMaxHeight()
                         .padding(16.dp)
                 ) {
+                    // Drawer content remains unchanged
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -221,17 +277,12 @@ fun FundRequest(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Theme",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color(0xFF3B82F6),
-                                fontSize = 16.sp
-                            )
-                        }
+                        Text(
+                            text = "Theme",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFF3B82F6),
+                            fontSize = 16.sp
+                        )
                     }
                     TextButton(
                         onClick = { /* Handle About click */ },
@@ -248,7 +299,12 @@ fun FundRequest(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Button(
-                        onClick = { /* Handle Logout */ },
+                        onClick = {
+                            authRepository.logout()
+                            navController.navigate("login") {
+                                popUpTo("fund_request") { inclusive = true }
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 56.dp)
@@ -367,267 +423,278 @@ fun FundRequest(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) { focusManager.clearFocus() }, // Clear focus on tap outside
+                    ) { focusManager.clearFocus() },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 50.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { navController.popBackStack() },
-                        modifier = Modifier
-                            .size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color(0xFF1F2937)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Request Fund",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp
-                        ),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier
-                            .weight(1f)
-                            .offset(x = (-18).dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
-                // Budget Name Input
-                OutlinedTextField(
-                    value = budgetName,
-                    onValueChange = { budgetName = it },
-                    label = { Text("Budget Name (Purpose)", color = Color(0xFF4B5563)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    singleLine = true,
-                    colors = textFieldColors,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Expenses List Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Expenses",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = Color(0xFF1F2937)
-                    )
-                    IconButton(
-                        onClick = { showDialog = true },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Expense",
-                            tint = Color(0xFF1F2937)
-                        )
-                    }
-                }
-
-                // Expenses List
-                if (expenses.isEmpty()) {
+                if (isLoading) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(vertical = 16.dp),
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF734656)
+                        )
+                    }
+                } else if (errorMessage != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No expenses added yet.",
+                            text = "Error: $errorMessage",
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 18.sp
                             ),
-                            color = Color(0xFF4B5563),
+                            color = Color(0xFFD32F2F),
                             textAlign = TextAlign.Center
                         )
                     }
                 } else {
-                    LazyColumn(
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                            .fillMaxWidth()
+                            .padding(top = 50.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Inside LazyColumn items block
-                        items(expenses) { expense ->
-                            val index = expenses.indexOf(expense)
-                            val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                            val offset by animatedOffset.getOrNull(index)?.asState() ?: remember { mutableStateOf(0f) }
-                            val alpha by animatedAlpha.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                            var dragOffset by remember { mutableStateOf(0f) }
-                            val swipeThreshold = 150f // Pixels to swipe to trigger delete
-                            val hapticFeedback = LocalHapticFeedback.current // For haptic feedback
+                        IconButton(
+                            onClick = { navController.popBackStack() },
+                            modifier = Modifier
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color(0xFF1F2937)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Request Fund",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 28.sp
+                            ),
+                            color = Color(0xFF1F2937),
+                            modifier = Modifier
+                                .weight(1f)
+                                .offset(x = (-18).dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    OutlinedTextField(
+                        value = budgetName,
+                        onValueChange = { budgetName = it },
+                        label = { Text("Budget Name (Purpose)", color = Color(0xFF4B5563)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        singleLine = true,
+                        colors = textFieldColors,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Expenses",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp
+                            ),
+                            color = Color(0xFF1F2937)
+                        )
+                        IconButton(
+                            onClick = { showDialog = true },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Expense",
+                                tint = Color(0xFF1F2937)
+                            )
+                        }
+                    }
+                    if (expenses.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No expenses added yet.",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 18.sp
+                                ),
+                                color = Color(0xFF4B5563),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(expenses) { expense ->
+                                val index = expenses.indexOf(expense)
+                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                                val offset by animatedOffset.getOrNull(index)?.asState() ?: remember { mutableStateOf(0f) }
+                                val alpha by animatedAlpha.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                                var dragOffset by remember { mutableStateOf(0f) }
+                                val swipeThreshold = 150f
+                                val hapticFeedback = LocalHapticFeedback.current
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .offset(x = offset.dp)
-                                    .alpha(alpha)
-                            ) {
-                                // Delete background for swipe
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(80.dp)
-                                        .background(
-                                            color = Color(0xFFE7685D).copy(alpha = (abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f)),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ),
-                                    contentAlignment = Alignment.CenterEnd
+                                        .offset(x = offset.dp)
+                                        .alpha(alpha)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        tint = Color.White,
-                                        modifier = Modifier
-                                            .padding(end = 16.dp)
-                                            .size(24.dp)
-                                            .alpha((abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f))
-                                    )
-                                }
-
-                                // Expense card
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .scale(scale)
-                                        .offset(x = dragOffset.dp)
-                                        .pointerInput(Unit) {
-                                            detectHorizontalDragGestures(
-                                                onDragStart = {
-                                                    // Optional: Perform haptic feedback on drag start
-                                                    hapticFeedback.performHapticFeedback(
-                                                        HapticFeedbackType.LongPress)
-                                                },
-                                                onDragEnd = {
-                                                    if (dragOffset < -swipeThreshold) { // Only trigger on left swipe
-                                                        deleteExpense(index, expenses, animatedScale, animatedOffset, animatedAlpha, snackbarHostState, coroutineScope)
-                                                    } else {
-                                                        coroutineScope.launch {
-                                                            animatedOffset.getOrNull(index)?.animateTo(
-                                                                targetValue = 0f,
-                                                                animationSpec = tween(200)
-                                                            )
-                                                        }
-                                                        dragOffset = 0f
-                                                    }
-                                                },
-                                                onHorizontalDrag = { _, dragAmount ->
-                                                    // Only allow left swipe (negative offset)
-                                                    dragOffset = (dragOffset + dragAmount).coerceIn(-swipeThreshold, 0f)
-                                                    coroutineScope.launch {
-                                                        animatedOffset.getOrNull(index)?.animateTo(
-                                                            targetValue = dragOffset,
-                                                            animationSpec = spring(
-                                                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                                                stiffness = Spring.StiffnessMediumLow
-                                                            )
-                                                        )
-                                                    }
-                                                    // Trigger haptic feedback when crossing threshold
-                                                    if (dragOffset < -swipeThreshold && dragOffset + dragAmount >= -swipeThreshold) {
-                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    }
-                                                }
-                                            )
-                                        },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.Transparent
-                                ) {
-                                    // Rest of the Surface content (same as original)
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .height(80.dp)
                                             .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
-                                                        (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
-                                                    ),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                                )
-                                            )
-                                            .border(
-                                                1.dp,
-                                                (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(8.dp)
+                                                color = Color(0xFFE7685D).copy(alpha = (abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f)),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ),
+                                        contentAlignment = Alignment.CenterEnd
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = Color.White,
-                                                        fontWeight = FontWeight.Bold
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .padding(end = 16.dp)
+                                                .size(24.dp)
+                                                .alpha((abs(dragOffset) / swipeThreshold).coerceIn(0f, 1f))
+                                        )
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .scale(scale)
+                                            .offset(x = dragOffset.dp)
+                                            .pointerInput(Unit) {
+                                                detectHorizontalDragGestures(
+                                                    onDragStart = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    },
+                                                    onDragEnd = {
+                                                        if (dragOffset < -swipeThreshold) {
+                                                            deleteExpense(
+                                                                index,
+                                                                expenses,
+                                                                animatedScale,
+                                                                animatedOffset,
+                                                                animatedAlpha,
+                                                                snackbarHostState,
+                                                                coroutineScope
+                                                            )
+                                                        } else {
+                                                            coroutineScope.launch {
+                                                                animatedOffset.getOrNull(index)?.animateTo(
+                                                                    targetValue = 0f,
+                                                                    animationSpec = tween(200)
+                                                                )
+                                                            }
+                                                            dragOffset = 0f
+                                                        }
+                                                    },
+                                                    onHorizontalDrag = { _, dragAmount ->
+                                                        dragOffset = (dragOffset + dragAmount).coerceIn(-swipeThreshold, 0f)
+                                                        coroutineScope.launch {
+                                                            animatedOffset.getOrNull(index)?.animateTo(
+                                                                targetValue = dragOffset,
+                                                                animationSpec = spring(
+                                                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                                                    stiffness = Spring.StiffnessMediumLow
+                                                                )
+                                                            )
+                                                        }
+                                                        if (dragOffset < -swipeThreshold && dragOffset + dragAmount >= -swipeThreshold) {
+                                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        }
+                                                    }
+                                                )
+                                            },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color.Transparent
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    brush = Brush.linearGradient(
+                                                        colors = listOf(
+                                                            (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
+                                                            (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
+                                                        ),
+                                                        start = Offset(0f, 0f),
+                                                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                                                     )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(
-                                                modifier = Modifier.weight(1f)
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    (categoryColors[expense.category] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(8.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = expense.category,
-                                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 14.sp
-                                                    ),
-                                                    color = Color(0xFF1F2937),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 12.sp
-                                                    ),
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                if (expense.remarks.isNotBlank()) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(
+                                                            text = "${index + 1}",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = Color.White,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column(
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
                                                     Text(
-                                                        text = "Remarks: ${expense.remarks}",
+                                                        text = expense.category,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 14.sp
+                                                        ),
+                                                        color = Color(0xFF1F2937),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = "₱${numberFormat.format(expense.quantity * expense.amountPerUnit)}",
                                                         style = MaterialTheme.typography.bodySmall.copy(
                                                             fontSize = 12.sp
                                                         ),
@@ -635,160 +702,210 @@ fun FundRequest(
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
+                                                    if (expense.remarks.isNotBlank()) {
+                                                        Text(
+                                                            text = "Remarks: ${expense.remarks}",
+                                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                                fontSize = 12.sp
+                                                            ),
+                                                            color = Color(0xFF4B5563),
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
                                                 }
+                                                Text(
+                                                    text = "Qty: ${expense.quantity}",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp
+                                                    ),
+                                                    color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
-                                            Text(
-                                                text = "Qty: ${expense.quantity}",
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                ),
-                                                color = categoryColors[expense.category] ?: Color(0xFF6B4E38),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-
-                // Total Expenses
-                Text(
-                    text = "Total Expenses: ₱${numberFormat.format(totalExpenses)}",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    ),
-                    color = Color(0xFF1F2937),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    textAlign = TextAlign.Center
-                )
-
-                // Request Budget Button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp, top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = {
-                            if (budgetName.isBlank() && expenses.isEmpty()) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Please enter a budget name and add at least one expense",
-                                        actionLabel = "OK",
-                                        duration = SnackbarDuration.Short
+                    Text(
+                        text = "Total Expenses: ₱${numberFormat.format(totalExpenses)}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp, top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(
+                            onClick = {
+                                if (budgetName.isBlank() && expenses.isEmpty()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please enter a budget name and add at least one expense",
+                                            actionLabel = "OK",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } else if (budgetName.isBlank()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please enter a budget name",
+                                            actionLabel = "OK",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } else if (expenses.isEmpty()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please add at least one expense",
+                                            actionLabel = "OK",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } else {
+                                    val submittedBudgetName = budgetName
+                                    val budget = SubmittedBudget(
+                                        budgetId = null,
+                                        name = budgetName,
+                                        expenses = expenses.toList(),
+                                        total = totalExpenses,
+                                        status = BudgetStatus.PENDING
                                     )
-                                }
-                            } else if (budgetName.isBlank()) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Please enter a budget name",
-                                        actionLabel = "OK",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
-                            } else if (expenses.isEmpty()) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Please add at least one expense",
-                                        actionLabel = "OK",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
-                            } else {
-                                val submittedBudgetName = budgetName
-                                val budget = SubmittedBudget(
-                                    budgetId = null,
-                                    name = budgetName,
-                                    expenses = expenses.toList(),
-                                    total = totalExpenses,
-                                    status = BudgetStatus.PENDING
-                                )
-                                coroutineScope.launch {
-                                    try {
-                                        val result = authRepository.addBudget(budget)
-                                        result.onSuccess { returnedBudget ->
-                                            snackbarHostState.showSnackbar(
-                                                message = "Budget request for $submittedBudgetName submitted successfully!",
-                                                actionLabel = "OK",
-                                                duration = SnackbarDuration.Short
-                                            )
-                                            budgetName = ""
-                                            expenses.clear()
-                                            navController.popBackStack()
-                                        }.onFailure { e ->
+                                    coroutineScope.launch {
+                                        try {
+                                            val result = authRepository.addBudget(budget)
+                                            result.onSuccess { returnedBudget ->
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Budget request for $submittedBudgetName submitted successfully!",
+                                                    actionLabel = "OK",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                budgetName = ""
+                                                expenses.clear()
+                                                navController.popBackStack()
+                                            }.onFailure { e ->
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Failed to submit budget: ${e.message}",
+                                                    actionLabel = "OK",
+                                                    duration = SnackbarDuration.Long
+                                                )
+                                            }
+                                        } catch (e: Exception) {
                                             snackbarHostState.showSnackbar(
                                                 message = "Failed to submit budget: ${e.message}",
                                                 actionLabel = "OK",
                                                 duration = SnackbarDuration.Long
                                             )
                                         }
-                                    } catch (e: Exception) {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Failed to submit budget: ${e.message}",
-                                            actionLabel = "OK",
-                                            duration = SnackbarDuration.Long
-                                        )
                                     }
                                 }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Box(
+                            },
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .height(56.dp)
+                                .padding(horizontal = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.RequestQuote,
-                                    contentDescription = "Request",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Request",
-                                    fontSize = 16.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.RequestQuote,
+                                        contentDescription = "Request",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Request",
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                        Button(
+                            onClick = { navController.navigate("requested_budgets") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .padding(horizontal = 4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.List,
+                                        contentDescription = "View Requested Budgets",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "View Requests",
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-
-            // Add Expense Dialog
-            // Add Expense Dialog
             if (showDialog) {
                 Dialog(
                     onDismissRequest = { showDialog = false },
@@ -808,7 +925,7 @@ fun FundRequest(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) { focusManager.clearFocus() }, // Clear focus on tap outside
+                            ) { focusManager.clearFocus() },
                         color = Color(0xFFF5F5F5),
                         shadowElevation = 8.dp
                     ) {
@@ -943,7 +1060,7 @@ fun FundRequest(
                                 OutlinedTextField(
                                     value = amountPerUnit,
                                     onValueChange = { amountPerUnit = it.filter { c -> c.isDigit() || c == '.' } },
-                                    label = { Text("Amount per Unit (₱)", color = Color(0xFF4B5563)) },
+                                    label = { Text("Amount per Unit", color = Color(0xFF4B5563)) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp)),
@@ -963,10 +1080,10 @@ fun FundRequest(
                                 OutlinedTextField(
                                     value = remarks,
                                     onValueChange = { remarks = it },
-                                    label = { Text("Remarks", color = Color(0xFF4B5563)) },
+                                    label = { Text("Remarks (Optional)", color = Color(0xFF4B5563)) },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp)), // Fixed typo: triumphs12.dp -> 12.dp
+                                        .clip(RoundedCornerShape(12.dp)),
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                     keyboardActions = KeyboardActions(
                                         onDone = { focusManager.clearFocus() }
@@ -977,174 +1094,96 @@ fun FundRequest(
                                         fontWeight = FontWeight.Medium
                                     )
                                 )
-                                Text(
-                                    text = "Total: ₱${numberFormat.format(
-                                        (quantity.toIntOrNull() ?: 0) * (amountPerUnit.toDoubleOrNull() ?: 0.0))}",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    ),
-                                    color = Color(0xFF1F2937)
-                                )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Button(
-                                    onClick = { showDialog = false },
+                                OutlinedButton(
+                                    onClick = {
+                                        showDialog = false
+                                        category = ""
+                                        quantity = ""
+                                        amountPerUnit = ""
+                                        remarks = ""
+                                    },
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp)
                                         .padding(end = 8.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.Transparent
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(0xFF3B82F6)
                                     ),
-                                    contentPadding = PaddingValues(0.dp)
+                                    border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                                ),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Close",
-                                            color = Color(0xFF3B82F6),
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
+                                    Text(
+                                        text = "Cancel",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                                 Button(
                                     onClick = {
-                                        if (category.isNotBlank() && quantity.isNotBlank() && amountPerUnit.isNotBlank()) {
-                                            expenses.add(
-                                                ExpenseItem(
-                                                    category = category,
-                                                    quantity = quantity.toIntOrNull() ?: 0,
-                                                    amountPerUnit = amountPerUnit.toDoubleOrNull() ?: 0.0,
-                                                    remarks = remarks
+                                        if (category.isBlank() || quantity.isBlank() || amountPerUnit.isBlank()) {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Please fill in all required fields",
+                                                    actionLabel = "OK",
+                                                    duration = SnackbarDuration.Short
                                                 )
-                                            )
-                                            animatedScale.add(Animatable(0f))
-                                            animatedOffset.add(Animatable(0f))
-                                            animatedAlpha.add(Animatable(1f))
-                                            category = ""
-                                            quantity = ""
-                                            amountPerUnit = ""
-                                            remarks = ""
-                                            showDialog = false
+                                            }
+                                        } else {
+                                            val qty = quantity.toIntOrNull() ?: 0
+                                            val amount = amountPerUnit.toDoubleOrNull() ?: 0.0
+                                            if (qty <= 0 || amount <= 0.0) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Quantity and amount must be greater than zero",
+                                                        actionLabel = "OK",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
+                                            } else {
+                                                expenses.add(
+                                                    ExpenseItem(
+                                                        category = category,
+                                                        quantity = qty,
+                                                        amountPerUnit = amount,
+                                                        remarks = remarks
+                                                    )
+                                                )
+                                                animatedScale.add(Animatable(0f))
+                                                animatedOffset.add(Animatable(0f))
+                                                animatedAlpha.add(Animatable(1f))
+                                                showDialog = false
+                                                category = ""
+                                                quantity = ""
+                                                amountPerUnit = ""
+                                                remarks = ""
+                                            }
                                         }
                                     },
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp)
                                         .padding(start = 8.dp),
-                                    shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.Transparent
+                                        containerColor = Color(0xFF734656)
                                     ),
-                                    contentPadding = PaddingValues(0.dp),
-                                    enabled = category.isNotBlank() && quantity.isNotBlank() && amountPerUnit.isNotBlank()
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                                ),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Add,
-                                                contentDescription = "Add",
-                                                modifier = Modifier.size(24.dp),
-                                                tint = Color.White
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Add",
-                                                fontSize = 16.sp,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
+                                    Text(
+                                        text = "Add",
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-// Helper function to handle expense deletion
-private fun deleteExpense(
-    index: Int,
-    expenses: MutableList<ExpenseItem>,
-    animatedScale: MutableList<Animatable<Float, *>>,
-    animatedOffset: MutableList<Animatable<Float, *>>,
-    animatedAlpha: MutableList<Animatable<Float, *>>,
-    snackbarHostState: SnackbarHostState,
-    coroutineScope: CoroutineScope
-) {
-    coroutineScope.launch {
-        animatedScale.getOrNull(index)?.animateTo(
-            targetValue = 0.5f,
-            animationSpec = tween(200)
-        )
-        animatedAlpha.getOrNull(index)?.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(200)
-        )
-        val deletedExpense = expenses[index]
-        expenses.removeAt(index)
-        animatedScale.removeAt(index)
-        animatedOffset.removeAt(index)
-        animatedAlpha.removeAt(index)
-        snackbarHostState.showSnackbar(
-            message = "${deletedExpense.category} removed",
-            actionLabel = "Undo",
-            duration = SnackbarDuration.Short
-        ).also { result ->
-            if (result == SnackbarResult.ActionPerformed) {
-                expenses.add(index, deletedExpense)
-                animatedScale.add(index, Animatable(0f))
-                animatedOffset.add(index, Animatable(0f))
-                animatedAlpha.add(index, Animatable(0f))
-                launch {
-                    animatedScale[index].animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(400)
-                    )
-                    animatedAlpha[index].animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(400)
-                    )
                 }
             }
         }

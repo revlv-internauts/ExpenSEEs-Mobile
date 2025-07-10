@@ -10,9 +10,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
 import com.example.expensees.screens.*
@@ -25,7 +27,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
     val submittedBudgets = remember { mutableStateListOf<SubmittedBudget>() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val liquidationViewModel: LiquidationViewModel = viewModel() // Hoist ViewModel here
+    val liquidationViewModel: LiquidationViewModel = viewModel()
 
     NavHost(navController = navController, startDestination = "loading") {
         composable("loading") {
@@ -108,15 +110,27 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
             FundRequest(
                 navController = navController,
                 authRepository = authRepository,
-                modifier = Modifier
+                modifier = modifier
             )
         }
-        composable("liquidation_Report") {
+        composable("requested_budgets") {
+            RequestedBudgetsScreen(
+                navController = navController,
+                authRepository = authRepository,
+                modifier = modifier
+            )
+        }
+        composable(
+            route = "liquidation_report/{budgetId}",
+            arguments = listOf(navArgument("budgetId") { type = NavType.StringType; nullable = true })
+        ) { backStackEntry ->
+            val budgetId = backStackEntry.arguments?.getString("budgetId")
             LiquidationReport(
                 navController = navController,
                 authRepository = authRepository,
-                viewModel = liquidationViewModel, // Pass the same ViewModel instance
-                modifier = modifier
+                viewModel = liquidationViewModel,
+                modifier = modifier,
+                budgetId = budgetId
             )
         }
         composable("detailed_liquidation_report/{budgetId}") { backStackEntry ->
@@ -125,7 +139,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
             if (budget != null) {
                 DetailedLiquidationReport(
                     budget = budget,
-                    selectedExpensesMap = liquidationViewModel.selectedExpensesMap, // Use ViewModel's map
+                    selectedExpensesMap = liquidationViewModel.selectedExpensesMap,
                     navController = navController,
                     modifier = modifier
                 )

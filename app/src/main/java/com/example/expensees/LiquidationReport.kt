@@ -76,15 +76,28 @@ fun LiquidationReport(
     modifier: Modifier = Modifier,
     navController: NavController,
     authRepository: AuthRepository,
-    viewModel: LiquidationViewModel = viewModel()
+    viewModel: LiquidationViewModel = viewModel(),
+    budgetId: String? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var selectedBudget by remember { mutableStateOf<SubmittedBudget?>(null) }
-    var selectedCategory by remember { mutableStateOf<BudgetStatus?>(null) }
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = viewModel.selectedExpensesMap // Use ViewModel's map
+
+    // Set selectedBudget based on budgetId
+    LaunchedEffect(budgetId) {
+        if (budgetId != null) {
+            val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
+            if (budget != null && budget.status == BudgetStatus.APPROVED) {
+                selectedBudget = budget
+            } else {
+                Toast.makeText(context, "Budget not found or not approved", Toast.LENGTH_SHORT).show()
+                navController.popBackStack()
+            }
+        }
+    }
 
     LaunchedEffect(selectedBudget) {
         if (selectedBudget == null) {
@@ -101,7 +114,6 @@ fun LiquidationReport(
     val generatedReports = remember { mutableStateListOf<String>() }
     var showReportDialog by remember { mutableStateOf(false) }
     var reportContent by remember { mutableStateOf("") }
-    var showAllBudgets by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -188,10 +200,6 @@ fun LiquidationReport(
     BackHandler(enabled = true) {
         if (selectedBudget != null) {
             selectedBudget = null
-        } else if (selectedCategory != null) {
-            selectedCategory = null
-        } else if (showAllBudgets) {
-            showAllBudgets = false
         } else {
             if (navController.currentBackStackEntry?.destination?.route != "home") {
                 navController.navigate("home") {
@@ -254,10 +262,6 @@ fun LiquidationReport(
                     onClick = {
                         if (selectedBudget != null) {
                             selectedBudget = null
-                        } else if (selectedCategory != null) {
-                            selectedCategory = null
-                        } else if (showAllBudgets) {
-                            showAllBudgets = false
                         } else {
                             if (navController.currentBackStackEntry?.destination?.route != "home") {
                                 navController.navigate("home") {
@@ -380,435 +384,115 @@ fun LiquidationReport(
                     )
                 }
             } else if (selectedBudget == null) {
-                if (selectedCategory == null && !showAllBudgets) {
-                    Text(
-                        text = "Select a Budget Category",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
-                    val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
-                    val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
-
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.PENDING },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = pendingCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "Pending Budgets ($pendingCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.APPROVED },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = approvedCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "Approved Budgets ($approvedCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.DENIED },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = deniedCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "Denied Budgets ($deniedCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Button(
-                        onClick = { showAllBudgets = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "View All Budgets",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else if (showAllBudgets) {
-                    Text(
-                        text = "All Budget Requests",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    Button(
-                        onClick = { showAllBudgets = false },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(bottom = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF734656)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "Back to Categories",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    if (authRepository.submittedBudgets.isEmpty()) {
-                        Box(
+                Text(
+                    text = "Select a Budget",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    ),
+                    color = Color(0xFF1F2937),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(authRepository.submittedBudgets) { budget ->
+                        val index = authRepository.submittedBudgets.indexOf(budget)
+                        val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f)
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No budget requests available.",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 18.sp
+                                .scale(scale)
+                                .then(
+                                    if (budget.status == BudgetStatus.APPROVED) {
+                                        Modifier.clickable { selectedBudget = budget }
+                                    } else {
+                                        Modifier
+                                    }
                                 ),
-                                color = Color(0xFF4B5563),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.Transparent
                         ) {
-                            items(authRepository.submittedBudgets) { budget ->
-                                val index = authRepository.submittedBudgets.indexOf(budget)
-                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .scale(scale)
-                                        .then(
-                                            if (budget.status == BudgetStatus.APPROVED) {
-                                                Modifier.clickable { selectedBudget = budget }
-                                            } else {
-                                                Modifier
-                                            }
-                                        ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.Transparent
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
+                                                (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
+                                            ),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                                        )
+                                    )
+                                    .border(
+                                        1.dp,
+                                        (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
-                                                        (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
-                                                    ),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                                )
-                                            )
-                                            .border(
-                                                1.dp,
-                                                (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(8.dp)
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = statusColors[budget.status] ?: Color(0xFF6B4E38),
+                                        modifier = Modifier.size(24.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = statusColors[budget.status] ?: Color(0xFF6B4E38),
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = Color.White,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text(
-                                                    text = budget.name,
-                                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 14.sp
-                                                    ),
-                                                    color = Color(0xFF1F2937),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "₱${numberFormat.format(budget.total)}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 12.sp
-                                                    ),
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 12.sp
-                                                    ),
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .clip(CircleShape)
-                                                    .background(statusColors[budget.status] ?: Color(0xFF6B4E38))
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = "${index + 1}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    val category = selectedCategory!!
-                    Text(
-                        text = "${category.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} Budget Requests",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    Button(
-                        onClick = { selectedCategory = null },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(bottom = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF734656)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        Text(
-                            text = "Back to Categories",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    val filteredBudgets = authRepository.submittedBudgets.filter { it.status == category }
-                    if (filteredBudgets.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No ${category.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} budget requests.",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 18.sp
-                                ),
-                                color = Color(0xFF4B5563),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(filteredBudgets) { budget ->
-                                val index = filteredBudgets.indexOf(budget)
-                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .scale(scale)
-                                        .then(
-                                            if (budget.status == BudgetStatus.APPROVED) {
-                                                Modifier.clickable { selectedBudget = budget }
-                                            } else {
-                                                Modifier
-                                            }
-                                        ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.Transparent
-                                ) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = budget.name,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp
+                                            ),
+                                            color = Color(0xFF1F2937),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "₱${numberFormat.format(budget.total)}",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontSize = 12.sp
+                                            ),
+                                            color = Color(0xFF4B5563),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontSize = 12.sp
+                                            ),
+                                            color = Color(0xFF4B5563),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(
-                                                        (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.1f),
-                                                        (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.03f)
-                                                    ),
-                                                    start = Offset(0f, 0f),
-                                                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                                                )
-                                            )
-                                            .border(
-                                                1.dp,
-                                                (statusColors[budget.status] ?: Color(0xFF6B4E38)).copy(alpha = 0.3f),
-                                                RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(8.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = statusColors[budget.status] ?: Color(0xFF6B4E38),
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        color = Color.White,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text(
-                                                    text = budget.name,
-                                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 14.sp
-                                                    ),
-                                                    color = Color(0xFF1F2937),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "₱${numberFormat.format(budget.total)}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 12.sp
-                                                    ),
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "Status: ${budget.status.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 12.sp
-                                                    ),
-                                                    color = Color(0xFF4B5563),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .clip(CircleShape)
-                                                    .background(statusColors[budget.status] ?: Color(0xFF6B4E38))
-                                            )
-                                        }
-                                    }
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(statusColors[budget.status] ?: Color(0xFF6B4E38))
+                                    )
                                 }
                             }
                         }
@@ -1114,7 +798,7 @@ fun LiquidationReport(
                             )
                         ) {
                             Text(
-                                text = "Back to Categories",
+                                text = "Back to Budgets",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 textAlign = TextAlign.Center,
