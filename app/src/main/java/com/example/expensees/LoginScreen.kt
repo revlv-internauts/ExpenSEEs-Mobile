@@ -15,8 +15,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -46,6 +46,15 @@ import com.example.expensees.R
 import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+
+import android.content.ContextWrapper
+import androidx.activity.ComponentActivity
+
+fun Context.getActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.getActivity()
+    else -> null
+}
 
 @Composable
 fun LoginScreen(
@@ -176,12 +185,20 @@ fun LoginScreen(
                     textAlign = TextAlign.Center
                 )
                 IconButton(
-                    onClick = { navController.navigate("notifications") },
+                    onClick = {
+                        context.getActivity()?.let { activity ->
+                            android.app.AlertDialog.Builder(activity)
+                                .setMessage("Are you sure you want to exit?")
+                                .setPositiveButton("Yes") { _, _ -> activity.finishAffinity() }
+                                .setNegativeButton("No", null)
+                                .show()
+                        }
+                    },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "View notifications",
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Exit App",
                         tint = Color(0xFFF5F5F5)
                     )
                 }
@@ -196,12 +213,21 @@ fun LoginScreen(
                     .padding(top = 32.dp)
             ) {
                 Text(
-                    text = "Welcome to ExpenSEEs!",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 34.sp
+                    text = "Welcome to ExpenSEEs",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
                     ),
                     color = Color(0xFFF5F5F5),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Effortless Financial Management",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp
+                    ),
+                    color = Color(0xFFE0E0E0),
                     textAlign = TextAlign.Center
                 )
                 Image(

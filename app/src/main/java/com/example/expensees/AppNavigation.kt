@@ -160,5 +160,11 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 modifier = modifier
             )
         }
+        composable("notifications") {
+            NotificationsScreen(
+                navController = navController,
+                modifier = modifier
+            )
+        }
     }
 }

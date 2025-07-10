@@ -190,19 +190,42 @@ fun FundRequest(
         coroutineScope: CoroutineScope
     ) {
         coroutineScope.launch {
+            // Animate out the card
             animatedAlpha.getOrNull(index)?.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(200)
             )
-            expenses.removeAt(index)
+            // Remove the expense from the local list
+            val removedExpense = expenses.removeAt(index)
+            // Remove animation states
             animatedScale.removeAt(index)
             animatedOffset.removeAt(index)
             animatedAlpha.removeAt(index)
+            // Show snackbar with undo option
             snackbarHostState.showSnackbar(
                 message = "Expense deleted",
-                actionLabel = "OK",
+                actionLabel = "Undo",
                 duration = SnackbarDuration.Short
-            )
+            ).let { result ->
+                if (result == SnackbarResult.ActionPerformed) {
+                    // Restore the expense if undo is clicked
+                    expenses.add(index, removedExpense)
+                    animatedScale.add(index, Animatable(0f))
+                    animatedOffset.add(index, Animatable(0f))
+                    animatedAlpha.add(index, Animatable(1f))
+                    // Animate the restored card back in
+                    coroutineScope.launch {
+                        animatedScale.getOrNull(index)?.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(400, easing = FastOutSlowInEasing)
+                        )
+                        animatedAlpha.getOrNull(index)?.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(400)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -219,7 +242,6 @@ fun FundRequest(
                         .fillMaxHeight()
                         .padding(16.dp)
                 ) {
-                    // Drawer content remains unchanged
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -601,7 +623,7 @@ fun FundRequest(
                                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     },
                                                     onDragEnd = {
-                                                        if (dragOffset < -swipeThreshold) {
+                                                        if (abs(dragOffset) >= swipeThreshold) {
                                                             deleteExpense(
                                                                 index,
                                                                 expenses,
@@ -632,7 +654,7 @@ fun FundRequest(
                                                                 )
                                                             )
                                                         }
-                                                        if (dragOffset < -swipeThreshold && dragOffset + dragAmount >= -swipeThreshold) {
+                                                        if (abs(dragOffset) >= swipeThreshold && abs(dragOffset - dragAmount) < swipeThreshold) {
                                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                         }
                                                     }
