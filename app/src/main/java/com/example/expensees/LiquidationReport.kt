@@ -85,6 +85,7 @@ fun LiquidationReport(
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = viewModel.selectedExpensesMap // Use ViewModel's map
+    val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() } // Moved to top level
 
     // Set selectedBudget based on budgetId
     LaunchedEffect(budgetId) {
@@ -198,13 +199,13 @@ fun LiquidationReport(
     }
 
     BackHandler(enabled = true) {
-        if (selectedBudget != null) {
-            selectedBudget = null
+        if (showExpenseSelectionDialog) {
+            showExpenseSelectionDialog = false
+            currentExpenseItem = null
+            checkedExpenses.clear()
         } else {
-            if (navController.currentBackStackEntry?.destination?.route != "home") {
-                navController.navigate("home") {
-                    popUpTo("home") { inclusive = false }
-                }
+            navController.navigate("requested_budgets") {
+                popUpTo("requested_budgets") { inclusive = false }
             }
         }
     }
@@ -260,14 +261,8 @@ fun LiquidationReport(
             ) {
                 IconButton(
                     onClick = {
-                        if (selectedBudget != null) {
-                            selectedBudget = null
-                        } else {
-                            if (navController.currentBackStackEntry?.destination?.route != "home") {
-                                navController.navigate("home") {
-                                    popUpTo("home") { inclusive = false }
-                                }
-                            }
+                        navController.navigate("requested_budgets") {
+                            popUpTo("requested_budgets") { inclusive = false }
                         }
                     },
                     modifier = Modifier
@@ -781,7 +776,11 @@ fun LiquidationReport(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         OutlinedButton(
-                            onClick = { selectedBudget = null },
+                            onClick = {
+                                navController.navigate("requested_budgets") {
+                                    popUpTo("requested_budgets") { inclusive = false }
+                                }
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
@@ -887,8 +886,8 @@ fun LiquidationReport(
 
         if (showExpenseSelectionDialog && currentExpenseItem != null) {
             val filteredExpenses = authRepository.userExpenses.filter { it.category == currentExpenseItem!!.first.category }
-            val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
             LaunchedEffect(filteredExpenses, currentExpenseItem) {
+                checkedExpenses.clear() // Clear previous state
                 filteredExpenses.forEach { expense ->
                     checkedExpenses[expense] = selectedExpensesMap[currentExpenseItem!!.second]?.contains(expense) ?: false
                 }
@@ -1174,7 +1173,7 @@ fun LiquidationReport(
                                         containerColor = Color(0xFF734656),
                                         disabledContainerColor = Color(0xFF734656).copy(alpha = 0.5f)
                                     ),
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(8.dp),
                                     enabled = filteredExpenses.isNotEmpty()
                                 ) {
                                     Row(
@@ -1184,7 +1183,7 @@ fun LiquidationReport(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Confirm",
-                                            modifier = Modifier.size(24.dp),
+                                            modifier = Modifier.size(16.dp),
                                             tint = Color.White
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
