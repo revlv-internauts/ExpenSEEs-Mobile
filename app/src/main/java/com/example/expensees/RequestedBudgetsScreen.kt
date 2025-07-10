@@ -114,7 +114,9 @@ fun RequestedBudgetsScreen(
                         } else if (showAllBudgets) {
                             showAllBudgets = false
                         } else {
-                            navController.popBackStack()
+                            navController.navigate("home") {
+                                popUpTo("requested_budgets") { inclusive = true }
+                            }
                         }
                     },
                     modifier = Modifier
