@@ -5,6 +5,7 @@ import com.example.expensees.models.SubmittedBudget
 import com.google.gson.annotations.SerializedName
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -51,6 +52,20 @@ interface ApiService {
     suspend fun getBudgets(
         @Header("Authorization") token: String
     ): Response<List<SubmittedBudget>>
+
+    @Multipart
+    @POST("api/users/{userId}/profile-picture")
+    suspend fun uploadProfilePicture(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String,
+        @Part file: MultipartBody.Part
+    ): Response<Unit>
+
+    @GET("api/users/{userId}/profile-picture")
+    suspend fun getProfilePicture(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String
+    ): Response<ResponseBody>
 }
 
 data class SignInRequest(

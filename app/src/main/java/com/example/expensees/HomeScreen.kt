@@ -67,6 +67,8 @@ import java.text.SimpleDateFormat
 import android.app.DownloadManager
 import android.os.Build
 import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -92,6 +94,7 @@ fun HomeScreen(
     onLogoutClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
@@ -107,6 +110,74 @@ fun HomeScreen(
     val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
     val username by remember { mutableStateOf(prefs.getString("username", "User") ?: "User") }
     val email by remember { mutableStateOf(prefs.getString("email", "user@example.com") ?: "user@example.com") }
+    var profileImageUri by remember { mutableStateOf<Uri?>(prefs.getString("profile_image", null)?.let { Uri.parse(it) }) }
+    var isLoadingProfilePicture by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (authRepository.isAuthenticated()) {
+            isLoadingProfilePicture = true
+            val result = authRepository.getProfilePicture()
+            isLoadingProfilePicture = false
+            if (result.isSuccess) {
+                profileImageUri = result.getOrNull()
+                // Update SharedPreferences with the new Uri
+                prefs.edit().putString("profile_image", profileImageUri?.toString()).apply()
+                Log.d("HomeScreen", "Profile picture fetched successfully: $profileImageUri")
+            } else {
+                val errorMessage = result.exceptionOrNull()?.message
+                Log.e("HomeScreen", "Failed to fetch profile picture: $errorMessage")
+                if (errorMessage?.contains("Unauthorized") == true || errorMessage?.contains("Invalid token") == true) {
+                    Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                } else if (errorMessage?.contains("Profile picture not found") == true) {
+                    // No profile picture on server, keep local Uri or clear it
+                    profileImageUri = null
+                    prefs.edit().remove("profile_image").apply()
+                }
+            }
+        }
+    }
+
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            scope.launch {
+                // Save to SharedPreferences as a fallback
+                prefs.edit().putString("profile_image", it.toString()).apply()
+                profileImageUri = it
+                // Upload to server
+                val result = authRepository.uploadProfilePicture(it)
+                if (result.isSuccess) {
+                    Toast.makeText(context, "Profile picture uploaded successfully", Toast.LENGTH_SHORT).show()
+                    Log.d("HomeScreen", "Profile picture uploaded: $it")
+                    // Fetch the updated profile picture from the server
+                    isLoadingProfilePicture = true
+                    val fetchResult = authRepository.getProfilePicture()
+                    isLoadingProfilePicture = false
+                    if (fetchResult.isSuccess) {
+                        profileImageUri = fetchResult.getOrNull()
+                        prefs.edit().putString("profile_image", profileImageUri?.toString()).apply()
+                        Log.d("HomeScreen", "Profile picture fetched after upload: $profileImageUri")
+                    } else {
+                        Log.e("HomeScreen", "Failed to fetch profile picture after upload: ${fetchResult.exceptionOrNull()?.message}")
+                    }
+                } else {
+                    Toast.makeText(context, "Failed to upload profile picture: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    Log.e("HomeScreen", "Profile picture upload failed: ${result.exceptionOrNull()?.message}")
+                    if (result.exceptionOrNull()?.message?.contains("Unauthorized") == true) {
+                        navController.navigate("login") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
@@ -146,7 +217,6 @@ fun HomeScreen(
             repeat(categoryTotals.size) { add(Animatable(0f)) }
         }
     }
-    val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     LaunchedEffect(categoryTotals) {
@@ -167,6 +237,7 @@ fun HomeScreen(
     var token by remember { mutableStateOf<String?>(null) }
     var tokenFetchFailed by remember { mutableStateOf(false) }
     var retryCount by remember { mutableStateOf(0) }
+
     LaunchedEffect(Unit) {
         if (retryCount < 2) {
             try {
@@ -205,6 +276,9 @@ fun HomeScreen(
                         }
                         change.consume()
                     } else if (!drawerState.isOpen && dragAmount > 0) {
+                        scope.launch {
+                            drawerState.open()
+                        }
                         change.consume()
                     }
                 },
@@ -232,16 +306,43 @@ fun HomeScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clickable {
+                                    imagePickerLauncher.launch("image/*")
+                                },
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = username.firstOrNull()?.uppercase() ?: "U",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                if (isLoadingProfilePicture) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = Color(0xFF734656),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    profileImageUri?.let { uri ->
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(uri)
+                                                .build(),
+                                            contentDescription = "Profile image",
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop,
+                                            onError = {
+                                                Log.e("HomeScreen", "Failed to load profile image: ${it.result.throwable.message}")
+                                                Toast.makeText(context, "Failed to load profile image", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    } ?: Text(
+                                        text = (prefs.getString("username", "User")?.firstOrNull()?.uppercase() ?: "U"),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
@@ -1815,155 +1916,3 @@ fun NavigationButton(
         }
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NotificationsScreen(
-    modifier: Modifier = Modifier,
-    navController: NavController
-) {
-    val context = LocalContext.current
-    val themeColor = Color(0xFF734656)
-
-    // Sample notification data (replace with your actual data source)
-    val notifications = remember {
-        listOf(
-            NotificationItem("Expense Approved", "Your expense for 'Office Supplies' has been approved.", "2025-07-10 10:00"),
-            NotificationItem("Fund Request", "Your fund request of ₱5,000 has been submitted.", "2025-07-09 15:30"),
-            NotificationItem("Reminder", "Please submit your liquidation report by July 15.", "2025-07-08 09:00")
-        )
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 50.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(
-                onClick = { navController.navigateUp() },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back to Home",
-                    tint = Color(0xFF1F2937)
-                )
-            }
-            Text(
-                text = "Notifications",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
-                ),
-                color = Color(0xFF1F2937),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.size(40.dp)) // Placeholder to balance the layout
-        }
-        if (notifications.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No notifications available.",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 18.sp
-                    ),
-                    color = Color(0xFF4B5563),
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(notifications) { index, notification ->
-                    val alpha by animateFloatAsState(
-                        targetValue = 1f,
-                        animationSpec = tween(
-                            durationMillis = 200,
-                            delayMillis = index * 50,
-                            easing = LinearOutSlowInEasing
-                        )
-                    )
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .alpha(alpha),
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "Notification Icon",
-                                tint = themeColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = notification.title,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 16.sp
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = notification.message,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 14.sp
-                                    ),
-                                    color = Color(0xFF4B5563),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = notification.timestamp,
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontSize = 12.sp
-                                    ),
-                                    color = Color(0xFF6B7280),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-data class NotificationItem(
-    val title: String,
-    val message: String,
-    val timestamp: String
-)

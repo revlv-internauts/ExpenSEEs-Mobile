@@ -23,11 +23,13 @@ import java.util.TimeZone
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import id.zelory.compressor.Compressor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.io.FileOutputStream
 
 class AuthRepository(
     private val apiService: ApiService,
@@ -44,6 +46,323 @@ class AuthRepository(
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     }
+
+    suspend fun getProfilePicture(): Result<Uri> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AuthRepository", "Fetching profile picture, coroutineContext=${currentCoroutineContext()}")
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection")
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+
+                val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                var token = prefs.getString("auth_token", null)
+                val userId = prefs.getString("user_id", null)
+                Log.d("AuthRepository", "Stored auth_token: ${token?.take(20) ?: "null"}..., userId: $userId")
+                if (token.isNullOrEmpty() || userId.isNullOrEmpty()) {
+                    Log.e("AuthRepository", "No token or userId found in SharedPreferences")
+                    return@withContext Result.failure(Exception("Not authenticated. Please log in."))
+                }
+
+                try {
+                    val decodedJWT = JWT.decode(token)
+                    val expiry = decodedJWT.expiresAt
+                    val currentTime = Date()
+                    Log.d("AuthRepository", "Token expiry: $expiry, currentTime: $currentTime, raw exp: ${decodedJWT.getClaim("exp").asLong()}")
+                    if (expiry == null || expiry.before(currentTime)) {
+                        Log.d("AuthRepository", "Access token expired, attempting to refresh")
+                        val refreshToken = prefs.getString("refresh_token", null)
+                        if (refreshToken.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "No refresh token available")
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                        val refreshResult = refreshToken(refreshToken)
+                        if (refreshResult.isSuccess) {
+                            token = prefs.getString("auth_token", null)
+                            if (token.isNullOrEmpty()) {
+                                Log.e("AuthRepository", "Failed to obtain new token after refresh")
+                                return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
+                            }
+                        } else {
+                            Log.e("AuthRepository", "Token refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                    }
+                } catch (e: JWTDecodeException) {
+                    Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
+                    return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
+                }
+
+                Log.d("AuthRepository", "Sending profile picture fetch request to /api/users/$userId/profile-picture with token: Bearer ${token.take(20)}...")
+                val response = apiService.getProfilePicture(
+                    token = "Bearer $token",
+                    userId = userId
+                )
+
+                Log.d("AuthRepository", "Get profile picture response: HTTP ${response.code()}, headers=${response.headers()}")
+                if (response.isSuccessful) {
+                    response.body()?.let { responseBody ->
+                        // Save the image to a temporary file
+                        val tempFile = File(context.cacheDir, "profile_picture_${System.currentTimeMillis()}.jpg")
+                        try {
+                            responseBody.byteStream().use { inputStream ->
+                                FileOutputStream(tempFile).use { outputStream ->
+                                    inputStream.copyTo(outputStream)
+                                }
+                            }
+                            if (!tempFile.exists() || tempFile.length() == 0L) {
+                                Log.e("AuthRepository", "Temp file is empty or not created: ${tempFile.absolutePath}")
+                                if (tempFile.exists()) {
+                                    try {
+                                        tempFile.delete()
+                                        Log.d("AuthRepository", "Deleted empty temp file: ${tempFile.absolutePath}")
+                                    } catch (e: Exception) {
+                                        Log.e("AuthRepository", "Error deleting empty temp file: ${e.message}", e)
+                                    }
+                                }
+                                return@withContext Result.failure(Exception("Failed to save profile picture"))
+                            }
+
+                            // Create a Uri for the file using FileProvider
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                tempFile
+                            )
+                            Log.d("AuthRepository", "Profile picture fetched and saved: ${tempFile.absolutePath}, Uri: $uri")
+                            Result.success(uri)
+                        } catch (e: IOException) {
+                            Log.e("AuthRepository", "Failed to save profile picture: ${e.message}", e)
+                            if (tempFile.exists()) {
+                                try {
+                                    tempFile.delete()
+                                    Log.d("AuthRepository", "Deleted temp file on error: ${tempFile.absolutePath}")
+                                } catch (deleteException: Exception) {
+                                    Log.e("AuthRepository", "Error deleting temp file: ${deleteException.message}", deleteException)
+                                }
+                            }
+                            Result.failure(Exception("Failed to save profile picture: ${e.message}"))
+                        }
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Get profile picture failed: HTTP ${response.code()}, body=$errorBody, headers=${response.headers()}")
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
+                    }
+                    val errorMessage = errorResponse?.message
+                        ?: errorResponse?.error
+                        ?: when (response.code()) {
+                            401 -> "Unauthorized: Invalid or expired token. Please log in again."
+                            404 -> "Profile picture not found."
+                            else -> "Server error (${response.code()}). Please try again."
+                        }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in getProfilePicture: ${e.message()}, code=${e.code()}, response=${e.response()?.raw()}", e)
+                val errorMessage = when (e.code()) {
+                    401 -> "Unauthorized: Invalid or expired token."
+                    404 -> "Profile picture not found."
+                    else -> "Network error: ${e.message()}"
+                }
+                Result.failure(Exception(errorMessage))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in getProfilePicture: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Get profile picture error: ${e.message}", e)
+                Result.failure(Exception("Failed to fetch profile picture: ${e.message}"))
+            }
+        }
+    }
+
+    // Upload profile picture
+    suspend fun uploadProfilePicture(uri: Uri): Result<String> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AuthRepository", "Uploading profile picture: uri=$uri, coroutineContext=${currentCoroutineContext()}")
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection")
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+
+                val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                var token = prefs.getString("auth_token", null)
+                val userId = prefs.getString("user_id", null)
+                Log.d("AuthRepository", "Stored auth_token: ${token?.take(20) ?: "null"}..., userId: $userId")
+                if (token.isNullOrEmpty() || userId.isNullOrEmpty()) {
+                    Log.e("AuthRepository", "No token or userId found in SharedPreferences")
+                    return@withContext Result.failure(Exception("Not authenticated. Please log in."))
+                }
+
+                try {
+                    val decodedJWT = JWT.decode(token)
+                    val expiry = decodedJWT.expiresAt
+                    val currentTime = Date()
+                    Log.d("AuthRepository", "Token expiry: $expiry, currentTime: $currentTime, raw exp: ${decodedJWT.getClaim("exp").asLong()}, timezone: ${TimeZone.getDefault().id}")
+                    if (expiry == null || expiry.before(currentTime)) {
+                        Log.d("AuthRepository", "Access token expired, attempting to refresh")
+                        val refreshToken = prefs.getString("refresh_token", null)
+                        if (refreshToken.isNullOrEmpty()) {
+                            Log.e("AuthRepository", "No refresh token available")
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                        val refreshResult = refreshToken(refreshToken)
+                        if (refreshResult.isSuccess) {
+                            token = prefs.getString("auth_token", null)
+                            if (token.isNullOrEmpty()) {
+                                Log.e("AuthRepository", "Failed to obtain new token after refresh")
+                                return@withContext Result.failure(Exception("Unauthorized: Failed to refresh token. Please log in again."))
+                            }
+                        } else {
+                            Log.e("AuthRepository", "Token refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                            return@withContext Result.failure(Exception("Unauthorized: Invalid or expired token. Please log in again."))
+                        }
+                    }
+                } catch (e: JWTDecodeException) {
+                    Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
+                    return@withContext Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
+                }
+
+                // Prepare image part
+                val imagePart = try {
+                    Log.d("AuthRepository", "Processing profile picture URI: $uri")
+                    if (uri.scheme == null || !listOf("content", "file").contains(uri.scheme)) {
+                        Log.e("AuthRepository", "Invalid URI scheme: ${uri.scheme} for URI: $uri")
+                        return@withContext Result.failure(Exception("Invalid image URI"))
+                    }
+                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        if (!cursor.moveToFirst()) {
+                            Log.e("AuthRepository", "URI is invalid or inaccessible: $uri")
+                            return@withContext Result.failure(Exception("Invalid or inaccessible image"))
+                        }
+                    }
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    if (inputStream == null) {
+                        Log.e("AuthRepository", "Failed to open input stream for URI: $uri")
+                        return@withContext Result.failure(Exception("Failed to access image"))
+                    }
+                    inputStream.use { input ->
+                        val tempFile = File(context.cacheDir, "profile_image_${System.currentTimeMillis()}.jpg")
+                        Log.d("AuthRepository", "Creating temp file: ${tempFile.absolutePath}")
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                        if (!tempFile.exists() || tempFile.length() == 0L) {
+                            Log.e("AuthRepository", "Temp file is empty or not created: ${tempFile.absolutePath}")
+                            if (tempFile.exists()) {
+                                try {
+                                    tempFile.delete()
+                                    Log.d("AuthRepository", "Deleted empty temp file: ${tempFile.absolutePath}")
+                                } catch (e: Exception) {
+                                    Log.e("AuthRepository", "Error deleting empty temp file: ${e.message}", e)
+                                }
+                            }
+                            return@withContext Result.failure(Exception("Failed to create image file"))
+                        }
+                        val imageFile = try {
+                            Compressor.compress(context, tempFile)
+                        } catch (e: Exception) {
+                            Log.w("AuthRepository", "Compression failed: ${e.message}, using original file")
+                            tempFile
+                        }
+                        try {
+                            val bytes = imageFile.readBytes()
+                            val fileName = uri.lastPathSegment?.let { segment ->
+                                if (segment.endsWith(".jpg", ignoreCase = true) || segment.endsWith(".jpeg", ignoreCase = true) || segment.endsWith(".png", ignoreCase = true)) {
+                                    segment
+                                } else {
+                                    "profile_image_${System.currentTimeMillis()}.jpg"
+                                }
+                            } ?: "profile_image_${System.currentTimeMillis()}.jpg"
+                            if (bytes.isEmpty()) {
+                                Log.e("AuthRepository", "Image bytes are empty for URI: $uri")
+                                return@withContext Result.failure(Exception("Empty image file"))
+                            }
+                            val mediaType = when {
+                                fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+                                else -> "image/jpeg"
+                            }.toMediaTypeOrNull()
+                            Log.d("AuthRepository", "Image part created: fieldName=file, fileName=$fileName, size=${bytes.size} bytes, mediaType=$mediaType")
+                            MultipartBody.Part.createFormData(
+                                "file",
+                                fileName,
+                                bytes.toRequestBody(mediaType)
+                            )
+                        } finally {
+                            if (imageFile.exists()) {
+                                try {
+                                    imageFile.delete()
+                                    Log.d("AuthRepository", "Temp file deleted: ${imageFile.absolutePath}")
+                                } catch (e: Exception) {
+                                    Log.e("AuthRepository", "Error deleting temp file: ${e.message}", e)
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AuthRepository", "Failed to prepare image part for URI $uri: ${e.message}", e)
+                    return@withContext Result.failure(Exception("Failed to prepare image: ${e.message}"))
+                }
+
+                Log.d("AuthRepository", "Sending profile picture upload request to /api/users/$userId/profile-picture with token: Bearer ${token.take(20)}...")
+                val response = apiService.uploadProfilePicture(
+                    token = "Bearer $token",
+                    userId = userId,
+                    file = imagePart
+                )
+
+                Log.d("AuthRepository", "Upload profile picture response: HTTP ${response.code()}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
+                if (response.isSuccessful) {
+                    Log.d("AuthRepository", "Profile picture uploaded successfully for userId=$userId")
+                    Result.success(uri.toString()) // Return the URI as a success result
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Upload profile picture failed: HTTP ${response.code()}, body=$errorBody, headers=${response.headers()}")
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
+                    }
+                    val errorMessage = errorResponse?.message
+                        ?: errorResponse?.error
+                        ?: when (response.code()) {
+                            401 -> "Unauthorized: Invalid or expired token. Please log in again."
+                            415 -> "Unsupported media type: Server does not accept multipart/form-data."
+                            400 -> "Invalid request: check file format."
+                            404 -> "User not found."
+                            else -> "Server error (${response.code()}). Please try again."
+                        }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in uploadProfilePicture: ${e.message()}, code=${e.code()}, response=${e.response()?.raw()}", e)
+                val errorMessage = when (e.code()) {
+                    401 -> "Unauthorized: Invalid or expired token."
+                    415 -> "Unsupported media type: Server does not accept multipart/form-data."
+                    else -> "Network error: ${e.message()}"
+                }
+                Result.failure(Exception(errorMessage))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in uploadProfilePicture: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Upload profile picture error: ${e.message}", e)
+                Result.failure(Exception("Failed to upload profile picture: ${e.message}"))
+            }
+        }
+    }
+
 
     suspend fun login(usernameOrEmail: String, password: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
