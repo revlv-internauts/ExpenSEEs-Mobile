@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,8 +54,8 @@ fun DetailedLiquidationReport(
                     .background(Color(0xFFF8FAFC)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.size(36.dp)) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back to Budgets", tint = Color(0xFF111827))
+                IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.size(36.dp)) {
+                    Icon(imageVector = Icons.Default.Home, contentDescription = "Navigate to Home", tint = Color(0xFF111827))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(

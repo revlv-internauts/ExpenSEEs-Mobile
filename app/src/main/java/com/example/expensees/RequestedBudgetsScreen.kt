@@ -334,15 +334,15 @@ fun RequestedBudgetsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .scale(scale)
-                                    .then(
-                                        if (budget.status == BudgetStatus.APPROVED && budget.budgetId != null) {
-                                            Modifier.clickable {
+                                    .clickable {
+                                        if (budget.budgetId != null) {
+                                            if (budget.status == BudgetStatus.APPROVED) {
                                                 navController.navigate("liquidation_report/${budget.budgetId}")
+                                            } else {
+                                                navController.navigate("budget_details/${budget.budgetId}")
                                             }
-                                        } else {
-                                            Modifier
                                         }
-                                    ),
+                                    },
                                 statusColors = statusColors
                             )
                         }

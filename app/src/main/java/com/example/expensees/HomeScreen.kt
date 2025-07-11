@@ -112,6 +112,8 @@ fun HomeScreen(
     val email by remember { mutableStateOf(prefs.getString("email", "user@example.com") ?: "user@example.com") }
     var profileImageUri by remember { mutableStateOf<Uri?>(prefs.getString("profile_image", null)?.let { Uri.parse(it) }) }
     var isLoadingProfilePicture by remember { mutableStateOf(false) }
+    var showProfileOptionsDialog by remember { mutableStateOf(false) }
+    var showProfilePictureDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (authRepository.isAuthenticated()) {
@@ -140,22 +142,18 @@ fun HomeScreen(
         }
     }
 
-
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
             scope.launch {
-                // Save to SharedPreferences as a fallback
                 prefs.edit().putString("profile_image", it.toString()).apply()
                 profileImageUri = it
-                // Upload to server
                 val result = authRepository.uploadProfilePicture(it)
                 if (result.isSuccess) {
                     Toast.makeText(context, "Profile picture uploaded successfully", Toast.LENGTH_SHORT).show()
                     Log.d("HomeScreen", "Profile picture uploaded: $it")
-                    // Fetch the updated profile picture from the server
                     isLoadingProfilePicture = true
                     val fetchResult = authRepository.getProfilePicture()
                     isLoadingProfilePicture = false
@@ -174,6 +172,78 @@ fun HomeScreen(
                             popUpTo("home") { inclusive = true }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Profile picture options dialog
+    if (showProfileOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileOptionsDialog = false },
+            title = { Text("Profile Picture Options") },
+            text = { Text("Would you like to view or change your profile picture?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showProfileOptionsDialog = false
+                        showProfilePictureDialog = true
+                    }
+                ) {
+                    Text("View")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showProfileOptionsDialog = false
+                        imagePickerLauncher.launch("image/*")
+                    }
+                ) {
+                    Text("Change")
+                }
+            }
+        )
+    }
+
+    // Profile picture viewer dialog
+    if (showProfilePictureDialog && profileImageUri != null) {
+        Dialog(
+            onDismissRequest = { showProfilePictureDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(profileImageUri)
+                        .build(),
+                    contentDescription = "Full-size profile picture",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(0.dp)),
+                    contentScale = ContentScale.Fit,
+                    onError = {
+                        Log.e("HomeScreen", "Failed to load full-size profile image: ${it.result.throwable.message}")
+                        Toast.makeText(context, "Failed to load profile image", Toast.LENGTH_SHORT).show()
+                        showProfilePictureDialog = false
+                    }
+                )
+                IconButton(
+                    onClick = { showProfilePictureDialog = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .background(Color(0xFFE5E7EB), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close image",
+                        tint = Color(0xFF1F2937)
+                    )
                 }
             }
         }
@@ -309,7 +379,11 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clickable {
-                                    imagePickerLauncher.launch("image/*")
+                                    if (isLoadingProfilePicture) {
+                                        Toast.makeText(context, "Profile picture is still loading", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        showProfileOptionsDialog = true
+                                    }
                                 },
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
@@ -485,16 +559,81 @@ fun HomeScreen(
                     color = Color(0xFF1F2937),
                     textAlign = TextAlign.Center
                 )
+
+                var notificationsViewed by remember {
+                    mutableStateOf(prefs.getBoolean("notifications_viewed", false))
+                }
+                val lastNotificationViewTime by remember {
+                    mutableStateOf(prefs.getLong("last_notification_view_time", 0L))
+                }
+
+
+                LaunchedEffect(expenses) {
+                    if (expenses.isNotEmpty()) {
+                        val latestExpenseTime = expenses.maxOfOrNull {
+                            it.createdAt?.let { createdAt ->
+                                java.time.LocalDateTime.parse(createdAt).toEpochSecond(java.time.ZoneOffset.UTC)
+                            } ?: 0L
+                        } ?: 0L
+                        if (latestExpenseTime > lastNotificationViewTime) {
+                            notificationsViewed = false
+                            prefs.edit().putBoolean("notifications_viewed", false).apply()
+                        }
+                    }
+                }
+
+                val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+
+
+                LaunchedEffect(expenses) {
+                    if (expenses.isNotEmpty()) {
+                        val latestExpenseTime = expenses.maxOfOrNull {
+                            it.createdAt?.let { createdAt ->
+                                java.time.LocalDateTime.parse(createdAt).toEpochSecond(java.time.ZoneOffset.UTC)
+                            } ?: 0L
+                        } ?: 0L
+                        if (latestExpenseTime > lastNotificationViewTime) {
+                            notificationsViewed = false
+                            prefs.edit().putBoolean("notifications_viewed", false).apply()
+                        }
+                    }
+                }
+
+                LaunchedEffect(notificationsViewed) {
+                    prefs.edit().putBoolean("notifications_viewed", notificationsViewed).apply()
+                    if (notificationsViewed) {
+                        prefs.edit().putLong("last_notification_view_time", System.currentTimeMillis() / 1000).apply()
+                    }
+                }
                 IconButton(
-                    onClick = { navController.navigate("notifications") },
-                    modifier = Modifier
-                        .size(40.dp)
+                    onClick = {
+                        navController.navigate("notifications")
+                        notificationsViewed = true // Set to true when bell is clicked
+                    },
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF1F2937)
-                    )
+                    Box {
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = "Notifications",
+                            tint = Color(0xFF1F2937)
+                        )
+                        if (expenses.isNotEmpty() && !notificationsViewed) { // Show circle only if not viewed
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp) // Smaller circle
+                                    .align(Alignment.TopEnd)
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = CircleShape
+                                    )
+                            )
+                        }
+                    }
                 }
             }
             if (expenses.isEmpty()) {
@@ -804,7 +943,7 @@ fun HomeScreen(
                 NavigationButton(
                     icon = Icons.Default.Assignment,
                     label = "Report",
-                    onClick = { navController.navigate("liquidation_report") },
+                    onClick = { navController.navigate("liquidation_reports") },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1914,5 +2053,28 @@ fun NavigationButton(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun DrawerItem(icon: ImageVector, text: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

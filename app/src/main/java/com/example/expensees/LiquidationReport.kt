@@ -53,8 +53,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 // ViewModel to hold selectedExpensesMap state
+data class ReportRecord(val budgetName: String, val timestamp: String)
+
 class LiquidationViewModel : ViewModel() {
     val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
+    val generatedReports = mutableStateListOf<ReportRecord>()
 
     fun clearSelections() {
         selectedExpensesMap.clear()
@@ -65,6 +68,10 @@ class LiquidationViewModel : ViewModel() {
         if (expenses.isEmpty()) {
             selectedExpensesMap.remove(index)
         }
+    }
+
+    fun addGeneratedReport(budgetName: String, timestamp: String) {
+        generatedReports.add(ReportRecord(budgetName, timestamp))
     }
 }
 
@@ -84,10 +91,9 @@ fun LiquidationReport(
     var selectedBudget by remember { mutableStateOf<SubmittedBudget?>(null) }
     var showExpenseSelectionDialog by remember { mutableStateOf(false) }
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
-    val selectedExpensesMap = viewModel.selectedExpensesMap // Use ViewModel's map
-    val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() } // Moved to top level
+    val selectedExpensesMap = viewModel.selectedExpensesMap
+    val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
 
-    // Set selectedBudget based on budgetId
     LaunchedEffect(budgetId) {
         if (budgetId != null) {
             val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
@@ -102,7 +108,7 @@ fun LiquidationReport(
 
     LaunchedEffect(selectedBudget) {
         if (selectedBudget == null) {
-            viewModel.clearSelections() // Clear the map when no budget is selected
+            viewModel.clearSelections()
         }
     }
 
@@ -111,14 +117,12 @@ fun LiquidationReport(
         maximumFractionDigits = 2
         isGroupingUsed = true
     }
-    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    val generatedReports = remember { mutableStateListOf<String>() }
+    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     var showReportDialog by remember { mutableStateOf(false) }
     var reportContent by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Category colors from FundRequest
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
@@ -130,7 +134,6 @@ fun LiquidationReport(
     )
     val categoryColors = categories.zip(colorList).toMap()
 
-    // Status colors
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFD4A017),
         BudgetStatus.APPROVED to Color(0xFF388E3C),
@@ -143,7 +146,6 @@ fun LiquidationReport(
         BudgetStatus.DENIED to Color(0xFF1F2937)
     )
 
-    // Animation for budget cards
     val animatedScale = remember {
         mutableStateListOf<Animatable<Float, *>>().apply {
             repeat(authRepository.submittedBudgets.size) { add(Animatable(0f)) }
@@ -164,7 +166,6 @@ fun LiquidationReport(
         }
     }
 
-    // Fetch budgets and expenses
     LaunchedEffect(Unit) {
         isLoading = true
         errorMessage = null
@@ -817,7 +818,10 @@ fun LiquidationReport(
                                     coroutineScope.launch {
                                         try {
                                             delay(1000)
-                                            // Log the selectedExpensesMap to verify its contents
+                                            viewModel.addGeneratedReport(
+                                                budgetName = budget.name,
+                                                timestamp = OffsetDateTime.now().format(dateFormatter)
+                                            )
                                             println("Navigating to DetailedLiquidationReport with selectedExpensesMap: $selectedExpensesMap")
                                             navController.navigate("detailed_liquidation_report/${budget.budgetId}")
                                             Toast.makeText(
@@ -887,7 +891,7 @@ fun LiquidationReport(
         if (showExpenseSelectionDialog && currentExpenseItem != null) {
             val filteredExpenses = authRepository.userExpenses.filter { it.category == currentExpenseItem!!.first.category }
             LaunchedEffect(filteredExpenses, currentExpenseItem) {
-                checkedExpenses.clear() // Clear previous state
+                checkedExpenses.clear()
                 filteredExpenses.forEach { expense ->
                     checkedExpenses[expense] = selectedExpensesMap[currentExpenseItem!!.second]?.contains(expense) ?: false
                 }

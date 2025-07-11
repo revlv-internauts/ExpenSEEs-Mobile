@@ -175,6 +175,12 @@ fun ExpenseListScreen(
         }
     )
 
+    // Clear selected expenses when the date changes
+    LaunchedEffect(selectedDate) {
+        selectedExpenses = emptySet()
+        showCheckboxes = false
+    }
+
     // Category colors and icons
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
@@ -401,6 +407,19 @@ fun ExpenseListScreen(
 
         // Mini calendar
         if (!showAllExpenses) {
+            Text(
+                text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp
+                ),
+                color = Color(0xFF1F2937),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                textAlign = TextAlign.Center
+            )
+
             LazyRow(
                 state = lazyListState,
                 modifier = Modifier
@@ -409,6 +428,15 @@ fun ExpenseListScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(days) { day ->
+                    val hasExpenses = expenses.any { expense ->
+                        try {
+                            expense.dateOfTransaction?.let {
+                                LocalDate.parse(it, dateFormatter) == day
+                            } ?: false
+                        } catch (e: DateTimeParseException) {
+                            false
+                        }
+                    }
                     val isSelected = day == selectedDate
                     Surface(
                         modifier = Modifier
@@ -439,6 +467,13 @@ fun ExpenseListScreen(
                                     0xFF4B5563
                                 )
                             )
+                            if (hasExpenses) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(Color.Blue, CircleShape)
+                                )
+                            }
                         }
                     }
                 }
@@ -756,6 +791,44 @@ fun ExpenseListScreen(
                         Text(
                             text = "Deselect All",
                             color = themeColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                Button(
+                    onClick = {
+                        selectedExpenses = filteredExpenses.toSet()
+                        showCheckboxes = true
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Select All",
+                            color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center
@@ -1532,35 +1605,24 @@ fun ExpenseListScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black), // Black background for full-screen effect
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 selectedImagePath?.let { imagePath ->
                     var imageLoadFailed by remember { mutableStateOf(false) }
-                    // State for zoom and pan
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
-                    // Track image and container size
                     var imageSize by remember { mutableStateOf(IntSize.Zero) }
                     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
                     val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-                        // Update scale, limited between 1x and 5x
                         val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-
-                        // Calculate scaled image dimensions
                         val scaledWidth = imageSize.width * newScale
                         val scaledHeight = imageSize.height * newScale
-
-                        // Calculate maximum allowable offsets to keep image within bounds
                         val maxX = maxOf(0f, (scaledWidth - containerSize.width) / 2f)
                         val maxY = maxOf(0f, (scaledHeight - containerSize.height) / 2f)
-
-                        // Calculate new offset with the proposed change
                         val newOffsetX = (offset.x + offsetChange.x).coerceIn(-maxX, maxX)
                         val newOffsetY = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
-
-                        // Update state only if values change
                         if (newScale != scale || newOffsetX != offset.x || newOffsetY != offset.y) {
                             scale = newScale
                             offset = Offset(newOffsetX, newOffsetY)
@@ -1676,7 +1738,7 @@ fun ExpenseListScreen(
                                                 "ExpenseListScreen",
                                                 "Retry token fetched: ${token?.take(20)}..."
                                             )
-                                        }else {
+                                        } else {
                                             tokenFetchFailed = true
                                             Toast.makeText(
                                                 context,

@@ -166,5 +166,23 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 modifier = modifier
             )
         }
+        composable("liquidation_reports") {
+            LiquidationReportsScreen(
+                navController = navController,
+                viewModel = liquidationViewModel, // Use shared ViewModel
+                authRepository = authRepository, // Pass authRepository
+                modifier = modifier
+            )
+        }
+        composable("budget_details/{budgetId}") { backStackEntry ->
+            val budgetId = backStackEntry.arguments?.getString("budgetId")
+            if (budgetId != null) {
+                BudgetDetailsScreen(
+                    navController = navController,
+                    authRepository = authRepository,
+                    budgetId = budgetId
+                )
+            }
+        }
     }
 }

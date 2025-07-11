@@ -81,6 +81,11 @@ data class SignInResponse(
     @SerializedName("email") val email: String?
 )
 
+data class ResetPasswordRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("newPassword") val newPassword: String
+)
+
 data class ErrorResponse(
     @SerializedName("message") val message: String?,
     @SerializedName("error") val error: String?

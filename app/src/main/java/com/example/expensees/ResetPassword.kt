@@ -12,22 +12,32 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,11 +51,14 @@ fun ResetPassword(
     modifier: Modifier = Modifier,
     navController: NavController
 ) {
+    var email by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isResetComplete by remember { mutableStateOf(false) }
+    var showNewPassword by remember { mutableStateOf(false) }
+    var showConfirmPassword by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val interactionSource = remember { MutableInteractionSource() }
@@ -56,17 +69,24 @@ fun ResetPassword(
         label = "button_scale"
     )
 
-    BackHandler(enabled = true) {
-        navController.navigate("home") {
-            popUpTo("home") { inclusive = false }
-        }
-    }
+    // Focus management
+    val focusManager = LocalFocusManager.current
+    val emailFocusRequester = remember { FocusRequester() }
+    val newPasswordFocusRequester = remember { FocusRequester() }
+    val confirmPasswordFocusRequester = remember { FocusRequester() }
 
+    // Handle clicking outside to dismiss keyboard
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .windowInsetsPadding(WindowInsets(0, 0, 0, 0)),
+            .windowInsetsPadding(WindowInsets(0, 0, 0, 0))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                focusManager.clearFocus()
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -90,21 +110,102 @@ fun ResetPassword(
             )
 
             OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email Address") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 200.dp)
+                    .focusRequester(emailFocusRequester)
+                    .onKeyEvent { event ->
+                        if (event.key == Key.Enter && event.type == KeyEventType.KeyUp) {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
+                )
+            )
+
+            OutlinedTextField(
                 value = newPassword,
                 onValueChange = { newPassword = it },
                 label = { Text("New Password") },
-                modifier = Modifier.fillMaxWidth().padding(top = 200.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .focusRequester(newPasswordFocusRequester),
+                visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showNewPassword = !showNewPassword }) {
+                        Icon(
+                            imageVector = if (showNewPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showNewPassword) "Hide password" else "Show password",
+                            tint = Color(0xFF1F2937)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
+                )
             )
 
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+                    .focusRequester(confirmPasswordFocusRequester),
+                visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                        Icon(
+                            imageVector = if (showConfirmPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showConfirmPassword) "Hide password" else "Show password",
+                            tint = Color(0xFF1F2937)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
+                            errorMessage = "Please fill all fields"
+                        } else if (newPassword != confirmPassword) {
+                            errorMessage = "Passwords do not match"
+                        } else {
+                            coroutineScope.launch {
+                                isLoading = true
+                                delay(1500L)
+                                isLoading = false
+                                isResetComplete = true
+                                errorMessage = null
+                                Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
             )
 
             errorMessage?.let {
@@ -125,7 +226,7 @@ fun ResetPassword(
                 color = Color.Transparent,
                 shadowElevation = 4.dp,
                 onClick = {
-                    if (newPassword.isBlank() || confirmPassword.isBlank()) {
+                    if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
                         errorMessage = "Please fill all fields"
                     } else if (newPassword != confirmPassword) {
                         errorMessage = "Passwords do not match"
@@ -182,7 +283,6 @@ fun ResetPassword(
             }
         }
 
-        // Back button aligned with HomeScreen's navigation profile button
         IconButton(
             onClick = {
                 navController.navigate("home") {
@@ -200,6 +300,12 @@ fun ResetPassword(
                 contentDescription = "Back",
                 tint = Color(0xFF1F2937)
             )
+        }
+    }
+
+    BackHandler(enabled = true) {
+        navController.navigate("home") {
+            popUpTo("home") { inclusive = false }
         }
     }
 }
