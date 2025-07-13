@@ -8,7 +8,7 @@ import com.google.gson.annotations.SerializedName
 
 
 enum class BudgetStatus {
-    PENDING, APPROVED, DENIED
+    PENDING, DENIED, RELEASED, LIQUIDATED
 }
 
 data class ExpenseItem(
@@ -25,16 +25,12 @@ data class ExpenseItem(
 )
 
 data class SubmittedBudget(
-    @SerializedName("budgetId")
-    val budgetId: String? = null,
-    @SerializedName("name")
-    val name: String,
-    @SerializedName("expenses")
-    val expenses: List<ExpenseItem>,
-    @SerializedName("total")
-    val total: Double,
-    @SerializedName("status")
-    val status: BudgetStatus
+    @SerializedName("budgetId") val budgetId: String?,
+    @SerializedName("name") val name: String,
+    @SerializedName("expenses") val expenses: List<ExpenseItem>,
+    @SerializedName("total") val total: Double,
+    @SerializedName("status") val status: BudgetStatus,
+    @SerializedName("budgetDate") val budgetDate: String?
 )
 
 

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1089,22 +1090,23 @@ fun RecordExpensesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 50.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(
-                    onClick = { navController.navigate("home") },
+                    onClick = { navController.navigate("list_expenses") },
                     modifier = Modifier
                         .size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back to home",
+                        contentDescription = "Back to expense list",
                         tint = Color(0xFF1F2937)
                     )
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1117,6 +1119,17 @@ fun RecordExpensesScreen(
                         color = Color(0xFF1F2937),
                         textAlign = TextAlign.Center,
                         maxLines = 1
+                    )
+                }
+                IconButton(
+                    onClick = { navController.navigate("home") },
+                    modifier = Modifier
+                        .size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = "Go to home",
+                        tint = Color(0xFF1F2937)
                     )
                 }
             }
@@ -1524,11 +1537,11 @@ fun RecordExpensesScreen(
             // Add Expense Button
             Button(
                 onClick = {
+                    if (selectedImageUri == null) {
+                        Toast.makeText(context, "Please upload a receipt image", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     if (remarks.isNotBlank() && amount.isNotBlank() && category.isNotBlank() && dateOfTransaction.isNotBlank()) {
-                        if (selectedImageUri == null) {
-                            Toast.makeText(context, "Please upload a receipt image", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
                         val amountValue = amount.toDoubleOrNull()
                         if (amountValue != null) {
                             // Use device's local time for createdAt
@@ -1744,43 +1757,6 @@ fun RecordExpensesScreen(
                             textAlign = TextAlign.Center
                         )
                     }
-                }
-            }
-
-            // View Expenses Button
-            Button(
-                onClick = { navController.navigate("list_expenses") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(bottom = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                ),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                start = Offset(0f, 0f),
-                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "View Expenses",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }

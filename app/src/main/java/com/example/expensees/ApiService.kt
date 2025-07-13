@@ -1,6 +1,7 @@
 package com.example.expensees.network
 
 import com.example.expensees.models.Expense
+import com.example.expensees.models.LiquidationReportData
 import com.example.expensees.models.SubmittedBudget
 import com.google.gson.annotations.SerializedName
 import okhttp3.MultipartBody
@@ -8,6 +9,8 @@ import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("api/auth/sign-in")
@@ -66,6 +69,22 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("userId") userId: String
     ): Response<ResponseBody>
+
+    @POST("api/reports/liquidation")
+    suspend fun submitLiquidationReport(
+        @Header("Authorization") token: String,
+        @Body report: LiquidationReportData
+    ): Response<LiquidationReportData>
+
+    @POST("api/forgotPassword/reset-password")
+    suspend fun resetPassword(
+        @Header("Authorization") token: String,
+        @Query("email") email: String,
+        @Body request: ChangePassword
+    ): Response<Unit>
+
+    @POST("api/forgotPassword/reset-password")
+    suspend fun resetPassword(@Body request: ChangePassword): Response<Unit>
 }
 
 data class SignInRequest(
@@ -81,9 +100,10 @@ data class SignInResponse(
     @SerializedName("email") val email: String?
 )
 
-data class ResetPasswordRequest(
-    @SerializedName("email") val email: String,
-    @SerializedName("newPassword") val newPassword: String
+data class ChangePassword(
+    @SerializedName("currentPassword") val currentPassword: String,
+    @SerializedName("newPassword") val newPassword: String,
+    @SerializedName("repeatPassword") val repeatPassword: String
 )
 
 data class ErrorResponse(

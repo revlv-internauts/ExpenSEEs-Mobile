@@ -45,7 +45,7 @@ fun BudgetDetailsScreen(
     val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFD4A017),
-        BudgetStatus.APPROVED to Color(0xFF388E3C),
+        BudgetStatus.RELEASED to Color(0xFF388E3C),
         BudgetStatus.DENIED to Color(0xFFD32F2F)
     )
 

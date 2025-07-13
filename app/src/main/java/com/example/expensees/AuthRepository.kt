@@ -24,10 +24,12 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.example.expensees.models.LiquidationReportData
 import id.zelory.compressor.Compressor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.EOFException
 import java.io.File
 import java.io.FileOutputStream
 
@@ -46,6 +48,104 @@ class AuthRepository(
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     }
+
+    suspend fun resetPassword(
+        email: String,
+        currentPassword: String,
+        newPassword: String,
+        confirmPassword: String
+    ): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            repeat(2) { attempt ->
+                try {
+                    Log.d("AuthRepository", "Attempting password reset for email: $email (Attempt ${attempt + 1})")
+                    if (!isNetworkAvailable(context)) {
+                        Log.e("AuthRepository", "No network connection")
+                        return@withContext Result.failure(Exception("No internet connection"))
+                    }
+
+                    // Get logged-in user's email and token from SharedPreferences
+                    val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                    val loggedInEmail = prefs.getString("email", null)
+                    val token = prefs.getString("auth_token", null)
+                    if (loggedInEmail.isNullOrEmpty() || token.isNullOrEmpty()) {
+                        Log.e("AuthRepository", "No logged-in user or token found")
+                        return@withContext Result.failure(Exception("Not authenticated. Please log in."))
+                    }
+
+                    // Validate email
+                    if (email != loggedInEmail) {
+                        Log.e("AuthRepository", "Input email does not match logged-in user's email")
+                        return@withContext Result.failure(Exception("Email does not match the logged-in user's email"))
+                    }
+
+                    // Validate passwords
+                    if (newPassword != confirmPassword) {
+                        Log.e("AuthRepository", "New password and confirm password do not match")
+                        return@withContext Result.failure(Exception("Passwords do not match"))
+                    }
+
+                    Log.d("AuthRepository", "Sending password reset request for email: $email")
+                    val response = apiService.resetPassword(
+                        "Bearer $token",
+                        email,
+                        ChangePassword(currentPassword, newPassword, confirmPassword)
+                    )
+                    Log.d("AuthRepository", "Reset password response: HTTP ${response.code()}, errorBody=${response.errorBody()?.string() ?: "null"}")
+
+                    if (response.isSuccessful) {
+                        Log.d("AuthRepository", "Password reset successful for email: $email")
+                        return@withContext Result.success(Unit)
+                    } else {
+                        val errorBody = response.errorBody()?.string()
+                        Log.e("AuthRepository", "Password reset failed: HTTP ${response.code()}, body=$errorBody")
+                        val errorResponse = errorBody?.let {
+                            try {
+                                Gson().fromJson(it, ErrorResponse::class.java)
+                            } catch (e: Exception) {
+                                Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                                null
+                            }
+                        }
+                        val errorMessage = errorResponse?.message
+                            ?: errorResponse?.error
+                            ?: when (response.code()) {
+                                400 -> "Invalid request: Check email or password format"
+                                401 -> "Unauthorized: Invalid or expired token"
+                                404 -> "User not found"
+                                500 -> "Server error: Unable to process request. Please try again later."
+                                else -> "Server error (${response.code()}). Please try again."
+                            }
+                        return@withContext Result.failure(Exception(errorMessage))
+                    }
+                } catch (e: EOFException) {
+                    Log.e("AuthRepository", "EOF error in resetPassword: ${e.message}", e)
+                    if (attempt == 1) {
+                        return@withContext Result.failure(Exception("Server response was incomplete. Please try again later."))
+                    }
+                    Log.w("AuthRepository", "Retrying due to EOFException: ${e.message}")
+                } catch (e: HttpException) {
+                    Log.e("AuthRepository", "HTTP error in resetPassword: ${e.message()}, code=${e.code()}", e)
+                    val errorMessage = when (e.code()) {
+                        400 -> "Invalid request: Check email or password format"
+                        401 -> "Unauthorized: Invalid or expired token"
+                        404 -> "User not found"
+                        500 -> "Server error: Unable to process request"
+                        else -> "Network error: ${e.message()}"
+                    }
+                    return@withContext Result.failure(Exception(errorMessage))
+                } catch (e: IOException) {
+                    Log.e("AuthRepository", "IO error in resetPassword: ${e.message}", e)
+                    return@withContext Result.failure(Exception("No internet connection or server issue"))
+                } catch (e: Exception) {
+                    Log.e("AuthRepository", "Password reset error: ${e.message}", e)
+                    return@withContext Result.failure(Exception("Failed to reset password: ${e.message}"))
+                }
+            }
+            Result.failure(Exception("Failed to reset password after retries"))
+        }
+    }
+
 
     suspend fun getProfilePicture(): Result<Uri> {
         return withContext(Dispatchers.IO) {
@@ -1233,6 +1333,69 @@ class AuthRepository(
             } catch (e: JWTDecodeException) {
                 Log.e("AuthRepository", "Invalid JWT: ${e.message}", e)
                 Result.failure(Exception("Unauthorized: Invalid token. Please log in again."))
+            }
+        }
+    }
+
+    suspend fun submitLiquidationReport(report: LiquidationReportData): Result<LiquidationReportData> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d("AuthRepository", "Submitting liquidation report: reportId=${report.reportId}, budgetId=${report.budgetId}")
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection")
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
+                }
+                val token = tokenResult.getOrNull()!!
+
+                Log.d("AuthRepository", "Sending request to /api/reports/liquidation with token: Bearer ${token.take(20)}...")
+                val response = apiService.submitLiquidationReport("Bearer $token", report)
+                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+
+                if (response.isSuccessful) {
+                    response.body()?.let { returnedReport ->
+                        Log.d("AuthRepository", "Liquidation report submitted: reportId=${returnedReport.reportId}")
+                        Result.success(returnedReport)
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Submit liquidation report failed: HTTP ${response.code()}, body=$errorBody")
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
+                    }
+                    val errorMessage = errorResponse?.message
+                        ?: errorResponse?.error
+                        ?: when (response.code()) {
+                            401 -> "Unauthorized: Invalid or expired token. Please log in again."
+                            400 -> "Invalid report data: check field formats."
+                            422 -> "Validation error: ensure all required fields are provided."
+                            else -> "Server error (${response.code()}). Please try again."
+                        }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in submitLiquidationReport: ${e.message()}, code=${e.code()}", e)
+                val errorMessage = when (e.code()) {
+                    401 -> "Unauthorized: Invalid or expired token."
+                    else -> "Network error: ${e.message()}"
+                }
+                Result.failure(Exception(errorMessage))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in submitLiquidationReport: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Submit liquidation report error: ${e.message}", e)
+                Result.failure(Exception("Failed to submit liquidation report: ${e.message}"))
             }
         }
     }

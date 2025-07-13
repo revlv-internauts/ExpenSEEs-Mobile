@@ -451,21 +451,11 @@ fun HomeScreen(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Palette, contentDescription = "Theme Icon") },
-                        label = { Text("Theme") },
-                        selected = false,
-                        onClick = {
-                            Toast.makeText(context, "Theme clicked", Toast.LENGTH_SHORT).show()
-                            scope.launch { drawerState.close() }
-                        },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
-                    NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Info, contentDescription = "About Icon") },
                         label = { Text("About") },
                         selected = false,
                         onClick = {
-                            Toast.makeText(context, "About clicked", Toast.LENGTH_SHORT).show()
+                            navController.navigate("about")
                             scope.launch { drawerState.close() }
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -566,24 +556,6 @@ fun HomeScreen(
                 val lastNotificationViewTime by remember {
                     mutableStateOf(prefs.getLong("last_notification_view_time", 0L))
                 }
-
-
-                LaunchedEffect(expenses) {
-                    if (expenses.isNotEmpty()) {
-                        val latestExpenseTime = expenses.maxOfOrNull {
-                            it.createdAt?.let { createdAt ->
-                                java.time.LocalDateTime.parse(createdAt).toEpochSecond(java.time.ZoneOffset.UTC)
-                            } ?: 0L
-                        } ?: 0L
-                        if (latestExpenseTime > lastNotificationViewTime) {
-                            notificationsViewed = false
-                            prefs.edit().putBoolean("notifications_viewed", false).apply()
-                        }
-                    }
-                }
-
-                val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-
 
                 LaunchedEffect(expenses) {
                     if (expenses.isNotEmpty()) {
@@ -929,14 +901,14 @@ fun HomeScreen(
                 NavigationButton(
                     icon = Icons.Default.Add,
                     label = "Record",
-                    onClick = onRecordExpensesClick,
+                    onClick = onListExpensesClick,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 NavigationButton(
                     icon = Icons.Default.RequestQuote,
                     label = "Request",
-                    onClick = { navController.navigate("fund_request") },
+                    onClick = { navController.navigate("requested_budgets") },
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))

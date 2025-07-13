@@ -42,7 +42,7 @@ fun DetailedLiquidationReport(
 
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFCA8A04),
-        BudgetStatus.APPROVED to Color(0xFF16A34A),
+        BudgetStatus.RELEASED to Color(0xFF16A34A),
         BudgetStatus.DENIED to Color(0xFFDC2626)
     )
 

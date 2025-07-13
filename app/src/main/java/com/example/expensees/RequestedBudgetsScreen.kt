@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,7 +60,7 @@ fun RequestedBudgetsScreen(
     // Status colors from LiquidationReport
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFD4A017),
-        BudgetStatus.APPROVED to Color(0xFF388E3C),
+        BudgetStatus.RELEASED to Color(0xFF388E3C),
         BudgetStatus.DENIED to Color(0xFFD32F2F)
     )
 
@@ -83,13 +85,22 @@ fun RequestedBudgetsScreen(
         }
     }
 
+    // Fetch budgets when the screen is loaded
+    LaunchedEffect(Unit) {
+        authRepository.getBudgets().onSuccess {
+            Log.d("RequestedBudgetsScreen", "Budgets fetched successfully")
+        }.onFailure { e ->
+            Log.e("RequestedBudgetsScreen", "Failed to fetch budgets: ${e.message}")
+        }
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5)),
     ) { innerPadding ->
         val focusManager = LocalFocusManager.current
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
@@ -98,181 +109,156 @@ fun RequestedBudgetsScreen(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) { focusManager.clearFocus() },
-            horizontalAlignment = Alignment.CenterHorizontally
+                ) { focusManager.clearFocus() }
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 50.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                IconButton(
-                    onClick = {
-                        if (selectedCategory != null) {
-                            selectedCategory = null
-                        } else if (showAllBudgets) {
-                            showAllBudgets = false
-                        } else {
-                            navController.navigate("home") {
-                                popUpTo("requested_budgets") { inclusive = true }
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color(0xFF1F2937)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = if (showAllBudgets) "All Budget Requests"
-                    else if (selectedCategory != null) "${selectedCategory!!.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} Budget Requests"
-                    else "Requested Budgets",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
-                    ),
-                    color = Color(0xFF1F2937),
-                    modifier = Modifier
-                        .weight(1f)
-                        .offset(x = (-18).dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            if (selectedCategory == null && !showAllBudgets) {
-                Text(
-                    text = "Select a Budget Category",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
-                    ),
-                    color = Color(0xFF1F2937),
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-                val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
-                val approvedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.APPROVED }
-                val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
-
-                Button(
-                    onClick = { selectedCategory = BudgetStatus.PENDING },
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF78495B),
-                        disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = pendingCount > 0,
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 2.dp
-                    )
+                        .padding(top = 50.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Pending Budgets ($pendingCount)",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Button(
-                    onClick = { selectedCategory = BudgetStatus.APPROVED },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF78495B),
-                        disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = approvedCount > 0,
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 2.dp
-                    )
-                ) {
-                    Text(
-                        text = "Approved Budgets ($approvedCount)",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Button(
-                    onClick = { selectedCategory = BudgetStatus.DENIED },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF78495B),
-                        disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = deniedCount > 0,
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 2.dp
-                    )
-                ) {
-                    Text(
-                        text = "Denied Budgets ($deniedCount)",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Button(
-                    onClick = { showAllBudgets = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF78495B)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 2.dp
-                    )
-                ) {
-                    Text(
-                        text = "View All Budgets",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                if (showAllBudgets || selectedCategory != null) {
-                    Button(
+                    IconButton(
                         onClick = {
-                            selectedCategory = null
-                            showAllBudgets = false
+                            if (selectedCategory != null) {
+                                selectedCategory = null
+                            } else if (showAllBudgets) {
+                                showAllBudgets = false
+                            } else {
+                                navController.navigate("home") {
+                                    popUpTo("requested_budgets") { inclusive = true }
+                                }
+                            }
                         },
+                        modifier = Modifier
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFF1F2937)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = if (showAllBudgets) "All Budget Requests"
+                        else if (selectedCategory != null) "${selectedCategory!!.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} Budget Requests"
+                        else "Requested Budgets",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier
+                            .weight(1f)
+                            .offset(x = (-18).dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                if (selectedCategory == null && !showAllBudgets) {
+                    Text(
+                        text = "Select a Budget Category",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    val pendingCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.PENDING }
+                    val releasedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.RELEASED }
+                    val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
+
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.PENDING },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .padding(bottom = 8.dp),
+                            .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF734656)
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = pendingCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
+                    ) {
+                        Text(
+                            text = "Pending Budgets ($pendingCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.RELEASED },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = releasedCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
+                    ) {
+                        Text(
+                            text = "Released Budgets ($releasedCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Button(
+                        onClick = { selectedCategory = BudgetStatus.DENIED },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF78495B),
+                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = deniedCount > 0,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
+                    ) {
+                        Text(
+                            text = "Denied Budgets ($deniedCount)",
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Button(
+                        onClick = { showAllBudgets = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF78495B)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         elevation = ButtonDefaults.buttonElevation(
@@ -281,72 +267,137 @@ fun RequestedBudgetsScreen(
                         )
                     ) {
                         Text(
-                            text = "Back to Categories",
+                            text = "View All Budgets",
                             fontSize = 16.sp,
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.Center
                         )
                     }
-                }
-
-                val budgetsToShow = when {
-                    showAllBudgets -> authRepository.submittedBudgets
-                    selectedCategory != null -> authRepository.submittedBudgets.filter { it.status == selectedCategory }
-                    else -> authRepository.submittedBudgets
-                }
-
-                if (budgetsToShow.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = when {
-                                showAllBudgets -> "No budget requests available."
-                                selectedCategory != null -> "No ${selectedCategory!!.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} budget requests."
-                                else -> "No budgets requested yet."
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 18.sp
-                            ),
-                            color = Color(0xFF4B5563),
-                            textAlign = TextAlign.Center
-                        )
-                    }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(budgetsToShow) { budget ->
-                            val index = budgetsToShow.indexOf(budget)
-                            val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
-                            BudgetCard(
-                                budget = budget,
-                                numberFormat = numberFormat,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .scale(scale)
-                                    .clickable {
-                                        if (budget.budgetId != null) {
-                                            if (budget.status == BudgetStatus.APPROVED) {
-                                                navController.navigate("liquidation_report/${budget.budgetId}")
-                                            } else {
-                                                navController.navigate("budget_details/${budget.budgetId}")
-                                            }
-                                        }
-                                    },
-                                statusColors = statusColors
+                    if (showAllBudgets || selectedCategory != null) {
+                        Button(
+                            onClick = {
+                                selectedCategory = null
+                                showAllBudgets = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .padding(bottom = 8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF734656)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Back to Categories",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
+
+                    val budgetsToShow = when {
+                        showAllBudgets -> authRepository.submittedBudgets
+                        selectedCategory != null -> authRepository.submittedBudgets.filter { it.status == selectedCategory }
+                        else -> authRepository.submittedBudgets
+                    }
+
+                    if (budgetsToShow.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = when {
+                                    showAllBudgets -> "No budget requests available."
+                                    selectedCategory != null -> "No ${selectedCategory!!.name.lowercase(Locale.US).replaceFirstChar { it.uppercase() }} budget requests."
+                                    else -> "No budgets requested yet."
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 18.sp
+                                ),
+                                color = Color(0xFF4B5563),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(budgetsToShow) { budget ->
+                                val index = budgetsToShow.indexOf(budget)
+                                val scale by animatedScale.getOrNull(index)?.asState() ?: remember { mutableStateOf(1f) }
+                                BudgetCard(
+                                    budget = budget,
+                                    numberFormat = numberFormat,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .scale(scale)
+                                        .clickable {
+                                            if (budget.budgetId != null) {
+                                                if (budget.status == BudgetStatus.RELEASED) {
+                                                    navController.navigate("liquidation_report/${budget.budgetId}")
+                                                } else {
+                                                    navController.navigate("budget_details/${budget.budgetId}")
+                                                }
+                                            }
+                                        },
+                                    statusColors = statusColors
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add button in bottom-right corner
+            FloatingActionButton(
+                onClick = { navController.navigate("fund_request") },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = 16.dp)
+                    .size(48.dp),
+                shape = CircleShape,
+                containerColor = Color.Transparent,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add budget",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
@@ -42,21 +43,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import kotlinx.coroutines.delay
+import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResetPassword(
     modifier: Modifier = Modifier,
-    navController: NavController
+    navController: NavController,
+    authRepository: AuthRepository
 ) {
     var email by remember { mutableStateOf("") }
+    var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isResetComplete by remember { mutableStateOf(false) }
+    var showCurrentPassword by remember { mutableStateOf(false) }
     var showNewPassword by remember { mutableStateOf(false) }
     var showConfirmPassword by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -72,8 +76,65 @@ fun ResetPassword(
     // Focus management
     val focusManager = LocalFocusManager.current
     val emailFocusRequester = remember { FocusRequester() }
+    val currentPasswordFocusRequester = remember { FocusRequester() }
     val newPasswordFocusRequester = remember { FocusRequester() }
     val confirmPasswordFocusRequester = remember { FocusRequester() }
+
+    // Get logged-in user's email from SharedPreferences
+    val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+    val loggedInEmail = prefs.getString("email", null)
+
+    // Check if the button should be enabled
+    val isButtonEnabled = email.isNotBlank() &&
+            currentPassword.isNotBlank() &&
+            newPassword.isNotBlank() &&
+            confirmPassword.isNotBlank() &&
+            email == loggedInEmail &&
+            newPassword == confirmPassword &&
+            !isLoading &&
+            !isResetComplete
+
+    // Handle password reset logic
+    val performResetPassword: () -> Unit = {
+        when {
+            email.isBlank() || currentPassword.isBlank() || newPassword.isBlank() || confirmPassword.isBlank() -> {
+                errorMessage = "Please fill all fields"
+            }
+            email != loggedInEmail -> {
+                errorMessage = "Email does not match the logged-in user's email"
+            }
+            newPassword != confirmPassword -> {
+                errorMessage = "New password and confirm password do not match"
+            }
+            else -> {
+                coroutineScope.launch {
+                    isLoading = true
+                    errorMessage = null
+                    val result = authRepository.resetPassword(email, currentPassword, newPassword, confirmPassword)
+                    isLoading = false
+                    result.onSuccess {
+                        isResetComplete = true
+                        Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
+                        navController.navigate("login") {
+                            popUpTo("reset_password") { inclusive = true }
+                        }
+                    }.onFailure { e ->
+                        errorMessage = when (e.message) {
+                            "Email does not match the logged-in user's email" -> "Email does not match the logged-in user's email"
+                            "Not authenticated. Please log in." -> "Please log in to reset your password"
+                            "No internet connection or server issue" -> "No internet connection or server issue. Please check your network"
+                            "User not found" -> "User not found. Please check the email"
+                            "Unauthorized: Invalid or expired token" -> "Invalid or expired session. Please log in again"
+                            "Server response was incomplete. Please try again later." -> "Server error: Incomplete response. Please try again"
+                            "Server error: Unable to process request" -> "Server error: Unable to process request. Please try again"
+                            else -> "Failed to reset password: ${e.message}"
+                        }
+                        Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
 
     // Handle clicking outside to dismiss keyboard
     Box(
@@ -111,11 +172,11 @@ fun ResetPassword(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it.trim() },
                 label = { Text("Email Address") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 200.dp)
+                    .padding(top = 100.dp)
                     .focusRequester(emailFocusRequester)
                     .onKeyEvent { event ->
                         if (event.key == Key.Enter && event.type == KeyEventType.KeyUp) {
@@ -137,8 +198,37 @@ fun ResetPassword(
             )
 
             OutlinedTextField(
+                value = currentPassword,
+                onValueChange = { currentPassword = it.trim() },
+                label = { Text("Current Password") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .focusRequester(currentPasswordFocusRequester),
+                visualTransformation = if (showCurrentPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showCurrentPassword = !showCurrentPassword }) {
+                        Icon(
+                            imageVector = if (showCurrentPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showCurrentPassword) "Hide password" else "Show password",
+                            tint = Color(0xFF1F2937)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
+                )
+            )
+
+            OutlinedTextField(
                 value = newPassword,
-                onValueChange = { newPassword = it },
+                onValueChange = { newPassword = it.trim() },
                 label = { Text("New Password") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -167,7 +257,7 @@ fun ResetPassword(
 
             OutlinedTextField(
                 value = confirmPassword,
-                onValueChange = { confirmPassword = it },
+                onValueChange = { confirmPassword = it.trim() },
                 label = { Text("Confirm Password") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,20 +280,7 @@ fun ResetPassword(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
-                            errorMessage = "Please fill all fields"
-                        } else if (newPassword != confirmPassword) {
-                            errorMessage = "Passwords do not match"
-                        } else {
-                            coroutineScope.launch {
-                                isLoading = true
-                                delay(1500L)
-                                isLoading = false
-                                isResetComplete = true
-                                errorMessage = null
-                                Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                        performResetPassword()
                     }
                 )
             )
@@ -225,29 +302,18 @@ fun ResetPassword(
                 shape = RoundedCornerShape(12.dp),
                 color = Color.Transparent,
                 shadowElevation = 4.dp,
-                onClick = {
-                    if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
-                        errorMessage = "Please fill all fields"
-                    } else if (newPassword != confirmPassword) {
-                        errorMessage = "Passwords do not match"
-                    } else {
-                        coroutineScope.launch {
-                            isLoading = true
-                            delay(1500L)
-                            isLoading = false
-                            isResetComplete = true
-                            errorMessage = null
-                            Toast.makeText(context, "Password reset successful", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+                onClick = { performResetPassword() },
+                enabled = isButtonEnabled
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             brush = Brush.linearGradient(
-                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                colors = listOf(
+                                    if (isButtonEnabled) Color(0xFF734656) else Color.Gray,
+                                    if (isButtonEnabled) Color(0xFF8A5B6E) else Color.Gray
+                                ),
                                 start = Offset(0f, 0f),
                                 end = Offset(Float.POSITIVE_INFINITY, 0f)
                             )

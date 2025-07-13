@@ -151,6 +151,7 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
         composable("reset_password") {
             ResetPassword(
                 navController = navController,
+                authRepository = authRepository, // Pass authRepository
                 modifier = modifier
             )
         }
@@ -171,6 +172,12 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 navController = navController,
                 viewModel = liquidationViewModel, // Use shared ViewModel
                 authRepository = authRepository, // Pass authRepository
+                modifier = modifier
+            )
+        }
+        composable("about") {
+            AboutScreen(
+                navController = navController,
                 modifier = modifier
             )
         }

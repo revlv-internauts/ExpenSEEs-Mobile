@@ -1,5 +1,6 @@
 package com.example.expensees.screens
 
+import android.app.DatePickerDialog
 import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -50,8 +52,11 @@ import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.util.Locale
+import java.time.format.DateTimeFormatter
+import java.util.*
 import kotlin.math.abs
+
+// ... (enum BudgetStatus and data class SubmittedBudget remain unchanged)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,8 +65,9 @@ fun FundRequest(
     navController: NavController,
     authRepository: AuthRepository
 ) {
-    // State management
     var budgetName by remember { mutableStateOf("") }
+    var budgetDate by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     val expenses = remember { mutableStateListOf<ExpenseItem>() }
     val coroutineScope = rememberCoroutineScope()
@@ -69,8 +75,31 @@ fun FundRequest(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
-    // Fetch budgets when the screen is loaded
+    // Initialize DatePickerDialog
+    val calendar = Calendar.getInstance()
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                budgetDate = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                showDatePicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            // Handle cancellation to allow reopening the dialog
+            setOnCancelListener {
+                showDatePicker = false
+            }
+            setOnDismissListener {
+                showDatePicker = false
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         isLoading = true
         errorMessage = null
@@ -108,21 +137,20 @@ fun FundRequest(
         }
     }
 
-    // Dialog state
     var category by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var amountPerUnit by remember { mutableStateOf("") }
     var remarks by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
 
-    // Number formatter
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
         isGroupingUsed = true
     }
 
-    // Categories and colors
+    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
         "Rent", "Parking", "Electronic Supplies", "Grocery", "Other Expenses"
@@ -134,10 +162,8 @@ fun FundRequest(
     )
     val categoryColors = categories.zip(colorList).toMap()
 
-    // Calculate total expenses
     val totalExpenses = expenses.sumOf { it.quantity * it.amountPerUnit }
 
-    // Animation for expense cards
     val animatedScale = remember {
         mutableStateListOf<Animatable<Float, *>>().apply {
             repeat(expenses.size) { add(Animatable(0f)) }
@@ -179,7 +205,6 @@ fun FundRequest(
         cursorColor = Color(0xFF3B82F6)
     )
 
-    // Define deleteExpense function inside the composable
     fun deleteExpense(
         index: Int,
         expenses: MutableList<ExpenseItem>,
@@ -190,30 +215,24 @@ fun FundRequest(
         coroutineScope: CoroutineScope
     ) {
         coroutineScope.launch {
-            // Animate out the card
             animatedAlpha.getOrNull(index)?.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(200)
             )
-            // Remove the expense from the local list
             val removedExpense = expenses.removeAt(index)
-            // Remove animation states
             animatedScale.removeAt(index)
             animatedOffset.removeAt(index)
             animatedAlpha.removeAt(index)
-            // Show snackbar with undo option
             snackbarHostState.showSnackbar(
                 message = "Expense deleted",
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short
             ).let { result ->
                 if (result == SnackbarResult.ActionPerformed) {
-                    // Restore the expense if undo is clicked
                     expenses.add(index, removedExpense)
                     animatedScale.add(index, Animatable(0f))
                     animatedOffset.add(index, Animatable(0f))
                     animatedAlpha.add(index, Animatable(1f))
-                    // Animate the restored card back in
                     coroutineScope.launch {
                         animatedScale.getOrNull(index)?.animateTo(
                             targetValue = 1f,
@@ -481,7 +500,8 @@ fun FundRequest(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 50.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         IconButton(
                             onClick = { navController.popBackStack() },
@@ -494,7 +514,6 @@ fun FundRequest(
                                 tint = Color(0xFF1F2937)
                             )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Request Fund",
                             style = MaterialTheme.typography.headlineMedium.copy(
@@ -504,9 +523,24 @@ fun FundRequest(
                             color = Color(0xFF1F2937),
                             modifier = Modifier
                                 .weight(1f)
-                                .offset(x = (-18).dp),
+                                .padding(horizontal = 8.dp),
                             textAlign = TextAlign.Center
                         )
+                        IconButton(
+                            onClick = {
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = true }
+                                }
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = "Home",
+                                tint = Color(0xFF1F2937)
+                            )
+                        }
                     }
                     OutlinedTextField(
                         value = budgetName,
@@ -523,6 +557,64 @@ fun FundRequest(
                             fontWeight = FontWeight.Medium
                         )
                     )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Budget Date",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                            color = Color(0xFF1F2937),
+                            modifier = Modifier
+                                .width(100.dp)
+                                .padding(end = 8.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { showDatePicker = true }
+                        ) {
+                            OutlinedTextField(
+                                value = budgetDate,
+                                onValueChange = { },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp),
+                                enabled = false,
+                                readOnly = true,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                placeholder = {
+                                    Text(
+                                        "Select date (YYYY-MM-DD)",
+                                        color = Color(0xFF4B5563),
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    disabledTextColor = Color(0xFF1F2937),
+                                    disabledBorderColor = Color(0xFFE5E7EB),
+                                    disabledPlaceholderColor = Color(0xFF4B5563),
+                                    disabledLabelColor = Color(0xFF4B5563),
+                                    disabledLeadingIconColor = Color(0xFF4B5563),
+                                    disabledTrailingIconColor = Color(0xFF4B5563)
+                                ),
+                                trailingIcon = {
+                                    IconButton(onClick = { showDatePicker = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = "Select date",
+                                            tint = Color(0xFF8A5B6E)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
@@ -773,10 +865,10 @@ fun FundRequest(
                     ) {
                         Button(
                             onClick = {
-                                if (budgetName.isBlank() && expenses.isEmpty()) {
+                                if (budgetName.isBlank() && expenses.isEmpty() && budgetDate.isBlank()) {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = "Please enter a budget name and add at least one expense",
+                                            message = "Please enter a budget name, date, and add at least one expense",
                                             actionLabel = "OK",
                                             duration = SnackbarDuration.Short
                                         )
@@ -785,6 +877,14 @@ fun FundRequest(
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
                                             message = "Please enter a budget name",
+                                            actionLabel = "OK",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                } else if (budgetDate.isBlank()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please select a budget date",
                                             actionLabel = "OK",
                                             duration = SnackbarDuration.Short
                                         )
@@ -804,7 +904,8 @@ fun FundRequest(
                                         name = budgetName,
                                         expenses = expenses.toList(),
                                         total = totalExpenses,
-                                        status = BudgetStatus.PENDING
+                                        status = BudgetStatus.PENDING,
+                                        budgetDate = budgetDate
                                     )
                                     coroutineScope.launch {
                                         try {
@@ -816,6 +917,7 @@ fun FundRequest(
                                                     duration = SnackbarDuration.Short
                                                 )
                                                 budgetName = ""
+                                                budgetDate = ""
                                                 expenses.clear()
                                                 navController.popBackStack()
                                             }.onFailure { e ->
@@ -836,9 +938,8 @@ fun FundRequest(
                                 }
                             },
                             modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp)
-                                .padding(horizontal = 4.dp),
+                                .fillMaxWidth()
+                                .height(56.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
                             ),
@@ -879,12 +980,223 @@ fun FundRequest(
                                 }
                             }
                         }
+                    }
+                }
+            }
+            if (showDatePicker) {
+                // Show the native DatePickerDialog
+                LaunchedEffect(showDatePicker) {
+                    datePickerDialog.show()
+                }
+            }
+        }
+    }
+    if (showDialog) {
+        Dialog(
+            onDismissRequest = { showDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            val dialogAlpha by animateFloatAsState(
+                targetValue = if (showDialog) 1f else 0f,
+                animationSpec = tween(300, easing = LinearOutSlowInEasing)
+            )
+            val focusManager = LocalFocusManager.current
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .fillMaxHeight(0.85f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .alpha(dialogAlpha)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { focusManager.clearFocus() },
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Add Expense",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 20.sp
+                            ),
+                            color = Color(0xFF1F2937)
+                        )
+                        IconButton(
+                            onClick = { showDialog = false },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    Color(0xFFE5E7EB),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close dialog",
+                                tint = Color(0xFF4B5563)
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = category,
+                                onValueChange = { },
+                                label = { Text("Expense Category", color = Color(0xFF4B5563)) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp)),
+                                readOnly = true,
+                                interactionSource = remember { MutableInteractionSource() }.also { interactionSource ->
+                                    LaunchedEffect(interactionSource) {
+                                        interactionSource.interactions.collect { interaction ->
+                                            if (interaction is PressInteraction.Press) {
+                                                expanded = true
+                                            }
+                                        }
+                                    }
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        contentDescription = if (expanded) "Collapse" else "Expand",
+                                        tint = Color(0xFF1F2937)
+                                    )
+                                },
+                                colors = textFieldColors,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                )
+                            )
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF5F5F5))
+                            ) {
+                                categories.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = option,
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                ),
+                                                color = Color(0xFF1F2937)
+                                            )
+                                        },
+                                        onClick = {
+                                            category = option
+                                            expanded = false
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = quantity,
+                            onValueChange = { quantity = it.filter { c -> c.isDigit() } },
+                            label = { Text("Quantity", color = Color(0xFF4B5563)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp)),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            colors = textFieldColors,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        OutlinedTextField(
+                            value = amountPerUnit,
+                            onValueChange = { amountPerUnit = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("Amount per Unit", color = Color(0xFF4B5563)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp)),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            colors = textFieldColors,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        OutlinedTextField(
+                            value = remarks,
+                            onValueChange = { remarks = it },
+                            label = { Text("Remarks (Optional)", color = Color(0xFF4B5563)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp)),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(
+                                onDone = { focusManager.clearFocus() }
+                            ),
+                            colors = textFieldColors,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Button(
-                            onClick = { navController.navigate("requested_budgets") },
+                            onClick = {
+                                showDialog = false
+                                category = ""
+                                quantity = ""
+                                amountPerUnit = ""
+                                remarks = ""
+                            },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp)
-                                .padding(horizontal = 4.dp),
+                                .height(48.dp)
+                                .padding(end = 8.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
                             ),
@@ -905,304 +1217,85 @@ fun FundRequest(
                                     .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.List,
-                                        contentDescription = "View Requested Budgets",
-                                        modifier = Modifier.size(20.dp),
-                                        tint = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "View Requests",
-                                        fontSize = 16.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
+                                Text(
+                                    text = "Cancel",
+                                    fontSize = 16.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
-                    }
-                }
-            }
-            if (showDialog) {
-                Dialog(
-                    onDismissRequest = { showDialog = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
-                ) {
-                    val dialogAlpha by animateFloatAsState(
-                        targetValue = if (showDialog) 1f else 0f,
-                        animationSpec = tween(300, easing = LinearOutSlowInEasing)
-                    )
-                    val focusManager = LocalFocusManager.current
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth(0.95f)
-                            .fillMaxHeight(0.85f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .alpha(dialogAlpha)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { focusManager.clearFocus() },
-                        color = Color(0xFFF5F5F5),
-                        shadowElevation = 8.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Add Expense",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 20.sp
-                                    ),
-                                    color = Color(0xFF1F2937)
-                                )
-                                IconButton(
-                                    onClick = { showDialog = false },
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .background(
-                                            Color(0xFFE5E7EB),
-                                            CircleShape
+                        Button(
+                            onClick = {
+                                if (category.isBlank() || quantity.isBlank() || amountPerUnit.isBlank()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please fill in all required fields",
+                                            actionLabel = "OK",
+                                            duration = SnackbarDuration.Short
                                         )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close dialog",
-                                        tint = Color(0xFF4B5563)
-                                    )
-                                }
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    OutlinedTextField(
-                                        value = category,
-                                        onValueChange = { },
-                                        label = { Text("Expense Category", color = Color(0xFF4B5563)) },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp)),
-                                        readOnly = true,
-                                        interactionSource = remember { MutableInteractionSource() }.also { interactionSource ->
-                                            LaunchedEffect(interactionSource) {
-                                                interactionSource.interactions.collect { interaction ->
-                                                    if (interaction is PressInteraction.Press) {
-                                                        expanded = true
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        trailingIcon = {
-                                            Icon(
-                                                imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                                contentDescription = if (expanded) "Collapse" else "Expand",
-                                                tint = Color(0xFF1F2937)
-                                            )
-                                        },
-                                        colors = textFieldColors,
-                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Medium
-                                        ),
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                        keyboardActions = KeyboardActions(
-                                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                                        )
-                                    )
-                                    DropdownMenu(
-                                        expanded = expanded,
-                                        onDismissRequest = { expanded = false },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(Color(0xFFF5F5F5))
-                                    ) {
-                                        categories.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = option,
-                                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                                            fontSize = 16.sp,
-                                                            fontWeight = FontWeight.Medium
-                                                        ),
-                                                        color = Color(0xFF1F2937)
-                                                    )
-                                                },
-                                                onClick = {
-                                                    category = option
-                                                    expanded = false
-                                                },
-                                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    }
+                                } else {
+                                    val qty = quantity.toIntOrNull() ?: 0
+                                    val amount = amountPerUnit.toDoubleOrNull() ?: 0.0
+                                    if (qty <= 0 || amount <= 0.0) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Quantity and amount must be greater than zero",
+                                                actionLabel = "OK",
+                                                duration = SnackbarDuration.Short
                                             )
                                         }
-                                    }
-                                }
-                                OutlinedTextField(
-                                    value = quantity,
-                                    onValueChange = { quantity = it.filter { c -> c.isDigit() } },
-                                    label = { Text("Quantity", color = Color(0xFF4B5563)) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp)),
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                        imeAction = ImeAction.Next
-                                    ),
-                                    keyboardActions = KeyboardActions(
-                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                                    ),
-                                    colors = textFieldColors,
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                                OutlinedTextField(
-                                    value = amountPerUnit,
-                                    onValueChange = { amountPerUnit = it.filter { c -> c.isDigit() || c == '.' } },
-                                    label = { Text("Amount per Unit", color = Color(0xFF4B5563)) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp)),
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Decimal,
-                                        imeAction = ImeAction.Next
-                                    ),
-                                    keyboardActions = KeyboardActions(
-                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                                    ),
-                                    colors = textFieldColors,
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                                OutlinedTextField(
-                                    value = remarks,
-                                    onValueChange = { remarks = it },
-                                    label = { Text("Remarks (Optional)", color = Color(0xFF4B5563)) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp)),
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                    keyboardActions = KeyboardActions(
-                                        onDone = { focusManager.clearFocus() }
-                                    ),
-                                    colors = textFieldColors,
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
+                                    } else {
+                                        expenses.add(
+                                            ExpenseItem(
+                                                category = category,
+                                                quantity = qty,
+                                                amountPerUnit = amount,
+                                                remarks = remarks
+                                            )
+                                        )
+                                        animatedScale.add(Animatable(0f))
+                                        animatedOffset.add(Animatable(0f))
+                                        animatedAlpha.add(Animatable(1f))
                                         showDialog = false
                                         category = ""
                                         quantity = ""
                                         amountPerUnit = ""
                                         remarks = ""
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp)
-                                        .padding(end = 8.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = Color(0xFF3B82F6)
-                                    ),
-                                    border = BorderStroke(1.dp, Color(0xFF3B82F6)),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Cancel",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    }
                                 }
-                                Button(
-                                    onClick = {
-                                        if (category.isBlank() || quantity.isBlank() || amountPerUnit.isBlank()) {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    message = "Please fill in all required fields",
-                                                    actionLabel = "OK",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                            }
-                                        } else {
-                                            val qty = quantity.toIntOrNull() ?: 0
-                                            val amount = amountPerUnit.toDoubleOrNull() ?: 0.0
-                                            if (qty <= 0 || amount <= 0.0) {
-                                                coroutineScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        message = "Quantity and amount must be greater than zero",
-                                                        actionLabel = "OK",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                }
-                                            } else {
-                                                expenses.add(
-                                                    ExpenseItem(
-                                                        category = category,
-                                                        quantity = qty,
-                                                        amountPerUnit = amount,
-                                                        remarks = remarks
-                                                    )
-                                                )
-                                                animatedScale.add(Animatable(0f))
-                                                animatedOffset.add(Animatable(0f))
-                                                animatedAlpha.add(Animatable(1f))
-                                                showDialog = false
-                                                category = ""
-                                                quantity = ""
-                                                amountPerUnit = ""
-                                                remarks = ""
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp)
-                                        .padding(start = 8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF734656)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(
-                                        text = "Add",
-                                        fontSize = 16.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .padding(start = 8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                            start = Offset(0f, 0f),
+                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Add",
+                                    fontSize = 16.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }

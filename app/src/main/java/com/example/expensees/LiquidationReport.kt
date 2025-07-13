@@ -51,6 +51,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.expensees.models.LiquidationReportData
 
 // ViewModel to hold selectedExpensesMap state
 data class ReportRecord(val budgetName: String, val timestamp: String)
@@ -97,10 +98,11 @@ fun LiquidationReport(
     LaunchedEffect(budgetId) {
         if (budgetId != null) {
             val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
-            if (budget != null && budget.status == BudgetStatus.APPROVED) {
+            if (budget != null && budget.status == BudgetStatus.RELEASED) {
                 selectedBudget = budget
+                viewModel.clearSelections()
             } else {
-                Toast.makeText(context, "Budget not found or not approved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Budget not found or not released", Toast.LENGTH_SHORT).show()
                 navController.popBackStack()
             }
         }
@@ -136,13 +138,13 @@ fun LiquidationReport(
 
     val statusColors = mapOf(
         BudgetStatus.PENDING to Color(0xFFD4A017),
-        BudgetStatus.APPROVED to Color(0xFF388E3C),
+        BudgetStatus.RELEASED to Color(0xFF388E3C),
         BudgetStatus.DENIED to Color(0xFFD32F2F)
     )
 
     val textColors = mapOf(
         BudgetStatus.PENDING to Color(0xFF4B5563),
-        BudgetStatus.APPROVED to Color(0xFF1F2937),
+        BudgetStatus.RELEASED to Color(0xFF1F2937),
         BudgetStatus.DENIED to Color(0xFF1F2937)
     )
 
@@ -403,7 +405,7 @@ fun LiquidationReport(
                                 .fillMaxWidth()
                                 .scale(scale)
                                 .then(
-                                    if (budget.status == BudgetStatus.APPROVED) {
+                                    if (budget.status == BudgetStatus.RELEASED) {
                                         Modifier.clickable { selectedBudget = budget }
                                     } else {
                                         Modifier
@@ -817,18 +819,38 @@ fun LiquidationReport(
                                     isLoading = true
                                     coroutineScope.launch {
                                         try {
-                                            delay(1000)
-                                            viewModel.addGeneratedReport(
+                                            // Create LiquidationReportData
+                                            val totalActual = selectedExpensesMap.values.flatten().sumOf { it.amount }
+                                            val reportData = LiquidationReportData(
+                                                budgetId = budget.budgetId!!,
                                                 budgetName = budget.name,
-                                                timestamp = OffsetDateTime.now().format(dateFormatter)
+                                                generatedAt = OffsetDateTime.now().format(dateFormatter),
+                                                totalBudgeted = budget.total,
+                                                totalActual = totalActual,
+                                                totalRemaining = totalRemainingBalance,
+                                                expenses = selectedExpensesMap
                                             )
-                                            println("Navigating to DetailedLiquidationReport with selectedExpensesMap: $selectedExpensesMap")
-                                            navController.navigate("detailed_liquidation_report/${budget.budgetId}")
-                                            Toast.makeText(
-                                                context,
-                                                "Viewing Liquidation Report for ${budget.name}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+
+                                            // Submit report to server
+                                            val result = authRepository.submitLiquidationReport(reportData)
+                                            if (result.isSuccess) {
+                                                viewModel.addGeneratedReport(
+                                                    budgetName = budget.name,
+                                                    timestamp = reportData.generatedAt
+                                                )
+                                                println("Navigating to DetailedLiquidationReport with selectedExpensesMap: $selectedExpensesMap")
+                                                navController.navigate("detailed_liquidation_report/${budget.budgetId}")
+                                                Toast.makeText(
+                                                    context,
+                                                    "Liquidation Report for ${budget.name} submitted successfully",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                val errorMessage = result.exceptionOrNull()?.message ?: "Failed to submit report"
+                                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                                         } finally {
                                             isLoading = false
                                         }
@@ -889,17 +911,24 @@ fun LiquidationReport(
         }
 
         if (showExpenseSelectionDialog && currentExpenseItem != null) {
-            val filteredExpenses = authRepository.userExpenses.filter { it.category == currentExpenseItem!!.first.category }
-            LaunchedEffect(filteredExpenses, currentExpenseItem) {
+            val currentIndex = currentExpenseItem!!.second
+            val currentExpense = currentExpenseItem!!.first
+            // Filter expenses to show only those not assigned to other budgets or already selected for this index
+            val filteredExpenses = authRepository.userExpenses.filter { expense ->
+                val isAssignedToOtherBudget = selectedExpensesMap.any { (idx, exps) ->
+                    idx != currentIndex && exps.contains(expense)
+                }
+                expense.category == currentExpense.category && !isAssignedToOtherBudget
+            }
+            LaunchedEffect(filteredExpenses, currentExpenseItem, selectedBudget) {
                 checkedExpenses.clear()
+                // Initialize checkedExpenses only with expenses selected for the current index
                 filteredExpenses.forEach { expense ->
-                    checkedExpenses[expense] = selectedExpensesMap[currentExpenseItem!!.second]?.contains(expense) ?: false
+                    checkedExpenses[expense] = selectedExpensesMap[currentIndex]?.contains(expense) ?: false
                 }
                 println("Dialog initialized with checkedExpenses: ${checkedExpenses.filter { it.value }.keys}")
             }
 
-            val currentIndex = currentExpenseItem!!.second
-            val currentExpense = currentExpenseItem!!.first
             val budgetedAmount = currentExpense.quantity * currentExpense.amountPerUnit
             val potentialActualTotal = derivedStateOf {
                 checkedExpenses.filter { it.value }.keys.sumOf { it.amount }
@@ -940,12 +969,12 @@ fun LiquidationReport(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Select Receipts for ${currentExpenseItem!!.first.category}",
+                                text = "Select Receipts for ${currentExpense.category}",
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 20.sp
                                 ),
-                                color = Color(0xFF3B82F6)
+                                color = Color(0xFF1F2937)
                             )
                             IconButton(
                                 onClick = {
@@ -953,12 +982,7 @@ fun LiquidationReport(
                                     currentExpenseItem = null
                                     checkedExpenses.clear()
                                 },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        Color(0xFFE5E7EB),
-                                        CircleShape
-                                    )
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -969,7 +993,7 @@ fun LiquidationReport(
                         }
                         if (filteredExpenses.isEmpty()) {
                             Text(
-                                text = "No transactions recorded yet for ${currentExpenseItem!!.first.category}.",
+                                text = "No unassigned transactions available for ${currentExpense.category}.",
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 18.sp
@@ -1000,16 +1024,10 @@ fun LiquidationReport(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 items(filteredExpenses) { expense ->
-                                    val isUsed = selectedExpensesMap.any { (idx, exps) ->
-                                        idx != currentExpenseItem!!.second && exps.contains(expense)
-                                    }
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .scale(1f)
-                                            .clickable(
-                                                enabled = !isUsed || (checkedExpenses[expense] ?: false)
-                                            ) {
+                                            .clickable {
                                                 checkedExpenses[expense] = !(checkedExpenses[expense] ?: false)
                                             },
                                         shape = RoundedCornerShape(8.dp),
@@ -1045,7 +1063,6 @@ fun LiquidationReport(
                                                         checkedExpenses[expense] = isChecked
                                                     },
                                                     modifier = Modifier.padding(end = 8.dp),
-                                                    enabled = !isUsed || (checkedExpenses[expense] ?: false),
                                                     colors = CheckboxDefaults.colors(
                                                         checkedColor = Color(0xFF3B82F6),
                                                         uncheckedColor = Color(0xFF4B5563),
@@ -1055,32 +1072,16 @@ fun LiquidationReport(
                                                 Column(
                                                     modifier = Modifier.weight(1f)
                                                 ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = expense.remarks ?: "No remarks",
-                                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                fontSize = 14.sp
-                                                            ),
-                                                            color = if (isUsed && !(checkedExpenses[expense] ?: false))
-                                                                Color(0xFF4B5563).copy(alpha = 0.6f)
-                                                            else
-                                                                Color(0xFF1F2937),
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        if (isUsed) {
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Icon(
-                                                                imageVector = Icons.Default.CheckCircle,
-                                                                contentDescription = "Receipt Used",
-                                                                tint = Color(0xFF3B82F6),
-                                                                modifier = Modifier.size(16.dp)
-                                                            )
-                                                        }
-                                                    }
+                                                    Text(
+                                                        text = expense.remarks ?: "No remarks",
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 14.sp
+                                                        ),
+                                                        color = Color(0xFF1F2937),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
                                                     Text(
                                                         text = "₱${numberFormat.format(expense.amount)}",
                                                         style = MaterialTheme.typography.bodySmall.copy(
@@ -1121,9 +1122,9 @@ fun LiquidationReport(
                                         .height(48.dp)
                                         .padding(end = 8.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = Color(0xFF3B82F6)
+                                        contentColor = Color(0xFF1F2937)
                                     ),
-                                    border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                    border = BorderStroke(1.dp, Color(0xFF734656)),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text(
@@ -1136,38 +1137,25 @@ fun LiquidationReport(
                                     onClick = {
                                         val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
                                         println("Confirming selections: $newSelections")
-                                        val conflictingExpenses = newSelections.filter { expense ->
-                                            selectedExpensesMap.any { (idx, exps) ->
-                                                idx != currentExpenseItem!!.second && exps.contains(expense)
-                                            }
-                                        }
-                                        if (conflictingExpenses.isNotEmpty()) {
+                                        viewModel.updateSelections(currentIndex, newSelections)
+                                        println("Updated selectedExpensesMap: $selectedExpensesMap")
+                                        if (newSelections.isNotEmpty()) {
                                             Toast.makeText(
                                                 context,
-                                                "Cannot select receipts already used in other budgets",
+                                                "${newSelections.size} receipt(s) selected",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         } else {
-                                            viewModel.updateSelections(currentExpenseItem!!.second, newSelections)
-                                            println("Updated selectedExpensesMap: $selectedExpensesMap")
-                                            if (newSelections.isNotEmpty()) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "${newSelections.size} receipt(s) selected",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            } else {
-                                                viewModel.updateSelections(currentExpenseItem!!.second, emptyList())
-                                                Toast.makeText(
-                                                    context,
-                                                    "No receipts selected",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                            showExpenseSelectionDialog = false
-                                            currentExpenseItem = null
-                                            checkedExpenses.clear()
+                                            viewModel.updateSelections(currentIndex, emptyList())
+                                            Toast.makeText(
+                                                context,
+                                                "No receipts selected",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
+                                        showExpenseSelectionDialog = false
+                                        currentExpenseItem = null
+                                        checkedExpenses.clear()
                                     },
                                     modifier = Modifier
                                         .weight(1f)
