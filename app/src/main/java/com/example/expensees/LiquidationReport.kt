@@ -1,7 +1,9 @@
 package com.example.expensees.screens
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
@@ -51,30 +53,36 @@ import java.util.Locale
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.expensees.models.LiquidationReportData
+import java.io.File
 import java.time.LocalDate
 
 class LiquidationViewModel : ViewModel() {
-    val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
-    var selectedReport: LiquidationReportData? by mutableStateOf(null)
+    val selectedExpensesMap = mutableMapOf<Int, MutableList<Expense>>()
+    var selectedReport: LiquidationReportData? = null
         private set
 
-    fun selectReport(report: LiquidationReportData) {
-        selectedReport = report
-        selectedExpensesMap.clear()
-        // Group expenses by their corresponding budget expense item index
-        report.expenses.forEach { expense ->
-            val index = selectedReport?.expenses?.indexOfFirst { it == expense } ?: 0
-            selectedExpensesMap.getOrPut(index) { mutableListOf() }.add(expense)
-        }
-    }
+    var retryCount by mutableStateOf(0)
+        private set
 
     fun updateSelections(index: Int, expenses: List<Expense>) {
         selectedExpensesMap[index] = expenses.toMutableList()
     }
 
+    fun selectReport(report: LiquidationReportData) {
+        selectedReport = report
+    }
+
     fun clearSelections() {
         selectedExpensesMap.clear()
-        selectedReport = null
+        retryCount = 0
+    }
+
+    fun incrementRetryCount(): Boolean {
+        if (retryCount < 3) {
+            retryCount++
+            return true
+        }
+        return false
     }
 }
 
@@ -96,6 +104,8 @@ fun LiquidationReport(
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = viewModel.selectedExpensesMap
     val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
+    val snackbarHostState = remember { SnackbarHostState() } // Define at top level
+
 
     LaunchedEffect(budgetId) {
         if (budgetId != null) {
@@ -104,7 +114,12 @@ fun LiquidationReport(
                 selectedBudget = budget
                 viewModel.clearSelections()
             } else {
-                Toast.makeText(context, "Budget not found or not released", Toast.LENGTH_SHORT).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Budget not found or not released",
+                        duration = SnackbarDuration.Short
+                    )
+                }
                 navController.popBackStack()
             }
         }
@@ -211,7 +226,7 @@ fun LiquidationReport(
             .background(Color(0xFFF5F5F5)),
         snackbarHost = {
             SnackbarHost(
-                hostState = remember { SnackbarHostState() },
+                hostState = snackbarHostState,
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth(),
@@ -219,11 +234,11 @@ fun LiquidationReport(
                     Snackbar(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFF5F5F5))
                             .padding(12.dp),
                         containerColor = Color(0xFFF5F5F5),
                         contentColor = Color(0xFF1F2937),
                         shape = RoundedCornerShape(12.dp),
+                        actionContentColor = Color(0xFF3B82F6),
                         content = {
                             Text(
                                 text = snackbarData.visuals.message,
@@ -234,6 +249,22 @@ fun LiquidationReport(
                                 color = Color(0xFF1F2937),
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
+                        },
+                        action = snackbarData.visuals.actionLabel?.let { label ->
+                            {
+                                TextButton(
+                                    onClick = { snackbarData.performAction() },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = Color(0xFF3B82F6)
+                                    )
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     )
                 }
@@ -802,60 +833,193 @@ fun LiquidationReport(
                         Button(
                             onClick = {
                                 if (selectedExpensesMap.isEmpty() || selectedExpensesMap.all { it.value.isEmpty() }) {
-                                    Toast.makeText(
-                                        context,
-                                        "Please upload at least one receipt to generate the report",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Please select at least one receipt to generate the report",
+                                            duration = SnackbarDuration.Long
+                                        )
+                                    }
+                                } else if (selectedExpensesMap.values.flatten().size > 1) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Only one expense can be submitted per report",
+                                            duration = SnackbarDuration.Long
+                                        )
+                                    }
                                 } else {
                                     isLoading = true
                                     coroutineScope.launch {
                                         try {
-                                            // Flatten expenses and add required fields
-                                            val currentTime = OffsetDateTime.now()
-                                            val currentDate = LocalDate.now()
-                                            val expenses = selectedExpensesMap.values.flatten().map { expense ->
-                                                Expense(
-                                                    expenseId = null, // Server assigns
-                                                    category = expense.category,
-                                                    amount = expense.amount,
-                                                    remarks = expense.remarks,
-                                                    dateOfTransaction = currentDate.format(transactionDateFormatter),
-                                                    createdAt = null, // Server assigns
-                                                    imagePaths = emptyList(), // Add image support if needed
-                                                )
+                                            // Sync local expenses
+                                            val selectedExpenses = selectedExpensesMap.values.flatten()
+                                            val localExpenses = selectedExpenses.filter { it.expenseId?.startsWith("local_") == true }
+                                            if (localExpenses.isNotEmpty()) {
+                                                localExpenses.forEach { localExpense ->
+                                                    if (localExpense.category == null || localExpense.dateOfTransaction == null) {
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                message = "Invalid expense: Missing category or date for ${localExpense.remarks}",
+                                                                duration = SnackbarDuration.Long
+                                                            )
+                                                        }
+                                                        isLoading = false
+                                                        return@launch
+                                                    }
+                                                    val result = authRepository.addExpense(localExpense)
+                                                    if (result.isSuccess) {
+                                                        val syncedExpense = result.getOrNull()
+                                                        if (syncedExpense != null) {
+                                                            selectedExpensesMap.forEach { (index, expenses) ->
+                                                                if (expenses.contains(localExpense)) {
+                                                                    expenses.remove(localExpense)
+                                                                    expenses.add(syncedExpense)
+                                                                    viewModel.updateSelections(index, expenses)
+                                                                }
+                                                            }
+                                                            authRepository.userExpenses.remove(localExpense)
+                                                            authRepository.userExpenses.add(syncedExpense)
+                                                        }
+                                                    } else {
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                message = "Failed to sync local expense: ${result.exceptionOrNull()?.message}",
+                                                                duration = SnackbarDuration.Long
+                                                            )
+                                                        }
+                                                        isLoading = false
+                                                        return@launch
+                                                    }
+                                                }
                                             }
-                                            // Create LiquidationReportData
+
+                                            // Validate and prepare expenses
+                                            val expenses = selectedExpensesMap.values.flatten().mapNotNull { expense ->
+                                                if (expense.category == null || expense.dateOfTransaction == null) {
+                                                    Log.w("LiquidationReport", "Skipping invalid expense: category=${expense.category}, dateOfTransaction=${expense.dateOfTransaction}")
+                                                    null
+                                                } else {
+                                                    // Validate imagePaths
+                                                    val validImagePaths = expense.imagePaths?.filter { path ->
+                                                        try {
+                                                            if (path.startsWith("Uploads/")) {
+                                                                Log.w("LiquidationReport", "Skipping server-side image path: $path")
+                                                                false
+                                                            } else if (path.startsWith("content://")) {
+                                                                context.contentResolver.openInputStream(Uri.parse(path))?.close()
+                                                                true
+                                                            } else {
+                                                                File(path).exists()
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            Log.w("LiquidationReport", "Invalid image path: $path")
+                                                            false
+                                                        }
+                                                    } ?: emptyList()
+                                                    Expense(
+                                                        expenseId = expense.expenseId,
+                                                        category = expense.category,
+                                                        amount = expense.amount,
+                                                        remarks = expense.remarks,
+                                                        dateOfTransaction = expense.dateOfTransaction,
+                                                        createdAt = expense.createdAt ?: OffsetDateTime.now().format(dateFormatter),
+                                                        imagePaths = validImagePaths
+                                                    )
+                                                }
+                                            }
+
+                                            if (expenses.isEmpty()) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "No valid expenses selected. Ensure the expense has a category and date.",
+                                                        duration = SnackbarDuration.Long
+                                                    )
+                                                }
+                                                isLoading = false
+                                                return@launch
+                                            }
+
+                                            // Calculate totals
                                             val totalSpent = expenses.sumOf { it.amount }
+                                            val totalBudgeted = budget.total
+                                            val remainingBalance = totalBudgeted - totalSpent
+
+                                            // Create LiquidationReportData
                                             val reportData = LiquidationReportData(
                                                 liquidationId = "local_${System.currentTimeMillis()}",
                                                 budgetId = budget.budgetId!!,
                                                 budgetName = budget.name,
                                                 totalSpent = totalSpent,
-                                                remainingBalance = totalRemainingBalance,
+                                                remainingBalance = remainingBalance,
                                                 status = "PENDING",
-                                                dateOfTransaction = currentDate.format(transactionDateFormatter),
-                                                createdAt = currentTime.format(dateFormatter),
-                                                expenses = expenses
+                                                dateOfTransaction = LocalDate.now().format(transactionDateFormatter),
+                                                createdAt = OffsetDateTime.now().format(dateFormatter),
+                                                expenses = expenses,
+                                                remarks = null
                                             )
-                                            viewModel.selectReport(reportData) // Set report in view model
-                                            // Submit report to server
+
+                                            // Submit report
                                             val result = authRepository.submitLiquidationReport(reportData)
                                             if (result.isSuccess) {
                                                 val submittedReport = result.getOrNull() ?: reportData
                                                 viewModel.selectReport(submittedReport)
                                                 navController.navigate("detailed_liquidation_report/${submittedReport.liquidationId}")
-                                                Toast.makeText(
-                                                    context,
-                                                    "Liquidation Report for ${budget.name} submitted successfully",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Liquidation Report for ${budget.name} submitted successfully",
+                                                        duration = SnackbarDuration.Long
+                                                    )
+                                                }
+                                                viewModel.clearSelections() // Reset retryCount on success
                                             } else {
-                                                val errorMessage = result.exceptionOrNull()?.message ?: "Failed to submit report"
-                                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                                val errorMessage = when {
+                                                    result.exceptionOrNull()?.message?.contains("date", ignoreCase = true) == true ->
+                                                        "Failed to submit report: Invalid date format. Ensure dates are in yyyy-MM-dd format."
+                                                    else ->
+                                                        result.exceptionOrNull()?.message ?: "Failed to submit report. Please check expense data or contact support."
+                                                }
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = errorMessage,
+                                                        actionLabel = if (viewModel.retryCount < 3) "Retry" else null,
+                                                        duration = SnackbarDuration.Long
+                                                    ).let { action ->
+                                                        if (action == SnackbarResult.ActionPerformed && viewModel.incrementRetryCount()) {
+                                                            isLoading = true
+                                                            val retryResult = authRepository.submitLiquidationReport(reportData)
+                                                            if (retryResult.isSuccess) {
+                                                                val submittedReport = retryResult.getOrNull() ?: reportData
+                                                                viewModel.selectReport(submittedReport)
+                                                                navController.navigate("detailed_liquidation_report/${submittedReport.liquidationId}")
+                                                                snackbarHostState.showSnackbar(
+                                                                    message = "Liquidation Report for ${budget.name} submitted successfully",
+                                                                    duration = SnackbarDuration.Long
+                                                                )
+                                                                viewModel.clearSelections() // Reset retryCount on success
+                                                            } else {
+                                                                val retryErrorMessage = when {
+                                                                    retryResult.exceptionOrNull()?.message?.contains("date", ignoreCase = true) == true ->
+                                                                        "Retry failed: Invalid date format. Ensure dates are in yyyy-MM-dd format."
+                                                                    else ->
+                                                                        retryResult.exceptionOrNull()?.message ?: "Retry failed. Please check expense data or contact support."
+                                                                }
+                                                                snackbarHostState.showSnackbar(
+                                                                    message = retryErrorMessage,
+                                                                    actionLabel = if (viewModel.retryCount < 3) "Retry" else null,
+                                                                    duration = SnackbarDuration.Long
+                                                                )
+                                                            }
+                                                            isLoading = false
+                                                        }
+                                                    }
+                                                }
                                             }
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Error: ${e.message}",
+                                                    duration = SnackbarDuration.Long
+                                                )
+                                            }
                                         } finally {
                                             isLoading = false
                                         }

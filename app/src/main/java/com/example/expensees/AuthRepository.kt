@@ -26,6 +26,7 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.example.expensees.models.LiquidationReportData
 import id.zelory.compressor.Compressor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -1398,34 +1399,134 @@ class AuthRepository(
                     return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
                 }
                 val token = tokenResult.getOrNull()!!
-                Log.d("AuthRepository", "Sending request to /api/liquidation with token: Bearer ${token.take(20)}...")
-                val response = apiService.submitLiquidationReport("Bearer $token", report.budgetId, report)
-                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+                Log.d("AuthRepository", "Submitting liquidation report for budgetId: ${report.budgetId} with token: Bearer ${token.take(20)}...")
+
+                // Collect all parts in a list
+                val parts = mutableListOf<MultipartBody.Part>()
+
+                // Add budgetId
+                parts.add(
+                    MultipartBody.Part.createFormData(
+                        "budgetId",
+                        report.budgetId
+                    )
+                )
+
+                // Add single expense fields (server expects one expense)
+                if (report.expenses.isNotEmpty()) {
+                    val expense = report.expenses[0] // Take first expense
+                    if (expense.category == null || expense.dateOfTransaction == null) {
+                        Log.w("AuthRepository", "Skipping expense: category=${expense.category}, dateOfTransaction=${expense.dateOfTransaction}")
+                        return@withContext Result.failure(Exception("Invalid expense: Missing category or date"))
+                    }
+
+                    parts.add(
+                        MultipartBody.Part.createFormData(
+                            "category",
+                            expense.category
+                        )
+                    )
+                    parts.add(
+                        MultipartBody.Part.createFormData(
+                            "amount",
+                            expense.amount.toString()
+                        )
+                    )
+                    parts.add(
+                        MultipartBody.Part.createFormData(
+                            "remarks",
+                            expense.remarks ?: ""
+                        )
+                    )
+                    parts.add(
+                        MultipartBody.Part.createFormData(
+                            "dateOfTransaction",
+                            expense.dateOfTransaction
+                        )
+                    )
+
+                    // Add image files for this expense, if any
+                    expense.imagePaths?.forEachIndexed { fileIndex, imagePath ->
+                        try {
+                            // Skip server-side paths starting with "Uploads/"
+                            if (imagePath.startsWith("Uploads/")) {
+                                Log.w("AuthRepository", "Skipping server-side image path: $imagePath")
+                                return@forEachIndexed
+                            }
+                            val file = if (imagePath.startsWith("content://")) {
+                                context.contentResolver.openInputStream(Uri.parse(imagePath))?.use { input ->
+                                    val tempFile = File.createTempFile("expense_$fileIndex", ".jpg", context.cacheDir)
+                                    tempFile.outputStream().use { output ->
+                                        input.copyTo(output)
+                                    }
+                                    tempFile
+                                }
+                            } else {
+                                File(imagePath)
+                            }
+                            if (file?.exists() == true) {
+                                val requestFile = file.readBytes().toRequestBody("image/jpeg".toMediaType())
+                                parts.add(
+                                    MultipartBody.Part.createFormData(
+                                        "files[$fileIndex]",
+                                        file.name,
+                                        requestFile
+                                    )
+                                )
+                            } else {
+                                Log.w("AuthRepository", "Image file not found: $imagePath")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to process image $imagePath: ${e.message}")
+                        }
+                    }
+                } else {
+                    Log.w("AuthRepository", "No expenses provided in the report")
+                    return@withContext Result.failure(Exception("No valid expenses provided"))
+                }
+
+                Log.d("AuthRepository", "Multipart request parts: ${parts.size}")
+
+                // Make the API call
+                val response = apiService.submitLiquidationReport(
+                    authorization = "Bearer $token",
+                    budgetId = report.budgetId,
+                    parts = parts
+                )
+                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
+
                 if (response.isSuccessful) {
                     response.body()?.let { submittedReport ->
                         liquidationReports.add(submittedReport)
+                        Log.d("AuthRepository", "Liquidation report submitted: liquidationId=${submittedReport.liquidationId}")
                         Result.success(submittedReport)
                     } ?: Result.failure(Exception("Empty response body"))
                 } else {
                     val errorBody = response.errorBody()?.string()
                     Log.e("AuthRepository", "Submit liquidation report failed: HTTP ${response.code()}, body=$errorBody")
-                    val errorMessage = when (response.code()) {
-                        401 -> "Unauthorized: Invalid or expired token."
-                        400 -> "Invalid request: Check payload format."
-                        500 -> "Server error: $errorBody"
-                        else -> "Failed to submit report: HTTP ${response.code()}"
+                    val errorResponse = errorBody?.let {
+                        try {
+                            Gson().fromJson(it, ErrorResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
+                            null
+                        }
                     }
+                    val errorMessage = errorResponse?.error
+                        ?: errorResponse?.message
+                        ?: when (response.code()) {
+                            400 -> "Invalid request: Check expense amount, category, or date format."
+                            401 -> "Unauthorized: Invalid or expired token."
+                            404 -> "Budget not found for ID: ${report.budgetId}"
+                            422 -> "Validation error: Ensure all required fields and files are provided."
+                            500 -> "Server error: Unable to process request. Contact support."
+                            else -> "Failed to submit report: HTTP ${response.code()}"
+                        }
                     Result.failure(Exception(errorMessage))
                 }
-            } catch (e: HttpException) {
-                Log.e("AuthRepository", "HTTP error in submitLiquidationReport: ${e.message()}, code=${e.code()}", e)
-                Result.failure(Exception("Network error: ${e.message()}"))
-            } catch (e: IOException) {
-                Log.e("AuthRepository", "IO error in submitLiquidationReport: ${e.message}", e)
-                Result.failure(Exception("No internet connection"))
             } catch (e: Exception) {
-                Log.e("AuthRepository", "Submit liquidation report error: ${e.message}", e)
-                Result.failure(Exception("Failed to submit report: ${e.message}"))
+                Log.e("AuthRepository", "Error in submitLiquidationReport: ${e.message}", e)
+                Result.failure(Exception("Network error: ${e.message}"))
             }
         }
     }

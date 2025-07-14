@@ -70,11 +70,12 @@ interface ApiService {
         @Path("userId") userId: String
     ): Response<ResponseBody>
 
-    @POST("api/liquidation")
+    @Multipart
+    @POST("/api/liquidation")
     suspend fun submitLiquidationReport(
-        @Header("Authorization") token: String,
+        @Header("Authorization") authorization: String,
         @Query("budgetId") budgetId: String,
-        @Body report: LiquidationReportData
+        @Part parts: List<MultipartBody.Part>
     ): Response<LiquidationReportData>
 
     @GET("api/liquidation")
