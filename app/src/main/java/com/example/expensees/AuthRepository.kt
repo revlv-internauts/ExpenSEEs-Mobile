@@ -1337,65 +1337,139 @@ class AuthRepository(
         }
     }
 
-    suspend fun submitLiquidationReport(report: LiquidationReportData): Result<LiquidationReportData> {
+    val liquidationReports: SnapshotStateList<LiquidationReportData> = mutableStateListOf()
+
+    suspend fun getLiquidationReports(): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("AuthRepository", "Submitting liquidation report: reportId=${report.reportId}, budgetId=${report.budgetId}")
                 if (!isNetworkAvailable(context)) {
-                    Log.e("AuthRepository", "No network connection")
-                    return@withContext Result.failure(Exception("No internet connection"))
+                    Log.e("AuthRepository", "No network connection, returning local liquidation reports")
+                    return@withContext Result.success(Unit)
                 }
-
                 val tokenResult = getValidToken()
                 if (tokenResult.isFailure) {
                     Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
                     return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
                 }
                 val token = tokenResult.getOrNull()!!
-
-                Log.d("AuthRepository", "Sending request to /api/reports/liquidation with token: Bearer ${token.take(20)}...")
-                val response = apiService.submitLiquidationReport("Bearer $token", report)
-                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
-
+                Log.d("AuthRepository", "Fetching liquidation reports with token: Bearer ${token.take(20)}...")
+                val response = apiService.getLiquidationReports("Bearer $token")
+                Log.d("AuthRepository", "Get liquidation reports response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
                 if (response.isSuccessful) {
-                    response.body()?.let { returnedReport ->
-                        Log.d("AuthRepository", "Liquidation report submitted: reportId=${returnedReport.reportId}")
-                        Result.success(returnedReport)
+                    response.body()?.let { reportsResponse ->
+                        liquidationReports.removeAll { !it.liquidationId.startsWith("local_") }
+                        liquidationReports.addAll(reportsResponse.budgets) // Use budgets from the wrapper
+                        Log.d("AuthRepository", "Fetched ${reportsResponse.budgets.size} liquidation reports")
+                        Result.success(Unit)
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Get liquidation reports failed: HTTP ${response.code()}, body=$errorBody")
+                    val errorMessage = when (response.code()) {
+                        401 -> "Unauthorized: Invalid or expired token."
+                        400 -> "Invalid request: check API format."
+                        else -> "Server error (${response.code()}): $errorBody"
+                    }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in getLiquidationReports: ${e.message()}, code=${e.code()}", e)
+                Result.failure(Exception("Network error: ${e.message()}"))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in getLiquidationReports: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Get liquidation reports error: ${e.message}", e)
+                Result.failure(Exception("Failed to fetch liquidation reports: ${e.message}"))
+            }
+        }
+    }
+
+    suspend fun submitLiquidationReport(report: LiquidationReportData): Result<LiquidationReportData> {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection")
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
+                }
+                val token = tokenResult.getOrNull()!!
+                Log.d("AuthRepository", "Sending request to /api/liquidation with token: Bearer ${token.take(20)}...")
+                val response = apiService.submitLiquidationReport("Bearer $token", report.budgetId, report)
+                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+                if (response.isSuccessful) {
+                    response.body()?.let { submittedReport ->
+                        liquidationReports.add(submittedReport)
+                        Result.success(submittedReport)
                     } ?: Result.failure(Exception("Empty response body"))
                 } else {
                     val errorBody = response.errorBody()?.string()
                     Log.e("AuthRepository", "Submit liquidation report failed: HTTP ${response.code()}, body=$errorBody")
-                    val errorResponse = errorBody?.let {
-                        try {
-                            Gson().fromJson(it, ErrorResponse::class.java)
-                        } catch (e: Exception) {
-                            Log.e("AuthRepository", "Failed to parse error body: ${e.message}")
-                            null
-                        }
+                    val errorMessage = when (response.code()) {
+                        401 -> "Unauthorized: Invalid or expired token."
+                        400 -> "Invalid request: Check payload format."
+                        500 -> "Server error: $errorBody"
+                        else -> "Failed to submit report: HTTP ${response.code()}"
                     }
-                    val errorMessage = errorResponse?.message
-                        ?: errorResponse?.error
-                        ?: when (response.code()) {
-                            401 -> "Unauthorized: Invalid or expired token. Please log in again."
-                            400 -> "Invalid report data: check field formats."
-                            422 -> "Validation error: ensure all required fields are provided."
-                            else -> "Server error (${response.code()}). Please try again."
-                        }
                     Result.failure(Exception(errorMessage))
                 }
             } catch (e: HttpException) {
                 Log.e("AuthRepository", "HTTP error in submitLiquidationReport: ${e.message()}, code=${e.code()}", e)
-                val errorMessage = when (e.code()) {
-                    401 -> "Unauthorized: Invalid or expired token."
-                    else -> "Network error: ${e.message()}"
-                }
-                Result.failure(Exception(errorMessage))
+                Result.failure(Exception("Network error: ${e.message()}"))
             } catch (e: IOException) {
                 Log.e("AuthRepository", "IO error in submitLiquidationReport: ${e.message}", e)
                 Result.failure(Exception("No internet connection"))
             } catch (e: Exception) {
                 Log.e("AuthRepository", "Submit liquidation report error: ${e.message}", e)
-                Result.failure(Exception("Failed to submit liquidation report: ${e.message}"))
+                Result.failure(Exception("Failed to submit report: ${e.message}"))
+            }
+        }
+    }
+
+    suspend fun getLiquidationReport(liquidationId: String): Result<LiquidationReportData> {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (!isNetworkAvailable(context)) {
+                    Log.e("AuthRepository", "No network connection")
+                    return@withContext Result.failure(Exception("No internet connection"))
+                }
+                val tokenResult = getValidToken()
+                if (tokenResult.isFailure) {
+                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
+                }
+                val token = tokenResult.getOrNull()!!
+                Log.d("AuthRepository", "Fetching liquidation report for ID: $liquidationId with token: Bearer ${token.take(20)}...")
+                val response = apiService.getLiquidationReport("Bearer $token", liquidationId)
+                Log.d("AuthRepository", "Get liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+                if (response.isSuccessful) {
+                    response.body()?.let { report ->
+                        Result.success(report)
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthRepository", "Get liquidation report failed: HTTP ${response.code()}, body=$errorBody")
+                    val errorMessage = when (response.code()) {
+                        401 -> "Unauthorized: Invalid or expired token."
+                        404 -> "Report not found for ID: $liquidationId"
+                        500 -> "Server error: $errorBody"
+                        else -> "Failed to fetch report: HTTP ${response.code()}"
+                    }
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: HttpException) {
+                Log.e("AuthRepository", "HTTP error in getLiquidationReport: ${e.message()}, code=${e.code()}", e)
+                Result.failure(Exception("Network error: ${e.message()}"))
+            } catch (e: IOException) {
+                Log.e("AuthRepository", "IO error in getLiquidationReport: ${e.message}", e)
+                Result.failure(Exception("No internet connection"))
+            } catch (e: Exception) {
+                Log.e("AuthRepository", "Get liquidation report error: ${e.message}", e)
+                Result.failure(Exception("Failed to fetch report: ${e.message}"))
             }
         }
     }

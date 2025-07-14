@@ -43,7 +43,6 @@ import com.example.expensees.models.Expense
 import com.example.expensees.models.ExpenseItem
 import com.example.expensees.models.SubmittedBudget
 import com.example.expensees.network.AuthRepository
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.OffsetDateTime
@@ -52,27 +51,30 @@ import java.util.Locale
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.expensees.models.LiquidationReportData
-
-// ViewModel to hold selectedExpensesMap state
-data class ReportRecord(val budgetName: String, val timestamp: String)
+import java.time.LocalDate
 
 class LiquidationViewModel : ViewModel() {
     val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
-    val generatedReports = mutableStateListOf<ReportRecord>()
+    var selectedReport: LiquidationReportData? by mutableStateOf(null)
+        private set
 
-    fun clearSelections() {
+    fun selectReport(report: LiquidationReportData) {
+        selectedReport = report
         selectedExpensesMap.clear()
-    }
-
-    fun updateSelections(index: Int, expenses: List<Expense>) {
-        selectedExpensesMap[index] = mutableListOf<Expense>().apply { addAll(expenses) }
-        if (expenses.isEmpty()) {
-            selectedExpensesMap.remove(index)
+        // Group expenses by their corresponding budget expense item index
+        report.expenses.forEach { expense ->
+            val index = selectedReport?.expenses?.indexOfFirst { it == expense } ?: 0
+            selectedExpensesMap.getOrPut(index) { mutableListOf() }.add(expense)
         }
     }
 
-    fun addGeneratedReport(budgetName: String, timestamp: String) {
-        generatedReports.add(ReportRecord(budgetName, timestamp))
+    fun updateSelections(index: Int, expenses: List<Expense>) {
+        selectedExpensesMap[index] = expenses.toMutableList()
+    }
+
+    fun clearSelections() {
+        selectedExpensesMap.clear()
+        selectedReport = null
     }
 }
 
@@ -120,9 +122,8 @@ fun LiquidationReport(
         isGroupingUsed = true
     }
     val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-    var showReportDialog by remember { mutableStateOf(false) }
-    var reportContent by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
+    val transactionDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val categories = listOf(
@@ -140,12 +141,6 @@ fun LiquidationReport(
         BudgetStatus.PENDING to Color(0xFFD4A017),
         BudgetStatus.RELEASED to Color(0xFF388E3C),
         BudgetStatus.DENIED to Color(0xFFD32F2F)
-    )
-
-    val textColors = mapOf(
-        BudgetStatus.PENDING to Color(0xFF4B5563),
-        BudgetStatus.RELEASED to Color(0xFF1F2937),
-        BudgetStatus.DENIED to Color(0xFF1F2937)
     )
 
     val animatedScale = remember {
@@ -196,10 +191,7 @@ fun LiquidationReport(
         } ?: return 0.0
     }
 
-    val totalRemainingBalance by derivedStateOf {
-        selectedExpensesMap.entries.size
-        calculateTotalRemainingBalance()
-    }
+    val totalRemainingBalance by derivedStateOf { calculateTotalRemainingBalance() }
 
     BackHandler(enabled = true) {
         if (showExpenseSelectionDialog) {
@@ -819,27 +811,40 @@ fun LiquidationReport(
                                     isLoading = true
                                     coroutineScope.launch {
                                         try {
+                                            // Flatten expenses and add required fields
+                                            val currentTime = OffsetDateTime.now()
+                                            val currentDate = LocalDate.now()
+                                            val expenses = selectedExpensesMap.values.flatten().map { expense ->
+                                                Expense(
+                                                    expenseId = null, // Server assigns
+                                                    category = expense.category,
+                                                    amount = expense.amount,
+                                                    remarks = expense.remarks,
+                                                    dateOfTransaction = currentDate.format(transactionDateFormatter),
+                                                    createdAt = null, // Server assigns
+                                                    imagePaths = emptyList(), // Add image support if needed
+                                                )
+                                            }
                                             // Create LiquidationReportData
-                                            val totalActual = selectedExpensesMap.values.flatten().sumOf { it.amount }
+                                            val totalSpent = expenses.sumOf { it.amount }
                                             val reportData = LiquidationReportData(
+                                                liquidationId = "local_${System.currentTimeMillis()}",
                                                 budgetId = budget.budgetId!!,
                                                 budgetName = budget.name,
-                                                generatedAt = OffsetDateTime.now().format(dateFormatter),
-                                                totalBudgeted = budget.total,
-                                                totalActual = totalActual,
-                                                totalRemaining = totalRemainingBalance,
-                                                expenses = selectedExpensesMap
+                                                totalSpent = totalSpent,
+                                                remainingBalance = totalRemainingBalance,
+                                                status = "PENDING",
+                                                dateOfTransaction = currentDate.format(transactionDateFormatter),
+                                                createdAt = currentTime.format(dateFormatter),
+                                                expenses = expenses
                                             )
-
+                                            viewModel.selectReport(reportData) // Set report in view model
                                             // Submit report to server
                                             val result = authRepository.submitLiquidationReport(reportData)
                                             if (result.isSuccess) {
-                                                viewModel.addGeneratedReport(
-                                                    budgetName = budget.name,
-                                                    timestamp = reportData.generatedAt
-                                                )
-                                                println("Navigating to DetailedLiquidationReport with selectedExpensesMap: $selectedExpensesMap")
-                                                navController.navigate("detailed_liquidation_report/${budget.budgetId}")
+                                                val submittedReport = result.getOrNull() ?: reportData
+                                                viewModel.selectReport(submittedReport)
+                                                navController.navigate("detailed_liquidation_report/${submittedReport.liquidationId}")
                                                 Toast.makeText(
                                                     context,
                                                     "Liquidation Report for ${budget.name} submitted successfully",
@@ -922,11 +927,9 @@ fun LiquidationReport(
             }
             LaunchedEffect(filteredExpenses, currentExpenseItem, selectedBudget) {
                 checkedExpenses.clear()
-                // Initialize checkedExpenses only with expenses selected for the current index
                 filteredExpenses.forEach { expense ->
                     checkedExpenses[expense] = selectedExpensesMap[currentIndex]?.contains(expense) ?: false
                 }
-                println("Dialog initialized with checkedExpenses: ${checkedExpenses.filter { it.value }.keys}")
             }
 
             val budgetedAmount = currentExpense.quantity * currentExpense.amountPerUnit
@@ -1136,9 +1139,7 @@ fun LiquidationReport(
                                 Button(
                                     onClick = {
                                         val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
-                                        println("Confirming selections: $newSelections")
                                         viewModel.updateSelections(currentIndex, newSelections)
-                                        println("Updated selectedExpensesMap: $selectedExpensesMap")
                                         if (newSelections.isNotEmpty()) {
                                             Toast.makeText(
                                                 context,
@@ -1188,99 +1189,6 @@ fun LiquidationReport(
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showReportDialog) {
-            val dialogAlpha by animateFloatAsState(
-                targetValue = if (showReportDialog) 1f else 0f,
-                animationSpec = tween(300, easing = LinearOutSlowInEasing)
-            )
-            Dialog(
-                onDismissRequest = { showReportDialog = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false)
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth(0.95f)
-                        .fillMaxHeight(0.85f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .alpha(dialogAlpha),
-                    color = Color(0xFFF5F5F5),
-                    shadowElevation = 8.dp
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Liquidation Report: ${selectedBudget?.name}",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 20.sp
-                                ),
-                                color = Color(0xFF3B82F6)
-                            )
-                            IconButton(
-                                onClick = { showReportDialog = false },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        Color(0xFFE5E7EB),
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close dialog",
-                                    tint = Color(0xFF4B5563)
-                                )
-                            }
-                        }
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        ) {
-                            item {
-                                Text(
-                                    text = reportContent,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 14.sp
-                                    ),
-                                    color = Color(0xFF1F2937)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedButton(
-                            onClick = { showReportDialog = false },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF3B82F6)
-                            ),
-                            border = BorderStroke(1.dp, Color(0xFF3B82F6)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(
-                                text = "Close",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
                         }
                     }
                 }

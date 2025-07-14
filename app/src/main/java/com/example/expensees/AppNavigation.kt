@@ -133,20 +133,16 @@ fun AppNavigation(modifier: Modifier = Modifier, authRepository: AuthRepository)
                 budgetId = budgetId
             )
         }
-        composable("detailed_liquidation_report/{budgetId}") { backStackEntry ->
-            val budgetId = backStackEntry.arguments?.getString("budgetId")
-            val budget = authRepository.submittedBudgets.find { it.budgetId == budgetId }
-            if (budget != null) {
-                DetailedLiquidationReport(
-                    budget = budget,
-                    selectedExpensesMap = liquidationViewModel.selectedExpensesMap,
-                    navController = navController,
-                    modifier = modifier
-                )
-            } else {
-                Toast.makeText(context, "Budget not found", Toast.LENGTH_SHORT).show()
-                navController.popBackStack()
-            }
+        composable(
+            route = "detailed_liquidation_report/{liquidationId}",
+            arguments = listOf(navArgument("liquidationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            DetailedLiquidationReport(
+                navController = navController,
+                viewModel = viewModel(),
+                authRepository = authRepository, // Inject via dependency injection or factory
+                liquidationId = backStackEntry.arguments?.getString("liquidationId") ?: ""
+            )
         }
         composable("reset_password") {
             ResetPassword(

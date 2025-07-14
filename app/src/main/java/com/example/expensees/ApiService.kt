@@ -70,10 +70,22 @@ interface ApiService {
         @Path("userId") userId: String
     ): Response<ResponseBody>
 
-    @POST("api/reports/liquidation")
+    @POST("api/liquidation")
     suspend fun submitLiquidationReport(
         @Header("Authorization") token: String,
+        @Query("budgetId") budgetId: String,
         @Body report: LiquidationReportData
+    ): Response<LiquidationReportData>
+
+    @GET("api/liquidation")
+    suspend fun getLiquidationReports(
+        @Header("Authorization") token: String
+    ): Response<LiquidationReportsResponse>
+
+    @GET("api/liquidation/{liquidationId}")
+    suspend fun getLiquidationReport(
+        @Header("Authorization") token: String,
+        @Path("liquidationId") liquidationId: String
     ): Response<LiquidationReportData>
 
     @POST("api/forgotPassword/reset-password")
@@ -122,4 +134,8 @@ data class ExpenseRequest(
     @SerializedName("remarks") val remarks: String?,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("image") val image: String? = null
+)
+
+data class LiquidationReportsResponse(
+    @SerializedName("budgets") val budgets: List<LiquidationReportData>
 )

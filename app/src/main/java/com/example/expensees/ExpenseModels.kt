@@ -52,12 +52,14 @@ data class Expense(
 )
 
 data class LiquidationReportData(
-    val reportId: String = java.util.UUID.randomUUID().toString(),
-    val budgetId: String,
-    val budgetName: String,
-    val generatedAt: String,
-    val totalBudgeted: Double,
-    val totalActual: Double,
-    val totalRemaining: Double,
-    val expenses: Map<Int, List<Expense>> // Map of expense item index to selected expenses
+    @SerializedName("liquidationId") val liquidationId: String,
+    @SerializedName("budgetId") val budgetId: String,
+    @SerializedName("budgetName") val budgetName: String,
+    @SerializedName("totalSpent") val totalSpent: Double,
+    @SerializedName("remainingBalance") val remainingBalance: Double,
+    @SerializedName("status") val status: String,
+    @SerializedName("dateOfTransaction") val dateOfTransaction: String,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("expenses") val expenses: List<Expense>,
+    @SerializedName("remarks") val remarks: String? = null // Added for detailed report response
 )
