@@ -57,7 +57,7 @@ import java.io.File
 import java.time.LocalDate
 
 class LiquidationViewModel : ViewModel() {
-    val selectedExpensesMap = mutableMapOf<Int, MutableList<Expense>>()
+    val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
     var selectedReport: LiquidationReportData? = null
         private set
 
@@ -104,8 +104,7 @@ fun LiquidationReport(
     var currentExpenseItem by remember { mutableStateOf<Pair<ExpenseItem, Int>?>(null) }
     val selectedExpensesMap = viewModel.selectedExpensesMap
     val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
-    val snackbarHostState = remember { SnackbarHostState() } // Define at top level
-
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(budgetId) {
         if (budgetId != null) {
@@ -969,7 +968,7 @@ fun LiquidationReport(
                                                         duration = SnackbarDuration.Long
                                                     )
                                                 }
-                                                viewModel.clearSelections() // Reset retryCount on success
+                                                viewModel.clearSelections()
                                             } else {
                                                 val errorMessage = when {
                                                     result.exceptionOrNull()?.message?.contains("date", ignoreCase = true) == true ->
@@ -994,7 +993,7 @@ fun LiquidationReport(
                                                                     message = "Liquidation Report for ${budget.name} submitted successfully",
                                                                     duration = SnackbarDuration.Long
                                                                 )
-                                                                viewModel.clearSelections() // Reset retryCount on success
+                                                                viewModel.clearSelections()
                                                             } else {
                                                                 val retryErrorMessage = when {
                                                                     retryResult.exceptionOrNull()?.message?.contains("date", ignoreCase = true) == true ->
@@ -1082,7 +1081,6 @@ fun LiquidationReport(
         if (showExpenseSelectionDialog && currentExpenseItem != null) {
             val currentIndex = currentExpenseItem!!.second
             val currentExpense = currentExpenseItem!!.first
-            // Filter expenses to show only those not assigned to other budgets or already selected for this index
             val filteredExpenses = authRepository.userExpenses.filter { expense ->
                 val isAssignedToOtherBudget = selectedExpensesMap.any { (idx, exps) ->
                     idx != currentIndex && exps.contains(expense)

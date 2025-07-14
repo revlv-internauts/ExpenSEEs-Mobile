@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -147,9 +148,20 @@ fun DetailedLiquidationReport(
                         fontSize = 26.sp
                     ),
                     color = Color(0xFF111827),
-                    modifier = Modifier.weight(1f).offset(x = (-18).dp),
+                    modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                IconButton(
+                    onClick = { navController.navigate("home") { popUpTo("home") { inclusive = false } } },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = "Go to Home",
+                        tint = Color(0xFF111827)
+                    )
+                }
             }
         }
     ) { innerPadding ->

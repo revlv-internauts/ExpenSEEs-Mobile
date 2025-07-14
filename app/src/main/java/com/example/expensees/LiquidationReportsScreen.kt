@@ -33,6 +33,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiquidationReportsScreen(
@@ -108,8 +109,8 @@ fun LiquidationReportsScreen(
             ) {
                 IconButton(
                     onClick = {
-                        navController.navigate("requested_budgets") {
-                            popUpTo("liquidation_reports") { inclusive = true }
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = false }
                         }
                     },
                     modifier = Modifier
@@ -117,7 +118,7 @@ fun LiquidationReportsScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back to Budgets",
+                        contentDescription = "Back to Home",
                         tint = Color(0xFF1F2937)
                     )
                 }

@@ -609,56 +609,42 @@ fun ExpenseListScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             expense.imagePaths?.firstOrNull()?.let { imagePath ->
                                 var imageLoadFailed by remember { mutableStateOf(false) }
-                                if (tokenFetchFailed) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                var isImageLoading by remember { mutableStateOf(true) }
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (tokenFetchFailed) {
                                         Text(
                                             text = "Auth Error",
                                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                             color = Color(0xFF4B5563),
                                             textAlign = TextAlign.Center
                                         )
-                                    }
-                                } else if (expense.expenseId?.startsWith("local_") == true) {
-                                    val bitmap = try {
-                                        val uri = Uri.parse(imagePath)
-                                        BitmapFactory.decodeStream(
-                                            context.contentResolver.openInputStream(
-                                                uri
+                                    } else if (expense.expenseId?.startsWith("local_") == true) {
+                                        val bitmap = try {
+                                            val uri = Uri.parse(imagePath)
+                                            BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                        } catch (e: Exception) {
+                                            Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
+                                            null
+                                        }
+                                        if (bitmap != null) {
+                                            isImageLoading = false
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = "Expense receipt",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .animateContentSize(animationSpec = tween(200)),
+                                                contentScale = ContentScale.Crop
                                             )
-                                        )
-                                    } catch (e: Exception) {
-                                        Log.e(
-                                            "ExpenseListScreen",
-                                            "Failed to load local image: $imagePath, error: ${e.message}"
-                                        )
-                                        null
-                                    }
-                                    if (bitmap != null) {
-                                        Image(
-                                            bitmap = bitmap.asImageBitmap(),
-                                            contentDescription = "Expense receipt",
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .border(1.5.dp, themeColor, RoundedCornerShape(12.dp))
-                                                .animateContentSize(animationSpec = tween(200)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        imageLoadFailed = true
-                                        Box(
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                        } else {
+                                            isImageLoading = false
+                                            imageLoadFailed = true
                                             Text(
                                                 text = "No Image",
                                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
@@ -666,77 +652,68 @@ fun ExpenseListScreen(
                                                 textAlign = TextAlign.Center
                                             )
                                         }
-                                    }
-                                } else {
-                                    val fullImageUrl =
-                                        "${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}/images"
-                                    Log.d(
-                                        "ExpenseListScreen",
-                                        "Loading server image: $fullImageUrl with token: ${
-                                            token?.take(20)
-                                        }..."
-                                    )
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(fullImageUrl)
-                                            .apply {
-                                                if (token != null) {
-                                                    addHeader("Authorization", "Bearer $token")
-                                                } else {
-                                                    imageLoadFailed = true
-                                                }
-                                            }
-                                            .diskCacheKey(fullImageUrl)
-                                            .memoryCacheKey(fullImageUrl)
-                                            .build(),
-                                        contentDescription = "Expense receipt",
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(1.5.dp, themeColor, RoundedCornerShape(12.dp))
-                                            .animateContentSize(animationSpec = tween(200)),
-                                        contentScale = ContentScale.Crop,
-                                        onError = { error ->
-                                            imageLoadFailed = true
-                                            scope.launch {
-                                                Log.e(
-                                                    "ExpenseListScreen",
-                                                    "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}"
-                                                )
-                                                snackbarHostState.showSnackbar(
-                                                    message = "Failed to load receipt image",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                                if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
-                                                    retryCount++
-                                                    val tokenResult = authRepository.getValidToken()
-                                                    if (tokenResult.isSuccess) {
-                                                        token = tokenResult.getOrNull()
-                                                        Log.d(
-                                                            "ExpenseListScreen",
-                                                            "Retry token fetched: ${token?.take(20)}..."
-                                                        )
+                                    } else {
+                                        val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}/images"
+                                        Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(fullImageUrl)
+                                                .apply {
+                                                    if (token != null) {
+                                                        addHeader("Authorization", "Bearer $token")
                                                     } else {
-                                                        tokenFetchFailed = true
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Authentication error: Please log in again",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        navController.navigate("login") {
-                                                            popUpTo("home") { inclusive = true }
+                                                        imageLoadFailed = true
+                                                        isImageLoading = false
+                                                    }
+                                                }
+                                                .diskCacheKey(fullImageUrl)
+                                                .memoryCacheKey(fullImageUrl)
+                                                .build(),
+                                            contentDescription = "Expense receipt",
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .animateContentSize(animationSpec = tween(200)),
+                                            contentScale = ContentScale.Crop,
+                                            onLoading = {
+                                                isImageLoading = true
+                                            },
+                                            onError = { error ->
+                                                isImageLoading = false
+                                                imageLoadFailed = true
+                                                scope.launch {
+                                                    Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Failed to load receipt image",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                    if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                        retryCount++
+                                                        val tokenResult = authRepository.getValidToken()
+                                                        if (tokenResult.isSuccess) {
+                                                            token = tokenResult.getOrNull()
+                                                            Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                        } else {
+                                                            tokenFetchFailed = true
+                                                            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                            navController.navigate("login") {
+                                                                popUpTo("home") { inclusive = true }
+                                                            }
                                                         }
                                                     }
                                                 }
+                                            },
+                                            onSuccess = {
+                                                isImageLoading = false
+                                                Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
                                             }
-                                        },
-                                        onSuccess = {
-                                            Log.d(
-                                                "ExpenseListScreen",
-                                                "Successfully loaded server image: $fullImageUrl"
-                                            )
-                                        }
-                                    )
+                                        )
+                                    }
+                                    if (isImageLoading && !imageLoadFailed) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = themeColor
+                                        )
+                                    }
                                 }
                             } ?: Box(
                                 modifier = Modifier
@@ -1211,102 +1188,112 @@ fun ExpenseListScreen(
                     )
                     selectedImagePath?.let { imagePath ->
                         var imageLoadFailed by remember { mutableStateOf(false) }
-                        if (tokenFetchFailed) {
-                            Text(
-                                text = "Authentication error: Please log in again",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF4B5563),
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                        } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
-                            val bitmap = try {
-                                val uri = Uri.parse(imagePath)
-                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                            } catch (e: Exception) {
-                                Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
-                                null
-                            }
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(240.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(
-                                            1.5.dp,
-                                            Color(0xFF734656),
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable { showFullScreenImage = true },
-                                    contentScale = ContentScale.Crop
-                                )
-                            } ?: run {
-                                imageLoadFailed = true
+                        var isImageLoading by remember { mutableStateOf(true) }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(240.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.5.dp, Color(0xFF734656), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (tokenFetchFailed) {
                                 Text(
-                                    text = "No receipt photo available",
+                                    text = "Authentication error: Please log in again",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Color(0xFF4B5563),
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
-                            }
-                        } else {
-                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
-                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(fullImageUrl)
-                                    .apply {
-                                        if (token != null) {
-                                            addHeader("Authorization", "Bearer $token")
-                                        } else {
-                                            imageLoadFailed = true
-                                        }
-                                    }
-                                    .diskCacheKey(fullImageUrl)
-                                    .memoryCacheKey(fullImageUrl)
-                                    .build(),
-                                contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(240.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        1.5.dp,
-                                        Color(0xFF734656),
-                                        RoundedCornerShape(12.dp)
+                            } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                                val bitmap = try {
+                                    val uri = Uri.parse(imagePath)
+                                    BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                } catch (e: Exception) {
+                                    Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
+                                    null
+                                }
+                                if (bitmap != null) {
+                                    isImageLoading = false
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clickable { showFullScreenImage = true },
+                                        contentScale = ContentScale.Crop
                                     )
-                                    .clickable { showFullScreenImage = true },
-                                contentScale = ContentScale.Crop,
-                                onError = { error ->
+                                } else {
+                                    isImageLoading = false
                                     imageLoadFailed = true
-                                    scope.launch {
-                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
-                                        snackbarHostState.showSnackbar(
-                                            message = "Failed to load receipt image: ${error.result.throwable.message}",
-                                            duration = SnackbarDuration.Long
-                                        )
-                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
-                                            retryCount++
-                                            val tokenResult = authRepository.getValidToken()
-                                            if (tokenResult.isSuccess) {
-                                                token = tokenResult.getOrNull()
-                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                    Text(
+                                        text = "No receipt photo available",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF4B5563),
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                    )
+                                }
+                            } else {
+                                val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
+                                Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(fullImageUrl)
+                                        .apply {
+                                            if (token != null) {
+                                                addHeader("Authorization", "Bearer $token")
                                             } else {
-                                                tokenFetchFailed = true
-                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
-                                                navController.navigate("login") {
-                                                    popUpTo("home") { inclusive = true }
+                                                imageLoadFailed = true
+                                                isImageLoading = false
+                                            }
+                                        }
+                                        .diskCacheKey(fullImageUrl)
+                                        .memoryCacheKey(fullImageUrl)
+                                        .build(),
+                                    contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clickable { showFullScreenImage = true },
+                                    contentScale = ContentScale.Crop,
+                                    onLoading = {
+                                        isImageLoading = true
+                                    },
+                                    onError = { error ->
+                                        isImageLoading = false
+                                        imageLoadFailed = true
+                                        scope.launch {
+                                            Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                            snackbarHostState.showSnackbar(
+                                                message = "Failed to load receipt image: ${error.result.throwable.message}",
+                                                duration = SnackbarDuration.Long
+                                            )
+                                            if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                retryCount++
+                                                val tokenResult = authRepository.getValidToken()
+                                                if (tokenResult.isSuccess) {
+                                                    token = tokenResult.getOrNull()
+                                                    Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                } else {
+                                                    tokenFetchFailed = true
+                                                    Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("login") {
+                                                        popUpTo("home") { inclusive = true }
+                                                    }
                                                 }
                                             }
                                         }
+                                    },
+                                    onSuccess = {
+                                        isImageLoading = false
+                                        Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
                                     }
-                                },
-                                onSuccess = {
-                                    Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
-                                }
-                            )
+                                )
+                            }
+                            if (isImageLoading && !imageLoadFailed) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(48.dp),
+                                    color = themeColor
+                                )
+                            }
                         }
                     } ?: Text(
                         text = "No receipt photo available",
