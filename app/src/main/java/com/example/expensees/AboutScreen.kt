@@ -92,7 +92,7 @@ fun AboutScreen(
                 ),
                 color = Color(0xFF4B5563),
                 textAlign = TextAlign.Start,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 38.dp)
             )
         }
 
@@ -208,7 +208,7 @@ fun AboutScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp),
+                .padding(top = 38.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(

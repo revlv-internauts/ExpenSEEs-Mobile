@@ -153,8 +153,9 @@ fun ExpenseListScreen(
     val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     val filteredExpenses = expenses.filter { expense ->
         try {
-            val matchesDate = showAllExpenses || expense.dateOfTransaction?.let {
-                LocalDate.parse(it, dateFormatter) == selectedDate
+            val matchesDate = showAllExpenses || expense.createdAt?.let {
+                val createdAtDate = LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                createdAtDate == selectedDate
             } ?: false
             val matchesSearch = searchQuery.isEmpty() ||
                     expense.category?.contains(searchQuery, ignoreCase = true) == true ||
@@ -168,9 +169,11 @@ fun ExpenseListScreen(
     }.sortedWith(
         compareByDescending<Expense> { expense ->
             try {
-                LocalDate.parse(expense.dateOfTransaction, dateFormatter)
+                expense.createdAt?.let {
+                    java.time.LocalDateTime.parse(it)
+                } ?: java.time.LocalDateTime.MIN
             } catch (e: DateTimeParseException) {
-                LocalDate.MIN
+                java.time.LocalDateTime.MIN
             }
         }
     )
@@ -428,8 +431,9 @@ fun ExpenseListScreen(
                     items(days) { day ->
                         val hasExpenses = expenses.any { expense ->
                             try {
-                                expense.dateOfTransaction?.let {
-                                    LocalDate.parse(it, dateFormatter) == day
+                                expense.createdAt?.let {
+                                    val createdAtDate = LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                    createdAtDate == day
                                 } ?: false
                             } catch (e: DateTimeParseException) {
                                 false
