@@ -60,7 +60,7 @@ fun DetailedLiquidationReport(
         "PENDING" to Color(0xFFCA8A04),
         "RELEASED" to Color(0xFF16A34A),
         "DENIED" to Color(0xFFDC2626),
-        "LIQUIDATED" to Color(0xFF6B7280)
+        "LIQUIDATED" to Color(0xFF4CAF50)
     )
 
     // Fetch report charter on composition
@@ -197,7 +197,7 @@ fun DetailedLiquidationReport(
                         modifier = Modifier
                             .size(14.dp)
                             .clip(CircleShape)
-                            .background(statusColors[report!!.status] ?: Color(0xFF6B7280))
+                            .background(statusColors[report!!.status] ?: Color(0xFF4CAF50))
                     )
                 }
                 Text(

@@ -173,106 +173,153 @@ fun RequestedBudgetsScreen(
                     val releasedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.RELEASED }
                     val deniedCount = authRepository.submittedBudgets.count { it.status == BudgetStatus.DENIED }
 
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.PENDING },
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = pendingCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Pending Budgets ($pendingCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
+                        Button(
+                            onClick = { selectedCategory = BudgetStatus.PENDING },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF78495B),
+                                disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = pendingCount > 0,
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Pending Budgets ($pendingCount)",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .background(statusColors[BudgetStatus.PENDING]!!, CircleShape)
                         )
                     }
 
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.RELEASED },
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = releasedCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Released Budgets ($releasedCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
+                        Button(
+                            onClick = { selectedCategory = BudgetStatus.RELEASED },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF78495B),
+                                disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = releasedCount > 0,
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Released Budgets ($releasedCount)",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .background(statusColors[BudgetStatus.RELEASED]!!, CircleShape)
                         )
                     }
 
-                    Button(
-                        onClick = { selectedCategory = BudgetStatus.DENIED },
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B),
-                            disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = deniedCount > 0,
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Denied Budgets ($deniedCount)",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
+                        Button(
+                            onClick = { selectedCategory = BudgetStatus.DENIED },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF78495B),
+                                disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = deniedCount > 0,
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Denied Budgets ($deniedCount)",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .background(statusColors[BudgetStatus.DENIED]!!, CircleShape)
                         )
                     }
-
-                    Button(
-                        onClick = { showAllBudgets = true },
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .padding(vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF78495B)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 4.dp,
-                            pressedElevation = 2.dp
-                        )
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "View All Budgets",
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
+                        Button(
+                            onClick = { showAllBudgets = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF78495B),
+                                disabledContainerColor = Color(0xFF78495B).copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 4.dp,
+                                pressedElevation = 2.dp
+                            )
+                        ) {
+                            Text(
+                                text = "View All Budgets",
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(20.dp))
                     }
                 } else {
                     if (showAllBudgets || selectedCategory != null) {
@@ -416,6 +463,8 @@ fun BudgetCard(
             .clip(RoundedCornerShape(8.dp)),
         color = Color.Transparent
     ) {
+
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()

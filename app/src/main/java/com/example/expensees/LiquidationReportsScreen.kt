@@ -55,7 +55,7 @@ fun LiquidationReportsScreen(
         "PENDING" to Color(0xFFCA8A04),
         "RELEASED" to Color(0xFF16A34A),
         "DENIED" to Color(0xFFDC2626),
-        "LIQUIDATED" to Color(0xFF6B7280)
+        "LIQUIDATED" to Color(0xFF4CAF50)
     )
 
     LaunchedEffect(Unit) {
@@ -276,7 +276,7 @@ fun LiquidationReportsScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .size(14.dp)
-                                                    .background(statusColors[report.status] ?: Color(0xFF6B7280), CircleShape)
+                                                    .background(statusColors[report.status] ?: Color(0xFF4CAF50), CircleShape)
                                             )
                                         }
                                         if (remarksLoading[report.liquidationId] == true) {
