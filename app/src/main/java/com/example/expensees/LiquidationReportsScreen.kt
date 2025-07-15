@@ -50,12 +50,16 @@ fun LiquidationReportsScreen(
     val detailedReports = remember { mutableStateMapOf<String, LiquidationReportData>() }
     val remarksLoading = remember { mutableStateMapOf<String, Boolean>() }
     val remarksErrors = remember { mutableStateMapOf<String, String?>() }
+    var selectedFilter by remember { mutableStateOf("Pending") } // Default to "Pending" instead of "All"
+    // Removed "All" from filter options
+    val filterOptions = listOf("Pending", "Denied", "Liquidated")
 
+    // Update statusColors to use consistent keys (uppercase to match report.status)
     val statusColors = mapOf(
         "PENDING" to Color(0xFFCA8A04),
         "RELEASED" to Color(0xFF16A34A),
         "DENIED" to Color(0xFFDC2626),
-        "LIQUIDATED" to Color(0xFF4CAF50)
+        "LIQUIDATED" to Color(0xFF4CAF50) // Ensure LIQUIDATED is mapped correctly
     )
 
     LaunchedEffect(Unit) {
@@ -136,7 +140,39 @@ fun LiquidationReportsScreen(
                     textAlign = TextAlign.Center
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+
+            // Segmented controls for filtering
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                filterOptions.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = filterOptions.size),
+                        onClick = { selectedFilter = option },
+                        selected = selectedFilter == option, // Ensure selected state is consistent
+                        label = {
+                            Text(
+                                text = option,
+                                fontSize = 14.sp, // Consistent font size
+                                fontWeight = if (selectedFilter == option) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        },
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = Color(0xFF3B82F6).copy(alpha = 0.1f),
+                            activeContentColor = Color(0xFF3B82F6),
+                            activeBorderColor = Color(0xFF3B82F6), // Add border for active state
+                            inactiveContainerColor = Color.White,
+                            inactiveContentColor = Color(0xFF4B5563),
+                            inactiveBorderColor = Color(0xFF4B5563).copy(alpha = 0.3f) // Consistent inactive border
+                        ),
+                        modifier = Modifier.height(40.dp) // Consistent height for all buttons
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             when {
                 isLoading -> {
@@ -221,11 +257,14 @@ fun LiquidationReportsScreen(
                     )
                 }
                 else -> {
+                    // Filter reports based on selectedFilter, no "All" option
+                    val filteredReports = reportsState.filter { it.status == selectedFilter.uppercase(Locale.US) }
+
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(reportsState) { report ->
+                        items(filteredReports) { report ->
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()

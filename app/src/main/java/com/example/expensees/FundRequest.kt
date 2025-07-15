@@ -1,7 +1,9 @@
 package com.example.expensees.screens
 
 import android.app.DatePickerDialog
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -56,8 +58,7 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.math.abs
 
-// ... (enum BudgetStatus and data class SubmittedBudget remain unchanged)
-
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FundRequest(
@@ -90,13 +91,8 @@ fun FundRequest(
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            // Handle cancellation to allow reopening the dialog
-            setOnCancelListener {
-                showDatePicker = false
-            }
-            setOnDismissListener {
-                showDatePicker = false
-            }
+            setOnCancelListener { showDatePicker = false }
+            setOnDismissListener { showDatePicker = false }
         }
     }
 
@@ -557,64 +553,47 @@ fun FundRequest(
                             fontWeight = FontWeight.Medium
                         )
                     )
-                    Row(
+                    OutlinedTextField(
+                        value = budgetDate,
+                        onValueChange = { },
+                        label = { Text("Budget Date", color = Color(0xFF4B5563)) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Budget Date",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier
-                                .width(100.dp)
-                                .padding(end = 8.dp)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { showDatePicker = true }
-                        ) {
-                            OutlinedTextField(
-                                value = budgetDate,
-                                onValueChange = { },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                enabled = false,
-                                readOnly = true,
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                placeholder = {
-                                    Text(
-                                        "Select date (YYYY-MM-DD)",
-                                        color = Color(0xFF4B5563),
-                                        fontSize = 14.sp
-                                    )
-                                },
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    disabledTextColor = Color(0xFF1F2937),
-                                    disabledBorderColor = Color(0xFFE5E7EB),
-                                    disabledPlaceholderColor = Color(0xFF4B5563),
-                                    disabledLabelColor = Color(0xFF4B5563),
-                                    disabledLeadingIconColor = Color(0xFF4B5563),
-                                    disabledTrailingIconColor = Color(0xFF4B5563)
-                                ),
-                                trailingIcon = {
-                                    IconButton(onClick = { showDatePicker = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.DateRange,
-                                            contentDescription = "Select date",
-                                            tint = Color(0xFF8A5B6E)
-                                        )
-                                    }
-                                }
+                            .padding(vertical = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showDatePicker = true },
+                        enabled = false,
+                        readOnly = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        placeholder = {
+                            Text(
+                                "Select date (YYYY-MM-DD)",
+                                color = Color(0xFF4B5563),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
                             )
+                        },
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            disabledTextColor = Color(0xFF1F2937),
+                            disabledBorderColor = Color(0xFFE5E7EB),
+                            disabledPlaceholderColor = Color(0xFF4B5563),
+                            disabledLabelColor = Color(0xFF4B5563),
+                            disabledLeadingIconColor = Color(0xFF4B5563),
+                            disabledTrailingIconColor = Color(0xFF4B5563)
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select date",
+                                    tint = Color(0xFF8A5B6E)
+                                )
+                            }
                         }
-                    }
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
@@ -984,7 +963,6 @@ fun FundRequest(
                 }
             }
             if (showDatePicker) {
-                // Show the native DatePickerDialog
                 LaunchedEffect(showDatePicker) {
                     datePickerDialog.show()
                 }
