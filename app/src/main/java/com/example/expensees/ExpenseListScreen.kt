@@ -498,240 +498,259 @@ fun ExpenseListScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = if (selectedExpenses.isNotEmpty()) 80.dp else 16.dp)
             ) {
-                itemsIndexed(filteredExpenses) { _, expense ->
-                    val isSelected = expense in selectedExpenses
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isPressed by interactionSource.collectIsPressedAsState()
-                    val scale by animateFloatAsState(
-                        targetValue = if (isPressed || isSelected) 1.05f else 1f,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                    )
-                    val elevation by animateDpAsState(
-                        targetValue = if (isPressed || isSelected) 8.dp else 4.dp,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                    )
+                if (filteredExpenses.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No recorded expenses yet",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = Color(0xFF4B5563),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    itemsIndexed(filteredExpenses) { _, expense ->
+                        val isSelected = expense in selectedExpenses
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val scale by animateFloatAsState(
+                            targetValue = if (isPressed || isSelected) 1.05f else 1f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        )
+                        val elevation by animateDpAsState(
+                            targetValue = if (isPressed || isSelected) 8.dp else 4.dp,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                        )
 
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .scale(scale)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = {
-                                        if (showCheckboxes) {
-                                            selectedExpenses = if (isSelected) {
-                                                selectedExpenses - expense
-                                            } else {
-                                                selectedExpenses + expense
-                                            }
-                                        } else {
-                                            selectedExpense = expense
-                                            selectedImagePath = expense.imagePaths?.firstOrNull()
-                                            showExpenseDialog = true
-                                        }
-                                    },
-                                    onLongPress = {
-                                        showCheckboxes = true
-                                        selectedExpenses = selectedExpenses + expense
-                                    }
-                                )
-                            }
-                            .clip(RoundedCornerShape(16.dp)),
-                        color = Color.White,
-                        shadowElevation = elevation
-                    ) {
-                        Row(
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (showCheckboxes) {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = { checked ->
-                                        selectedExpenses = if (checked) {
-                                            selectedExpenses + expense
-                                        } else {
-                                            selectedExpenses - expense
+                                .scale(scale)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            if (showCheckboxes) {
+                                                selectedExpenses = if (isSelected) {
+                                                    selectedExpenses - expense
+                                                } else {
+                                                    selectedExpenses + expense
+                                                }
+                                            } else {
+                                                selectedExpense = expense
+                                                selectedImagePath = expense.imagePaths?.firstOrNull()
+                                                showExpenseDialog = true
+                                            }
+                                        },
+                                        onLongPress = {
+                                            showCheckboxes = true
+                                            selectedExpenses = selectedExpenses + expense
                                         }
-                                        if (selectedExpenses.isEmpty()) {
-                                            showCheckboxes = false
-                                        }
-                                    },
-                                    colors = CheckboxDefaults.colors(
-                                        checkedColor = Color(0xFF734656),
-                                        uncheckedColor = Color(0xFF4B5563),
-                                        checkmarkColor = Color.White
-                                    ),
-                                    modifier = Modifier.padding(4.dp)
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.width(36.dp))
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = categoryIcons[expense.category]
-                                            ?: Icons.Default.Category,
-                                        contentDescription = null,
-                                        tint = Color(0xFF734656),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = expense.category ?: "",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp
-                                        ),
-                                        color = Color(0xFF1F2937)
                                     )
                                 }
-                                Text(
-                                    text = expense.remarks ?: "",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    ),
-                                    color = Color(0xFF1F2937),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "₱${numberFormat.format(expense.amount)}",
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    ),
-                                    color = Color(0xFF734656)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            expense.imagePaths?.firstOrNull()?.let { imagePath ->
-                                var imageLoadFailed by remember { mutableStateOf(false) }
-                                var isImageLoading by remember { mutableStateOf(true) }
-                                Box(
+                                .clip(RoundedCornerShape(16.dp)),
+                            color = Color.White,
+                            shadowElevation = elevation
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (showCheckboxes) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            selectedExpenses = if (checked) {
+                                                selectedExpenses + expense
+                                            } else {
+                                                selectedExpenses - expense
+                                            }
+                                            if (selectedExpenses.isEmpty()) {
+                                                showCheckboxes = false
+                                            }
+                                        },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = Color(0xFF734656),
+                                            uncheckedColor = Color(0xFF4B5563),
+                                            checkmarkColor = Color.White
+                                        ),
+                                        modifier = Modifier.padding(4.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = categoryIcons[expense.category]
+                                                ?: Icons.Default.Category,
+                                            contentDescription = null,
+                                            tint = Color(0xFF734656),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = expense.category ?: "",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp
+                                            ),
+                                            color = Color(0xFF1F2937)
+                                        )
+                                    }
+                                    Text(
+                                        text = expense.remarks ?: "",
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        ),
+                                        color = Color(0xFF1F2937),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "₱${numberFormat.format(expense.amount)}",
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        ),
+                                        color = Color(0xFF734656)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                expense.imagePaths?.firstOrNull()?.let { imagePath ->
+                                    var imageLoadFailed by remember { mutableStateOf(false) }
+                                    var isImageLoading by remember { mutableStateOf(true) }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (tokenFetchFailed) {
+                                            Text(
+                                                text = "Auth Error",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                                color = Color(0xFF4B5563),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        } else if (expense.expenseId?.startsWith("local_") == true) {
+                                            val bitmap = try {
+                                                val uri = Uri.parse(imagePath)
+                                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                                            } catch (e: Exception) {
+                                                Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
+                                                null
+                                            }
+                                            if (bitmap != null) {
+                                                isImageLoading = false
+                                                Image(
+                                                    bitmap = bitmap.asImageBitmap(),
+                                                    contentDescription = "Expense receipt",
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .animateContentSize(animationSpec = tween(200)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                isImageLoading = false
+                                                imageLoadFailed = true
+                                                Text(
+                                                    text = "No Image",
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                                    color = Color(0xFF4B5563),
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        } else {
+                                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}/images"
+                                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(fullImageUrl)
+                                                    .apply {
+                                                        if (token != null) {
+                                                            addHeader("Authorization", "Bearer $token")
+                                                        } else {
+                                                            imageLoadFailed = true
+                                                            isImageLoading = false
+                                                        }
+                                                    }
+                                                    .diskCacheKey(fullImageUrl)
+                                                    .memoryCacheKey(fullImageUrl)
+                                                    .build(),
+                                                contentDescription = "Expense receipt",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .animateContentSize(animationSpec = tween(200)),
+                                                contentScale = ContentScale.Crop,
+                                                onLoading = {
+                                                    isImageLoading = true
+                                                },
+                                                onError = { error ->
+                                                    isImageLoading = false
+                                                    imageLoadFailed = true
+                                                    scope.launch {
+                                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                                        snackbarHostState.showSnackbar(
+                                                            message = "Failed to load receipt image",
+                                                            duration = SnackbarDuration.Short
+                                                        )
+                                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                                            retryCount++
+                                                            val tokenResult = authRepository.getValidToken()
+                                                            if (tokenResult.isSuccess) {
+                                                                token = tokenResult.getOrNull()
+                                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                                            } else {
+                                                                tokenFetchFailed = true
+                                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                                navController.navigate("login") {
+                                                                    popUpTo("home") { inclusive = true }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                onSuccess = {
+                                                    isImageLoading = false
+                                                    Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
+                                                }
+                                            )
+                                        }
+                                        if (isImageLoading && !imageLoadFailed) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                color = themeColor
+                                            )
+                                        }
+                                    }
+                                } ?: Box(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (tokenFetchFailed) {
-                                        Text(
-                                            text = "Auth Error",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                            color = Color(0xFF4B5563),
-                                            textAlign = TextAlign.Center
-                                        )
-                                    } else if (expense.expenseId?.startsWith("local_") == true) {
-                                        val bitmap = try {
-                                            val uri = Uri.parse(imagePath)
-                                            BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                                        } catch (e: Exception) {
-                                            Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
-                                            null
-                                        }
-                                        if (bitmap != null) {
-                                            isImageLoading = false
-                                            Image(
-                                                bitmap = bitmap.asImageBitmap(),
-                                                contentDescription = "Expense receipt",
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .animateContentSize(animationSpec = tween(200)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            isImageLoading = false
-                                            imageLoadFailed = true
-                                            Text(
-                                                text = "No Image",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                                color = Color(0xFF4B5563),
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    } else {
-                                        val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${expense.expenseId}/images"
-                                        Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(fullImageUrl)
-                                                .apply {
-                                                    if (token != null) {
-                                                        addHeader("Authorization", "Bearer $token")
-                                                    } else {
-                                                        imageLoadFailed = true
-                                                        isImageLoading = false
-                                                    }
-                                                }
-                                                .diskCacheKey(fullImageUrl)
-                                                .memoryCacheKey(fullImageUrl)
-                                                .build(),
-                                            contentDescription = "Expense receipt",
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .animateContentSize(animationSpec = tween(200)),
-                                            contentScale = ContentScale.Crop,
-                                            onLoading = {
-                                                isImageLoading = true
-                                            },
-                                            onError = { error ->
-                                                isImageLoading = false
-                                                imageLoadFailed = true
-                                                scope.launch {
-                                                    Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
-                                                    snackbarHostState.showSnackbar(
-                                                        message = "Failed to load receipt image",
-                                                        duration = SnackbarDuration.Short
-                                                    )
-                                                    if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
-                                                        retryCount++
-                                                        val tokenResult = authRepository.getValidToken()
-                                                        if (tokenResult.isSuccess) {
-                                                            token = tokenResult.getOrNull()
-                                                            Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
-                                                        } else {
-                                                            tokenFetchFailed = true
-                                                            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
-                                                            navController.navigate("login") {
-                                                                popUpTo("home") { inclusive = true }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            onSuccess = {
-                                                isImageLoading = false
-                                                Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
-                                            }
-                                        )
-                                    }
-                                    if (isImageLoading && !imageLoadFailed) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp),
-                                            color = themeColor
-                                        )
-                                    }
+                                    Text(
+                                        text = "No Image",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                        color = Color(0xFF4B5563),
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
-                            } ?: Box(
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, themeColor, RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "No Image",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                    color = Color(0xFF4B5563),
-                                    textAlign = TextAlign.Center
-                                )
                             }
                         }
                     }

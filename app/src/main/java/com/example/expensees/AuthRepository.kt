@@ -1412,40 +1412,26 @@ class AuthRepository(
                     )
                 )
 
-                // Add single expense fields (server expects one expense)
-                if (report.expenses.isNotEmpty()) {
-                    val expense = report.expenses[0] // Take first expense
-                    if (expense.category == null || expense.dateOfTransaction == null) {
-                        Log.w("AuthRepository", "Skipping expense: category=${expense.category}, dateOfTransaction=${expense.dateOfTransaction}")
-                        return@withContext Result.failure(Exception("Invalid expense: Missing category or date"))
-                    }
+                // Serialize expenses list to JSON, excluding imagePaths
+                val gson = Gson()
+                val expensesJson = gson.toJson(report.expenses.map { expense ->
+                    mapOf(
+                        "category" to expense.category,
+                        "amount" to expense.amount,
+                        "remarks" to (expense.remarks ?: ""),
+                        "dateOfTransaction" to expense.dateOfTransaction
+                    )
+                })
+                parts.add(
+                    MultipartBody.Part.createFormData(
+                        "expenses",
+                        expensesJson
+                    )
+                )
 
-                    parts.add(
-                        MultipartBody.Part.createFormData(
-                            "category",
-                            expense.category
-                        )
-                    )
-                    parts.add(
-                        MultipartBody.Part.createFormData(
-                            "amount",
-                            expense.amount.toString()
-                        )
-                    )
-                    parts.add(
-                        MultipartBody.Part.createFormData(
-                            "remarks",
-                            expense.remarks ?: ""
-                        )
-                    )
-                    parts.add(
-                        MultipartBody.Part.createFormData(
-                            "dateOfTransaction",
-                            expense.dateOfTransaction
-                        )
-                    )
-
-                    // Add image files for this expense, if any
+                // Add image files for each expense
+                var fileCount = 0
+                report.expenses.forEachIndexed { expenseIndex, expense ->
                     expense.imagePaths?.forEachIndexed { fileIndex, imagePath ->
                         try {
                             // Skip server-side paths starting with "Uploads/"
@@ -1455,7 +1441,7 @@ class AuthRepository(
                             }
                             val file = if (imagePath.startsWith("content://")) {
                                 context.contentResolver.openInputStream(Uri.parse(imagePath))?.use { input ->
-                                    val tempFile = File.createTempFile("expense_$fileIndex", ".jpg", context.cacheDir)
+                                    val tempFile = File.createTempFile("expense_${expenseIndex}_$fileIndex", ".jpg", context.cacheDir)
                                     tempFile.outputStream().use { output ->
                                         input.copyTo(output)
                                     }
@@ -1468,24 +1454,22 @@ class AuthRepository(
                                 val requestFile = file.readBytes().toRequestBody("image/jpeg".toMediaType())
                                 parts.add(
                                     MultipartBody.Part.createFormData(
-                                        "files[$fileIndex]",
+                                        "files[$fileCount]", // Use a single files array to match backend
                                         file.name,
                                         requestFile
                                     )
                                 )
+                                fileCount++
                             } else {
                                 Log.w("AuthRepository", "Image file not found: $imagePath")
                             }
                         } catch (e: Exception) {
-                            Log.e("AuthRepository", "Failed to process image $imagePath: ${e.message}")
+                            Log.e("AuthRepository", "Failed to process image $imagePath for expense $expenseIndex: ${e.message}")
                         }
                     }
-                } else {
-                    Log.w("AuthRepository", "No expenses provided in the report")
-                    return@withContext Result.failure(Exception("No valid expenses provided"))
                 }
 
-                Log.d("AuthRepository", "Multipart request parts: ${parts.size}")
+                Log.d("AuthRepository", "Multipart request parts: ${parts.size}, files included: $fileCount")
 
                 // Make the API call
                 val response = apiService.submitLiquidationReport(

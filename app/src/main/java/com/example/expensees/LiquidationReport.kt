@@ -838,13 +838,6 @@ fun LiquidationReport(
                                             duration = SnackbarDuration.Long
                                         )
                                     }
-                                } else if (selectedExpensesMap.values.flatten().size > 1) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Only one expense can be submitted per report",
-                                            duration = SnackbarDuration.Long
-                                        )
-                                    }
                                 } else {
                                     isLoading = true
                                     coroutineScope.launch {
@@ -929,7 +922,7 @@ fun LiquidationReport(
                                             if (expenses.isEmpty()) {
                                                 coroutineScope.launch {
                                                     snackbarHostState.showSnackbar(
-                                                        message = "No valid expenses selected. Ensure the expense has a category and date.",
+                                                        message = "No valid expenses selected. Ensure each expense has a category and date.",
                                                         duration = SnackbarDuration.Long
                                                     )
                                                 }
