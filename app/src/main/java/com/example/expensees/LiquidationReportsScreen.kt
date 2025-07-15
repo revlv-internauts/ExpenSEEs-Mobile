@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,9 +29,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.expensees.models.LiquidationReportData
 import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -50,19 +52,17 @@ fun LiquidationReportsScreen(
     val detailedReports = remember { mutableStateMapOf<String, LiquidationReportData>() }
     val remarksLoading = remember { mutableStateMapOf<String, Boolean>() }
     val remarksErrors = remember { mutableStateMapOf<String, String?>() }
-    var selectedFilter by remember { mutableStateOf("Pending") } // Default to "Pending" instead of "All"
-    // Removed "All" from filter options
+    var selectedFilter by remember { mutableStateOf("Pending") }
     val filterOptions = listOf("Pending", "Denied", "Liquidated")
 
-    // Update statusColors to use consistent keys (uppercase to match report.status)
     val statusColors = mapOf(
         "PENDING" to Color(0xFFCA8A04),
         "RELEASED" to Color(0xFF16A34A),
         "DENIED" to Color(0xFFDC2626),
-        "LIQUIDATED" to Color(0xFF4CAF50) // Ensure LIQUIDATED is mapped correctly
+        "LIQUIDATED" to Color(0xFF4CAF50)
     )
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reportsState.size) {
         isLoading = true
         errorMessage = null
         coroutineScope.launch {
@@ -70,9 +70,12 @@ fun LiquidationReportsScreen(
             if (result.isFailure) {
                 errorMessage = result.exceptionOrNull()?.message ?: "Failed to load reports"
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
-            } else {
-                // Fetch detailed reports for remarks
-                reportsState.forEach { report ->
+                isLoading = false
+                return@launch
+            }
+
+            val deferredResults = reportsState.map { report ->
+                async {
                     remarksLoading[report.liquidationId] = true
                     val detailResult = authRepository.getLiquidationReport(report.liquidationId)
                     remarksLoading[report.liquidationId] = false
@@ -83,6 +86,7 @@ fun LiquidationReportsScreen(
                     }
                 }
             }
+            deferredResults.awaitAll()
             isLoading = false
         }
     }
@@ -139,9 +143,30 @@ fun LiquidationReportsScreen(
                         .offset(x = (-18).dp),
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                IconButton(
+                    onClick = {
+                        isLoading = true
+                        errorMessage = null
+                        coroutineScope.launch {
+                            val result = authRepository.getLiquidationReports()
+                            if (result.isFailure) {
+                                errorMessage = result.exceptionOrNull()?.message ?: "Failed to load reports"
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                            }
+                            isLoading = false
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh Reports",
+                        tint = Color(0xFF1F2937)
+                    )
+                }
             }
 
-            // Segmented controls for filtering
             SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -151,23 +176,23 @@ fun LiquidationReportsScreen(
                     SegmentedButton(
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = filterOptions.size),
                         onClick = { selectedFilter = option },
-                        selected = selectedFilter == option, // Ensure selected state is consistent
+                        selected = selectedFilter == option,
                         label = {
                             Text(
                                 text = option,
-                                fontSize = 14.sp, // Consistent font size
+                                fontSize = 14.sp,
                                 fontWeight = if (selectedFilter == option) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },
                         colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = Color(0xFF3B82F6).copy(alpha = 0.1f),
-                            activeContentColor = Color(0xFF3B82F6),
-                            activeBorderColor = Color(0xFF3B82F6), // Add border for active state
-                            inactiveContainerColor = Color.White,
+                            activeContainerColor = Color(0xFF734656).copy(alpha = 0.1f),
+                            activeContentColor = Color(0xFF734656),
+                            activeBorderColor = Color(0xFF5E3645),
+                            inactiveContainerColor = Color(0xFFF5F5F5),
                             inactiveContentColor = Color(0xFF4B5563),
-                            inactiveBorderColor = Color(0xFF4B5563).copy(alpha = 0.3f) // Consistent inactive border
+                            inactiveBorderColor = Color(0xFF4B5563).copy(alpha = 0.3f)
                         ),
-                        modifier = Modifier.height(40.dp) // Consistent height for all buttons
+                        modifier = Modifier.height(40.dp)
                     )
                 }
             }
@@ -184,7 +209,7 @@ fun LiquidationReportsScreen(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(48.dp),
-                            color = Color(0xFF3B82F6)
+                            color = Color(0xFF734656)
                         )
                     }
                 }
@@ -215,8 +240,12 @@ fun LiquidationReportsScreen(
                                     if (result.isFailure) {
                                         errorMessage = result.exceptionOrNull()?.message ?: "Failed to load reports"
                                         Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
-                                    } else {
-                                        reportsState.forEach { report ->
+                                        isLoading = false
+                                        return@launch
+                                    }
+
+                                    val deferredResults = reportsState.map { report ->
+                                        async {
                                             remarksLoading[report.liquidationId] = true
                                             val detailResult = authRepository.getLiquidationReport(report.liquidationId)
                                             remarksLoading[report.liquidationId] = false
@@ -227,6 +256,7 @@ fun LiquidationReportsScreen(
                                             }
                                         }
                                     }
+                                    deferredResults.awaitAll()
                                     isLoading = false
                                 }
                             },
@@ -257,8 +287,15 @@ fun LiquidationReportsScreen(
                     )
                 }
                 else -> {
-                    // Filter reports based on selectedFilter, no "All" option
-                    val filteredReports = reportsState.filter { it.status == selectedFilter.uppercase(Locale.US) }
+                    val filteredReports = reportsState
+                        .filter { it.status == selectedFilter.uppercase(Locale.US) }
+                        .sortedByDescending { report ->
+                            try {
+                                OffsetDateTime.parse(report.createdAt)
+                            } catch (e: Exception) {
+                                OffsetDateTime.MIN // Fallback to ensure invalid dates don't crash
+                            }
+                        }
 
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
@@ -275,7 +312,7 @@ fun LiquidationReportsScreen(
                                     },
                                 shape = RoundedCornerShape(8.dp),
                                 color = Color.Transparent,
-                                border = BorderStroke(1.dp, Color(0xFF4B5563).copy(alpha = 0.3f))
+                                border = BorderStroke(1.dp, Color(0xFF5E3645))
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -293,13 +330,6 @@ fun LiquidationReportsScreen(
                                                 fontSize = 16.sp
                                             ),
                                             color = Color(0xFF1F2937)
-                                        )
-                                        Text(
-                                            text = "Generated: ${report.createdAt.formatDate()}",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontSize = 12.sp
-                                            ),
-                                            color = Color(0xFF4B5563)
                                         )
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically
@@ -351,16 +381,5 @@ fun LiquidationReportsScreen(
                 }
             }
         }
-    }
-}
-
-@RequiresApi(Build.VERSION_CODES.O)
-fun String.formatDate(): String {
-    return try {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        val date = OffsetDateTime.parse(this).toLocalDateTime()
-        date.format(formatter)
-    } catch (e: Exception) {
-        this
     }
 }

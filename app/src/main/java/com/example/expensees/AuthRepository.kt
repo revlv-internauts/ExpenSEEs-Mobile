@@ -1344,28 +1344,47 @@ class AuthRepository(
         return withContext(Dispatchers.IO) {
             try {
                 if (!isNetworkAvailable(context)) {
-                    Log.e("AuthRepository", "No network connection, returning local liquidation reports")
+                    Log.e(
+                        "AuthRepository",
+                        "No network connection, returning local liquidation reports"
+                    )
                     return@withContext Result.success(Unit)
                 }
                 val tokenResult = getValidToken()
                 if (tokenResult.isFailure) {
-                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    Log.e(
+                        "AuthRepository",
+                        "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}"
+                    )
                     return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
                 }
                 val token = tokenResult.getOrNull()!!
-                Log.d("AuthRepository", "Fetching liquidation reports with token: Bearer ${token.take(20)}...")
+                Log.d(
+                    "AuthRepository",
+                    "Fetching liquidation reports with token: Bearer ${token.take(20)}..."
+                )
                 val response = apiService.getLiquidationReports("Bearer $token")
-                Log.d("AuthRepository", "Get liquidation reports response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}")
+                Log.d(
+                    "AuthRepository",
+                    "Get liquidation reports response: HTTP ${response.code()}, body=${
+                        response.body()?.let { Gson().toJson(it) } ?: "null"
+                    }, errorBody=${response.errorBody()?.string() ?: "null"}")
                 if (response.isSuccessful) {
                     response.body()?.let { reportsResponse ->
                         liquidationReports.removeAll { !it.liquidationId.startsWith("local_") }
                         liquidationReports.addAll(reportsResponse.budgets) // Use budgets from the wrapper
-                        Log.d("AuthRepository", "Fetched ${reportsResponse.budgets.size} liquidation reports")
+                        Log.d(
+                            "AuthRepository",
+                            "Fetched ${reportsResponse.budgets.size} liquidation reports"
+                        )
                         Result.success(Unit)
                     } ?: Result.failure(Exception("Empty response body"))
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("AuthRepository", "Get liquidation reports failed: HTTP ${response.code()}, body=$errorBody")
+                    Log.e(
+                        "AuthRepository",
+                        "Get liquidation reports failed: HTTP ${response.code()}, body=$errorBody"
+                    )
                     val errorMessage = when (response.code()) {
                         401 -> "Unauthorized: Invalid or expired token."
                         400 -> "Invalid request: check API format."
@@ -1374,7 +1393,11 @@ class AuthRepository(
                     Result.failure(Exception(errorMessage))
                 }
             } catch (e: HttpException) {
-                Log.e("AuthRepository", "HTTP error in getLiquidationReports: ${e.message()}, code=${e.code()}", e)
+                Log.e(
+                    "AuthRepository",
+                    "HTTP error in getLiquidationReports: ${e.message()}, code=${e.code()}",
+                    e
+                )
                 Result.failure(Exception("Network error: ${e.message()}"))
             } catch (e: IOException) {
                 Log.e("AuthRepository", "IO error in getLiquidationReports: ${e.message}", e)
@@ -1395,11 +1418,19 @@ class AuthRepository(
                 }
                 val tokenResult = getValidToken()
                 if (tokenResult.isFailure) {
-                    Log.e("AuthRepository", "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}")
+                    Log.e(
+                        "AuthRepository",
+                        "Failed to get valid token: ${tokenResult.exceptionOrNull()?.message}"
+                    )
                     return@withContext Result.failure(tokenResult.exceptionOrNull()!!)
                 }
                 val token = tokenResult.getOrNull()!!
-                Log.d("AuthRepository", "Submitting liquidation report for budgetId: ${report.budgetId} with token: Bearer ${token.take(20)}...")
+                Log.d(
+                    "AuthRepository",
+                    "Submitting liquidation report for budgetId: ${report.budgetId} with token: Bearer ${
+                        token.take(20)
+                    }..."
+                )
 
                 // Collect all parts in a list
                 val parts = mutableListOf<MultipartBody.Part>()
@@ -1436,22 +1467,31 @@ class AuthRepository(
                         try {
                             // Skip server-side paths starting with "Uploads/"
                             if (imagePath.startsWith("Uploads/")) {
-                                Log.w("AuthRepository", "Skipping server-side image path: $imagePath")
+                                Log.w(
+                                    "AuthRepository",
+                                    "Skipping server-side image path: $imagePath"
+                                )
                                 return@forEachIndexed
                             }
                             val file = if (imagePath.startsWith("content://")) {
-                                context.contentResolver.openInputStream(Uri.parse(imagePath))?.use { input ->
-                                    val tempFile = File.createTempFile("expense_${expenseIndex}_$fileIndex", ".jpg", context.cacheDir)
-                                    tempFile.outputStream().use { output ->
-                                        input.copyTo(output)
+                                context.contentResolver.openInputStream(Uri.parse(imagePath))
+                                    ?.use { input ->
+                                        val tempFile = File.createTempFile(
+                                            "expense_${expenseIndex}_$fileIndex",
+                                            ".jpg",
+                                            context.cacheDir
+                                        )
+                                        tempFile.outputStream().use { output ->
+                                            input.copyTo(output)
+                                        }
+                                        tempFile
                                     }
-                                    tempFile
-                                }
                             } else {
                                 File(imagePath)
                             }
                             if (file?.exists() == true) {
-                                val requestFile = file.readBytes().toRequestBody("image/jpeg".toMediaType())
+                                val requestFile =
+                                    file.readBytes().toRequestBody("image/jpeg".toMediaType())
                                 parts.add(
                                     MultipartBody.Part.createFormData(
                                         "files[$fileCount]", // Use a single files array to match backend
@@ -1464,12 +1504,18 @@ class AuthRepository(
                                 Log.w("AuthRepository", "Image file not found: $imagePath")
                             }
                         } catch (e: Exception) {
-                            Log.e("AuthRepository", "Failed to process image $imagePath for expense $expenseIndex: ${e.message}")
+                            Log.e(
+                                "AuthRepository",
+                                "Failed to process image $imagePath for expense $expenseIndex: ${e.message}"
+                            )
                         }
                     }
                 }
 
-                Log.d("AuthRepository", "Multipart request parts: ${parts.size}, files included: $fileCount")
+                Log.d(
+                    "AuthRepository",
+                    "Multipart request parts: ${parts.size}, files included: $fileCount"
+                )
 
                 // Make the API call
                 val response = apiService.submitLiquidationReport(
@@ -1477,17 +1523,29 @@ class AuthRepository(
                     budgetId = report.budgetId,
                     parts = parts
                 )
-                Log.d("AuthRepository", "Submit liquidation report response: HTTP ${response.code()}, body=${response.body()?.let { Gson().toJson(it) } ?: "null"}, errorBody=${response.errorBody()?.string() ?: "null"}, headers=${response.headers()}")
+                Log.d(
+                    "AuthRepository",
+                    "Submit liquidation report response: HTTP ${response.code()}, body=${
+                        response.body()?.let { Gson().toJson(it) } ?: "null"
+                    }, errorBody=${
+                        response.errorBody()?.string() ?: "null"
+                    }, headers=${response.headers()}")
 
                 if (response.isSuccessful) {
                     response.body()?.let { submittedReport ->
                         liquidationReports.add(submittedReport)
-                        Log.d("AuthRepository", "Liquidation report submitted: liquidationId=${submittedReport.liquidationId}")
+                        Log.d(
+                            "AuthRepository",
+                            "Liquidation report submitted: liquidationId=${submittedReport.liquidationId}"
+                        )
                         Result.success(submittedReport)
                     } ?: Result.failure(Exception("Empty response body"))
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("AuthRepository", "Submit liquidation report failed: HTTP ${response.code()}, body=$errorBody")
+                    Log.e(
+                        "AuthRepository",
+                        "Submit liquidation report failed: HTTP ${response.code()}, body=$errorBody"
+                    )
                     val errorResponse = errorBody?.let {
                         try {
                             Gson().fromJson(it, ErrorResponse::class.java)

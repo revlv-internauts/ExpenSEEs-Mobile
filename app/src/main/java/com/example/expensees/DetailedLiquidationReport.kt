@@ -28,6 +28,7 @@ import com.example.expensees.models.LiquidationReportData
 import com.example.expensees.network.AuthRepository
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -54,14 +55,31 @@ fun DetailedLiquidationReport(
         isGroupingUsed = true
     }
 
-    val dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:ss")
-
     val statusColors = mapOf(
         "PENDING" to Color(0xFFCA8A04),
         "RELEASED" to Color(0xFF16A34A),
         "DENIED" to Color(0xFFDC2626),
         "LIQUIDATED" to Color(0xFF4CAF50)
     )
+
+    // Function to format expense.dateOfTransaction
+    fun String?.formatExpenseDate(): String {
+        if (this == null) return "N/A"
+        return try {
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            // Try parsing as ISO date-time first
+            try {
+                val date = OffsetDateTime.parse(this).toLocalDateTime()
+                date.format(formatter)
+            } catch (e: Exception) {
+                // Fallback to parsing as date-only
+                val date = LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE)
+                date.atStartOfDay().format(formatter)
+            }
+        } catch (e: Exception) {
+            this
+        }
+    }
 
     // Fetch report charter on composition
     LaunchedEffect(liquidationId) {
@@ -218,13 +236,6 @@ fun DetailedLiquidationReport(
                     color = Color(0xFF111827)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Generated: ${report!!.createdAt.format(dateFormatter)}",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.sp
-                    ),
-                    color = Color(0xFF6B7280)
-                )
                 Divider(
                     color = Color(0xFFE5E7EB),
                     thickness = 1.dp,
@@ -309,7 +320,7 @@ fun DetailedLiquidationReport(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = expense.dateOfTransaction ?: "N/A",
+                            text = expense.dateOfTransaction.formatExpenseDate(),
                             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                             color = Color(0xFF6B7280),
                             modifier = Modifier.weight(2f),
