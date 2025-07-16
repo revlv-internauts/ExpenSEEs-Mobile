@@ -78,6 +78,14 @@ fun FundRequest(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
+    // State for editing an expense
+    var editingExpenseIndex by remember { mutableStateOf<Int?>(null) }
+    var category by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
+    var amountPerUnit by remember { mutableStateOf("") }
+    var remarks by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
     // Initialize DatePickerDialog
     val calendar = Calendar.getInstance()
     val datePickerDialog = remember {
@@ -132,12 +140,6 @@ fun FundRequest(
             }
         }
     }
-
-    var category by remember { mutableStateOf("") }
-    var quantity by remember { mutableStateOf("") }
-    var amountPerUnit by remember { mutableStateOf("") }
-    var remarks by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
 
     val numberFormat = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
@@ -242,6 +244,17 @@ fun FundRequest(
                 }
             }
         }
+    }
+
+    // Function to populate dialog fields for editing
+    fun populateDialogForEdit(index: Int) {
+        val expense = expenses[index]
+        category = expense.category
+        quantity = expense.quantity.toString()
+        amountPerUnit = expense.amountPerUnit.toString()
+        remarks = expense.remarks
+        editingExpenseIndex = index
+        showDialog = true
     }
 
     ModalNavigationDrawer(
@@ -611,7 +624,14 @@ fun FundRequest(
                             color = Color(0xFF1F2937)
                         )
                         IconButton(
-                            onClick = { showDialog = true },
+                            onClick = {
+                                editingExpenseIndex = null // Clear for new expense
+                                category = ""
+                                quantity = ""
+                                amountPerUnit = ""
+                                remarks = ""
+                                showDialog = true
+                            },
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .size(40.dp)
@@ -688,6 +708,7 @@ fun FundRequest(
                                             .fillMaxWidth()
                                             .scale(scale)
                                             .offset(x = dragOffset.dp)
+                                            .clickable { populateDialogForEdit(index) }
                                             .pointerInput(Unit) {
                                                 detectHorizontalDragGestures(
                                                     onDragStart = {
@@ -1006,7 +1027,7 @@ fun FundRequest(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Add Expense",
+                            text = if (editingExpenseIndex != null) "Edit Expense" else "Add Expense",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 20.sp
@@ -1014,7 +1035,14 @@ fun FundRequest(
                             color = Color(0xFF1F2937)
                         )
                         IconButton(
-                            onClick = { showDialog = false },
+                            onClick = {
+                                showDialog = false
+                                editingExpenseIndex = null
+                                category = ""
+                                quantity = ""
+                                amountPerUnit = ""
+                                remarks = ""
+                            },
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(
@@ -1166,6 +1194,7 @@ fun FundRequest(
                         Button(
                             onClick = {
                                 showDialog = false
+                                editingExpenseIndex = null
                                 category = ""
                                 quantity = ""
                                 amountPerUnit = ""
@@ -1225,18 +1254,24 @@ fun FundRequest(
                                             )
                                         }
                                     } else {
-                                        expenses.add(
-                                            ExpenseItem(
-                                                category = category,
-                                                quantity = qty,
-                                                amountPerUnit = amount,
-                                                remarks = remarks
-                                            )
+                                        val newExpense = ExpenseItem(
+                                            category = category,
+                                            quantity = qty,
+                                            amountPerUnit = amount,
+                                            remarks = remarks
                                         )
-                                        animatedScale.add(Animatable(0f))
-                                        animatedOffset.add(Animatable(0f))
-                                        animatedAlpha.add(Animatable(1f))
+                                        if (editingExpenseIndex != null) {
+                                            // Update existing expense
+                                            expenses[editingExpenseIndex!!] = newExpense
+                                        } else {
+                                            // Add new expense
+                                            expenses.add(newExpense)
+                                            animatedScale.add(Animatable(0f))
+                                            animatedOffset.add(Animatable(0f))
+                                            animatedAlpha.add(Animatable(1f))
+                                        }
                                         showDialog = false
+                                        editingExpenseIndex = null
                                         category = ""
                                         quantity = ""
                                         amountPerUnit = ""
@@ -1269,7 +1304,7 @@ fun FundRequest(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Add",
+                                    text = if (editingExpenseIndex != null) "Update" else "Add",
                                     fontSize = 16.sp,
                                     color = Color.White,
                                     fontWeight = FontWeight.SemiBold

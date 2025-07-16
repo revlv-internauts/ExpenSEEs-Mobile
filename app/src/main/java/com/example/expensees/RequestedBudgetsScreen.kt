@@ -149,7 +149,7 @@ fun RequestedBudgetsScreen(
                         else "Requested Budgets",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp
+                            fontSize = 24.sp // Reduced from 28.sp to 24.sp
                         ),
                         color = Color(0xFF1F2937),
                         modifier = Modifier

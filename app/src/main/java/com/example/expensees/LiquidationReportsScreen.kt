@@ -113,7 +113,8 @@ fun LiquidationReportsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 50.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween // Ensures even spacing
             ) {
                 IconButton(
                     onClick = {
@@ -121,8 +122,7 @@ fun LiquidationReportsScreen(
                             popUpTo("home") { inclusive = false }
                         }
                     },
-                    modifier = Modifier
-                        .size(40.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
@@ -130,7 +130,6 @@ fun LiquidationReportsScreen(
                         tint = Color(0xFF1F2937)
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Liquidation Reports",
                     style = MaterialTheme.typography.headlineMedium.copy(
@@ -139,11 +138,10 @@ fun LiquidationReportsScreen(
                     ),
                     color = Color(0xFF1F2937),
                     modifier = Modifier
-                        .weight(1f)
-                        .offset(x = (-18).dp),
+                        .weight(1f) // Takes available space
+                        .wrapContentWidth(Alignment.CenterHorizontally), // Centers text horizontally
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(12.dp))
                 IconButton(
                     onClick = {
                         isLoading = true

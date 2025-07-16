@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.IntSize
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
 
@@ -1114,14 +1115,16 @@ fun HomeScreen(
                             // ... (Existing full-screen image dialog code remains unchanged)
                         }
 
-                        // Filter transactions based on selected month
+                        // Filter transactions based on selected month using createdAt
                         val filteredTransactions = if (selectedMonth != null) {
                             transactionsForCategory.filter { expense ->
-                                expense.dateOfTransaction?.let {
+                                expense.createdAt?.let {
                                     try {
-                                        val date = LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE)
+                                        val dateTime = LocalDateTime.parse(it)
+                                        val date = dateTime.toLocalDate()
                                         date.format(DateTimeFormatter.ofPattern("MMMM yyyy")) == selectedMonth
                                     } catch (e: Exception) {
+                                        Log.e("HomeScreen", "Failed to parse createdAt date: $it, error: ${e.message}")
                                         false
                                     }
                                 } ?: false
@@ -1342,7 +1345,14 @@ fun HomeScreen(
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
-                                                    text = expense.dateOfTransaction ?: "",
+                                                    text = expense.createdAt?.let {
+                                                        try {
+                                                            val dateTime = LocalDateTime.parse(it)
+                                                            dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                                                        } catch (e: Exception) {
+                                                            ""
+                                                        }
+                                                    } ?: "",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = Color(0xFF4B5563),
                                                     maxLines = 1,
