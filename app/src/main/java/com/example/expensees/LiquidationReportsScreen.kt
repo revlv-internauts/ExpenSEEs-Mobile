@@ -114,7 +114,7 @@ fun LiquidationReportsScreen(
                     .fillMaxWidth()
                     .padding(top = 50.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween // Ensures even spacing
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(
                     onClick = {
@@ -134,24 +134,43 @@ fun LiquidationReportsScreen(
                     text = "Liquidation Reports",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
+                        fontSize = 24.sp // Reduced from 28.sp to 24.sp
                     ),
                     color = Color(0xFF1F2937),
                     modifier = Modifier
-                        .weight(1f) // Takes available space
-                        .wrapContentWidth(Alignment.CenterHorizontally), // Centers text horizontally
+                        .weight(1f)
+                        .wrapContentWidth(Alignment.CenterHorizontally),
                     textAlign = TextAlign.Center
                 )
                 IconButton(
                     onClick = {
                         isLoading = true
                         errorMessage = null
+                        detailedReports.clear()
+                        remarksLoading.clear()
+                        remarksErrors.clear()
                         coroutineScope.launch {
                             val result = authRepository.getLiquidationReports()
                             if (result.isFailure) {
                                 errorMessage = result.exceptionOrNull()?.message ?: "Failed to load reports"
                                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                isLoading = false
+                                return@launch
                             }
+
+                            val deferredResults = reportsState.map { report ->
+                                async {
+                                    remarksLoading[report.liquidationId] = true
+                                    val detailResult = authRepository.getLiquidationReport(report.liquidationId)
+                                    remarksLoading[report.liquidationId] = false
+                                    if (detailResult.isSuccess) {
+                                        detailedReports[report.liquidationId] = detailResult.getOrNull()!!
+                                    } else {
+                                        remarksErrors[report.liquidationId] = detailResult.exceptionOrNull()?.message ?: "Failed to load remarks"
+                                    }
+                                }
+                            }
+                            deferredResults.awaitAll()
                             isLoading = false
                         }
                     },
@@ -233,6 +252,9 @@ fun LiquidationReportsScreen(
                             onClick = {
                                 isLoading = true
                                 errorMessage = null
+                                detailedReports.clear()
+                                remarksLoading.clear()
+                                remarksErrors.clear()
                                 coroutineScope.launch {
                                     val result = authRepository.getLiquidationReports()
                                     if (result.isFailure) {
@@ -291,7 +313,7 @@ fun LiquidationReportsScreen(
                             try {
                                 OffsetDateTime.parse(report.createdAt)
                             } catch (e: Exception) {
-                                OffsetDateTime.MIN // Fallback to ensure invalid dates don't crash
+                                OffsetDateTime.MIN
                             }
                         }
 
@@ -371,6 +393,20 @@ fun LiquidationReportsScreen(
                                                 color = Color(0xFF4B5563)
                                             )
                                         }
+                                        // Updated Text composable for date and time
+                                        Text(
+                                            text = try {
+                                                val localDateTime = java.time.LocalDateTime.parse(report.createdAt)
+                                                val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                                                localDateTime.format(formatter)
+                                            } catch (e: Exception) {
+                                                "Invalid date"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontSize = 12.sp
+                                            ),
+                                            color = Color(0xFF4B5563)
+                                        )
                                     }
                                 }
                             }

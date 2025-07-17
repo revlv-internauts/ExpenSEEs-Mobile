@@ -545,7 +545,6 @@ class AuthRepository(
         }
     }
 
-    // Fetch expenses from server
     suspend fun getExpenses(): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
@@ -1614,6 +1613,20 @@ class AuthRepository(
                 Log.e("AuthRepository", "Get liquidation report error: ${e.message}", e)
                 Result.failure(Exception("Failed to fetch report: ${e.message}"))
             }
+        }
+    }
+
+    suspend fun hasLiquidationReport(budgetId: String): Boolean {
+        return try {
+            val reportsResult = getLiquidationReports()
+            if (reportsResult.isSuccess) {
+                liquidationReports.any { it.budgetId == budgetId }
+            } else {
+                false // Assume no report if fetching fails
+            }
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Error checking liquidation report for budget $budgetId: ${e.message}")
+            false
         }
     }
 }

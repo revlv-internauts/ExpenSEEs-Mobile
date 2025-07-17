@@ -48,8 +48,16 @@ data class Expense(
     @SerializedName("imagePaths")
     val imagePaths: List<String>?,
     @SerializedName("createdAt")
-    val createdAt: String?
+    val createdAt: String?,
+    @SerializedName("updatedAt")
+    val updatedAt: String? = null,
+    @SerializedName("username")
+    val username: String? = null,
+    @SerializedName("isExpenseAdded")
+    val isExpenseAdded: Boolean? = false
 )
+
+
 
 data class LiquidationReportData(
     @SerializedName("liquidationId") val liquidationId: String,

@@ -276,6 +276,9 @@ fun HomeScreen(
     var selectedChartCategory by remember { mutableStateOf<String?>(null) }
     var selectedCategoryAmount by remember { mutableStateOf(0.0) }
 
+    // State to track chart type
+    var chartType by remember { mutableStateOf("pie") }
+
     val colorList = listOf(
         Color(0xFF6B4E38), Color(0xFFE7685D), Color(0xFFFBBD92), Color(0xFF4CAF50),
         Color(0xFF2196F3), Color(0xFFFF9800), Color(0xFFE28743), Color(0xFF009688),
@@ -741,61 +744,92 @@ fun HomeScreen(
                         <script>
                             const chartData = [${chartData.joinToString { if (it == 0.0) "0.01" else it.toString() }}];
                             const ctx = document.getElementById('expenseChart').getContext('2d');
-                            try {
-                                const chart = new Chart(ctx, {
-                                    type: 'pie',
-                                    data: {
-                                        labels: ['${categories.joinToString("','")}'],
-                                        datasets: [{
-                                            data: chartData,
-                                            backgroundColor: [
-                                                '${colorList.joinToString("','") { "#${it.toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}" }}'
-                                            ],
-                                            borderColor: ['#FFFFFF'],
-                                            borderWidth: 1
-                                        }]
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: {
-                                            legend: {
-                                                display: false
-                                            },
-                                            title: {
-                                                display: true,
-                                                text: 'Expense Distribution by Category',
-                                                color: '#1F2937',
-                                                font: { size: 18, weight: 'bold' },
-                                                align: 'center'
-                                            },
-                                            tooltip: {
-                                                enabled: true,
-                                                callbacks: {
-                                                    label: function(context) {
-                                                        const value = context.raw || 0;
-                                                        return context.label + ': ₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            let chart;
+                            function renderChart(type) {
+                                if (chart) chart.destroy();
+                                try {
+                                    chart = new Chart(ctx, {
+                                        type: type,
+                                        data: {
+                                            labels: ['${categories.joinToString("','")}'],
+                                            datasets: [{
+                                                data: chartData,
+                                                backgroundColor: [
+                                                    '${colorList.joinToString("','") { "#${it.toArgb().toUInt().toString(16).padStart(8, '0').substring(2)}" }}'
+                                                ],
+                                                borderColor: ['#FFFFFF'],
+                                                borderWidth: 1
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: {
+                                                    display: false
+                                                },
+                                                title: {
+                                                    display: true,
+                                                    text: 'Expense Distribution by Category',
+                                                    color: '#1F2937',
+                                                    font: { size: 18, weight: 'bold' },
+                                                    align: 'center'
+                                                },
+                                                tooltip: {
+                                                    enabled: true,
+                                                    callbacks: {
+                                                        label: function(context) {
+                                                            const value = context.raw || 0;
+                                                            return context.label + ': ₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                        }
                                                     }
                                                 }
+                                            },
+                                            ${if (chartType == "bar") """
+                                            scales: {
+                                                x: {
+                                                    ticks: {
+                                                        font: { size: 12 },
+                                                        color: '#1F2937',
+                                                        autoSkip: true,
+                                                        maxRotation: 45,
+                                                        minRotation: 45
+                                                    }
+                                                },
+                                                y: {
+                                                    type: 'logarithmic',
+                                                    min: 0.1,
+                                                    ticks: {
+                                                        callback: function(value) {
+                                                            return '₱' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                        },
+                                                        font: { size: 12 },
+                                                        color: '#1F2937',
+                                                        autoSkip: true,
+                                                        maxTicksLimit: 6
+                                                    }
+                                                }
+                                            },
+                                            """ else ""}
+                                            onClick: (event, elements, chart) => {
+                                                if (elements.length > 0) {
+                                                    const index = elements[0].index;
+                                                    const label = chart.data.labels[index];
+                                                    chart.options.plugins.title.text = label;
+                                                    window.android.onCategorySelected(label, chart.data.datasets[0].data[index]);
+                                                } else {
+                                                    chart.options.plugins.title.text = 'Expense Distribution by Category';
+                                                    window.android.onCategorySelected('', 0);
+                                                }
+                                                chart.update();
                                             }
-                                        },
-                                        onClick: (event, elements, chart) => {
-                                            if (elements.length > 0) {
-                                                const index = elements[0].index;
-                                                const label = chart.data.labels[index];
-                                                chart.options.plugins.title.text = label;
-                                                window.android.onCategorySelected(label, chart.data.datasets[0].data[index]);
-                                            } else {
-                                                chart.options.plugins.title.text = 'Expense Distribution by Category';
-                                                window.android.onCategorySelected('', 0);
-                                            }
-                                            chart.update();
                                         }
-                                    }
-                                });
-                            } catch (e) {
-                                console.error('Chart creation failed: ' + e.message);
+                                    });
+                                } catch (e) {
+                                    console.error('Chart creation failed: ' + e.message);
+                                }
                             }
+                            renderChart('$chartType');
                             window.android.onCategorySelected('', 0);
                         </script>
                     </body>
@@ -819,10 +853,20 @@ fun HomeScreen(
                                 }, "android")
                             }
                         },
+                        update = { webView ->
+                            webView.evaluateJavascript("renderChart('$chartType');", null)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(220.dp)
                             .padding(8.dp)
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures { _, dragAmount ->
+                                    if (dragAmount < -50f) { // Left swipe
+                                        chartType = if (chartType == "pie") "bar" else "pie"
+                                    }
+                                }
+                            }
                     )
                 }
                 Text(

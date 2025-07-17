@@ -4,15 +4,15 @@ import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Build
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -31,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,19 +40,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
-import com.example.expensees.models.BudgetStatus
-import com.example.expensees.models.Expense
-import com.example.expensees.models.ExpenseItem
-import com.example.expensees.models.SubmittedBudget
+import com.example.expensees.models.*
 import com.example.expensees.network.AuthRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.util.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.expensees.models.LiquidationReportData
 import java.io.File
 import java.time.LocalDate
 
@@ -60,7 +57,6 @@ class LiquidationViewModel : ViewModel() {
     val selectedExpensesMap = mutableStateMapOf<Int, MutableList<Expense>>()
     var selectedReport: LiquidationReportData? = null
         private set
-
     var retryCount by mutableStateOf(0)
         private set
 
@@ -105,6 +101,8 @@ fun LiquidationReport(
     val selectedExpensesMap = viewModel.selectedExpensesMap
     val checkedExpenses = remember { mutableStateMapOf<Expense, Boolean>() }
     val snackbarHostState = remember { SnackbarHostState() }
+    var notificationMessage by remember { mutableStateOf<String?>(null) }
+    var notificationId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(budgetId) {
         if (budgetId != null) {
@@ -185,11 +183,21 @@ fun LiquidationReport(
             val expenseResult = authRepository.getExpenses()
             if (budgetResult.isFailure) {
                 errorMessage = budgetResult.exceptionOrNull()?.message ?: "Failed to fetch budgets"
-                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = errorMessage!!,
+                        duration = SnackbarDuration.Long
+                    )
+                }
             }
             if (expenseResult.isFailure) {
                 errorMessage = (errorMessage ?: "") + "\n" + (expenseResult.exceptionOrNull()?.message ?: "Failed to fetch expenses")
-                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = errorMessage!!,
+                        duration = SnackbarDuration.Long
+                    )
+                }
             }
             isLoading = false
         }
@@ -219,55 +227,146 @@ fun LiquidationReport(
         }
     }
 
+    // Composable for swipeable notification (replacing Toast)
+    @Composable
+    fun SwipeableNotification(message: String, id: Long, onDismiss: () -> Unit) {
+        val offsetX = remember { Animatable(0f) }
+        val alpha = remember { Animatable(1f) }
+
+        LaunchedEffect(id) {
+            delay(1500) // Auto-dismiss after 1.5 seconds
+            if (offsetX.value == 0f) { // Only auto-dismiss if not already dragged
+                alpha.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 300)
+                )
+                onDismiss()
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = offsetX.value.dp)
+                .alpha(alpha.value)
+                .background(
+                    color = Color(0xFF3B82F6).copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(12.dp)
+                .pointerInput(id) {
+                    detectHorizontalDragGestures { _, dragAmount ->
+                        coroutineScope.launch {
+                            val newOffset = offsetX.value + dragAmount
+                            if (kotlin.math.abs(newOffset) > 100) { // Dismiss threshold
+                                alpha.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = 200)
+                                )
+                                onDismiss()
+                            } else {
+                                offsetX.snapTo(newOffset)
+                            }
+                        }
+                    }
+                }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                )
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable { onDismiss() }
+                )
+            }
+        }
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5)),
         snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
+            Column(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(16.dp)
-                    .fillMaxWidth(),
-                snackbar = { snackbarData ->
-                    Snackbar(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .padding(12.dp),
-                        containerColor = Color(0xFFF5F5F5),
-                        contentColor = Color(0xFF1F2937),
-                        shape = RoundedCornerShape(12.dp),
-                        actionContentColor = Color(0xFF3B82F6),
-                        content = {
-                            Text(
-                                text = snackbarData.visuals.message,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 16.sp
-                                ),
-                                color = Color(0xFF1F2937),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        },
-                        action = snackbarData.visuals.actionLabel?.let { label ->
-                            {
-                                TextButton(
-                                    onClick = { snackbarData.performAction() },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = Color(0xFF3B82F6)
-                                    )
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+            ) {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.fillMaxWidth(),
+                    snackbar = { snackbarData ->
+                        Snackbar(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            containerColor = Color(0xFFF5F5F5),
+                            contentColor = Color(0xFF1F2937),
+                            shape = RoundedCornerShape(12.dp),
+                            actionContentColor = Color(0xFF3B82F6),
+                            content = {
+                                Text(
+                                    text = snackbarData.visuals.message,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 16.sp
+                                    ),
+                                    color = Color(0xFF1F2937),
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            },
+                            action = snackbarData.visuals.actionLabel?.let { label ->
+                                {
+                                    TextButton(
+                                        onClick = { snackbarData.performAction() },
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = Color(0xFF3B82F6)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
+                )
+
+                // Swipeable notification for actions
+                AnimatedVisibility(
+                    visible = notificationMessage != null,
+                    enter = slideInVertically() + fadeIn(),
+                    exit = slideOutVertically() + fadeOut()
+                ) {
+                    notificationMessage?.let { message ->
+                        SwipeableNotification(
+                            message = message,
+                            id = notificationId ?: 0L,
+                            onDismiss = {
+                                notificationMessage = null
+                                notificationId = null
+                            }
+                        )
+                    }
                 }
-            )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -355,11 +454,21 @@ fun LiquidationReport(
                             val expenseResult = authRepository.getExpenses()
                             if (budgetResult.isFailure) {
                                 errorMessage = budgetResult.exceptionOrNull()?.message ?: "Failed to fetch budgets"
-                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = errorMessage!!,
+                                        duration = SnackbarDuration.Long
+                                    )
+                                }
                             }
                             if (expenseResult.isFailure) {
                                 errorMessage = (errorMessage ?: "") + "\n" + (expenseResult.exceptionOrNull()?.message ?: "Failed to fetch expenses")
-                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = errorMessage!!,
+                                        duration = SnackbarDuration.Long
+                                    )
+                                }
                             }
                             isLoading = false
                         }
@@ -719,11 +828,8 @@ fun LiquidationReport(
                                             IconButton(
                                                 onClick = {
                                                     viewModel.updateSelections(index, emptyList())
-                                                    Toast.makeText(
-                                                        context,
-                                                        "All receipts removed for ${expense.category}",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    notificationMessage = "All receipts removed for ${expense.category}"
+                                                    notificationId = System.currentTimeMillis()
                                                 },
                                                 modifier = Modifier
                                                     .size(36.dp),
@@ -1078,7 +1184,9 @@ fun LiquidationReport(
                 val isAssignedToOtherBudget = selectedExpensesMap.any { (idx, exps) ->
                     idx != currentIndex && exps.contains(expense)
                 }
-                expense.category == currentExpense.category && !isAssignedToOtherBudget
+                expense.category == currentExpense.category &&
+                        !isAssignedToOtherBudget &&
+                        expense.isExpenseAdded == false
             }
             LaunchedEffect(filteredExpenses, currentExpenseItem, selectedBudget) {
                 checkedExpenses.clear()
@@ -1296,18 +1404,11 @@ fun LiquidationReport(
                                         val newSelections = filteredExpenses.filter { checkedExpenses[it] == true }
                                         viewModel.updateSelections(currentIndex, newSelections)
                                         if (newSelections.isNotEmpty()) {
-                                            Toast.makeText(
-                                                context,
-                                                "${newSelections.size} receipt(s) selected",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+                                            notificationMessage = "${newSelections.size} receipt(s) selected"
+                                            notificationId = System.currentTimeMillis()
                                         } else {
-                                            viewModel.updateSelections(currentIndex, emptyList())
-                                            Toast.makeText(
-                                                context,
-                                                "No receipts selected",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                            notificationMessage = "No receipts selected"
+                                            notificationId = System.currentTimeMillis()
                                         }
                                         showExpenseSelectionDialog = false
                                         currentExpenseItem = null
