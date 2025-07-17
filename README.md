@@ -1,8 +1,13 @@
 ExpenSEEs
 
+
+
 Overview
 ExpenSEEs is a mobile expense tracker application designed to help users manage their daily expenses efficiently. Developed over six weeks in 2025 by Andrew Emmanuel A. Abarientos (Frontend Developer) and Al Francis B. Paz (Backend Developer) during their internship at REVLV, this app is a milestone project for two 4th-year Computer Engineering students at Ateneo de Naga University. It provides intuitive features for tracking, categorizing, and visualizing expenses, empowering users to gain better insight into their spending habits.
 Features
+
+
+
 
 Expense Tracking: Add, delete, and view expenses with details such as category, amount, date, and remarks, with support for attaching receipt images.
 Budget Management: Create and monitor budgets, including status tracking (Pending, Released, Denied, Liquidated).
@@ -14,6 +19,9 @@ Real-time Data: Fetches and displays data using Retrofit for seamless API integr
 Image Handling: Capture and store receipt images using a custom FileProvider for secure file access.
 
 
+
+
+
 Tech Stack
 
 Frontend: 
@@ -21,39 +29,40 @@ Jetpack Compose for UI
 Material3 for consistent design
 Android Navigation Component for screen navigation
 
-
 Backend: 
 Retrofit for API calls
 OkHttp for HTTP client with logging
 Gson for JSON serialization/deserialization
 
 
+
+
 Utilities:
 Custom FileProvider for generating secure URIs for receipt images
+
 
 
 API: Communicates with a backend server at http://152.42.192.226:8080/ for data operations
 Language: Kotlin
 Minimum SDK: Android Oreo (API 26, Build.VERSION_CODES.O)
 
+
+
 Installation
-
 Clone the Repository:git clone https://github.com/your-repo/expensees.git
-
 
 Open in Android Studio:
 Open the project in Android Studio.
 Ensure you have the latest Android SDK and Gradle installed.
 
-
 Configure FileProvider:
 Ensure the FileProvider is configured in the AndroidManifest.xml with the authority ${applicationId}.fileprovider.
 Verify that the res/xml/file_paths.xml is set up to allow access to the cache directory for image storage.
 
-
 Build and Run:
 Sync the project with Gradle.
 Run the app on an emulator or physical device running Android Oreo or higher.
+
 
 
 
@@ -65,6 +74,9 @@ Manage Budgets: Create budgets and view their status and associated expenses in 
 View Liquidation Reports: Access detailed reports for submitted budgets, including total spent, remaining balance, and receipt details.
 Navigate: Use the back and home buttons to move between screens, or refresh reports for updated data.
 Handle Images: Capture receipt images, which are stored securely using a FileProvider and linked to expenses.
+
+
+
 
 Project Structure
 
@@ -80,6 +92,10 @@ ApiConfig.kt: Contains the base URL for API communication.
 ImageUtils.kt: Utility for generating secure URIs for receipt images using FileProvider.
 AuthRepository: Manages API calls and data storage for authentication and reports.
 
+
+
+
+
 API Endpoints
 
 Authentication:
@@ -87,27 +103,25 @@ POST /api/auth/sign-in: User login
 POST /api/auth/refresh-token: Refresh access token
 POST /api/forgotPassword/reset-password: Reset password
 
-
 Expenses:
 POST /api/expenses: Add an expense
 DELETE /api/expenses/{expenseId}: Delete an expense
 GET /api/expenses: Retrieve all expenses
 
-
 Budgets:
 POST /api/budgets: Create a budget
 GET /api/budgets: Retrieve all budgets
-
 
 Profile:
 POST /api/users/{userId}/profile-picture: Upload profile picture
 GET /api/users/{userId}/profile-picture: Retrieve profile picture
 
-
 Liquidation Reports:
 POST /api/liquidation: Submit a liquidation report
 GET /api/liquidation: Retrieve all liquidation reports
 GET /api/liquidation/{liquidationId}: Retrieve a specific liquidation report
+
+
 
 
 
@@ -133,6 +147,10 @@ Key Components
 Forgot Password: Users can request a password reset link by entering their email. The UI features a gradient button with loading states and error handling (e.g., "Email not found" for invalid emails).
 Detailed Liquidation Report: Displays comprehensive report data with a formatted expense table, status indicators (color-coded dots), and financial summaries (total budgeted, spent, and remaining).
 Image Handling: The ImageUtils.kt utility generates secure URIs for receipt images, stored in the app's cache directory, ensuring compatibility with Android's FileProvider.
+
+
+
+
 
 
 Contact
