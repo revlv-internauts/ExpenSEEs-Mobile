@@ -82,6 +82,7 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.ui.graphics.graphicsLayer
 import java.io.FileOutputStream
+import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
@@ -97,11 +98,11 @@ fun ExpenseListScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showExpenseDialog by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
+    var selectedImagePath by remember { mutableStateOf<String?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showFullScreenImage by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
-    var selectedImagePath by remember { mutableStateOf<String?>(null) }
     var token by remember { mutableStateOf<String?>(null) }
     var tokenFetchFailed by remember { mutableStateOf(false) }
     var retryCount by remember { mutableStateOf(0) }
@@ -128,10 +129,7 @@ fun ExpenseListScreen(
                     Log.d("ExpenseListScreen", "Initial token fetched: ${token?.take(20)}...")
                 } else {
                     retryCount++
-                    Log.e(
-                        "ExpenseListScreen",
-                        "Initial token retrieval failed: ${tokenResult.exceptionOrNull()?.message}"
-                    )
+                    Log.e("ExpenseListScreen", "Initial token retrieval failed: ${tokenResult.exceptionOrNull()?.message}")
                     tokenFetchFailed = true
                 }
             } catch (e: Exception) {
@@ -141,8 +139,7 @@ fun ExpenseListScreen(
             }
         } else {
             tokenFetchFailed = true
-            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT)
-                .show()
+            Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
             navController.navigate("login") {
                 popUpTo("home") { inclusive = true }
             }
@@ -150,7 +147,7 @@ fun ExpenseListScreen(
     }
 
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
     val filteredExpenses = expenses.filter { expense ->
         try {
             val matchesDate = showAllExpenses || expense.createdAt?.let {
@@ -160,8 +157,7 @@ fun ExpenseListScreen(
             val matchesSearch = searchQuery.isEmpty() ||
                     expense.category?.contains(searchQuery, ignoreCase = true) == true ||
                     expense.remarks?.contains(searchQuery, ignoreCase = true) == true
-            val matchesCategory =
-                selectedSortCategory == null || expense.category == selectedSortCategory
+            val matchesCategory = selectedSortCategory == null || expense.category == selectedSortCategory
             matchesDate && matchesSearch && matchesCategory
         } catch (e: DateTimeParseException) {
             false
@@ -169,19 +165,24 @@ fun ExpenseListScreen(
     }.sortedWith(
         compareByDescending<Expense> { expense ->
             try {
-                expense.createdAt?.let {
-                    java.time.LocalDateTime.parse(it)
-                } ?: java.time.LocalDateTime.MIN
+                expense.createdAt?.let { java.time.LocalDateTime.parse(it) } ?: java.time.LocalDateTime.MIN
             } catch (e: DateTimeParseException) {
                 java.time.LocalDateTime.MIN
             }
         }
     )
 
-    LaunchedEffect(selectedDate) {
+    LaunchedEffect(selectedDate, showAllExpenses) {
         selectedExpenses = emptySet()
         showCheckboxes = false
+        selectedExpense = null
+        selectedImagePath = null
+        showExpenseDialog = false
+        showFullScreenImage = false
+        showInfoDialog = false
+        Log.d("ExpenseListScreen", "Date changed to $selectedDate, resetting selectedExpense and dialogs")
     }
+
 
     val categories = listOf(
         "Utilities", "Food", "Transportation", "Gas", "Office Supplies",
@@ -218,16 +219,16 @@ fun ExpenseListScreen(
     ).toMap()
 
     val calendar = Calendar.getInstance()
-    val datePickerDialog = remember {
+    val datePickerDialog = remember(selectedDate) {
         android.app.DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
                 selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
                 showDatePickerDialog = false
             },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
+            selectedDate.year,
+            selectedDate.monthValue - 1, // Month is 0-based in DatePickerDialog
+            selectedDate.dayOfMonth
         ).apply {
             setOnCancelListener { showDatePickerDialog = false }
             setOnDismissListener { showDatePickerDialog = false }
@@ -279,12 +280,21 @@ fun ExpenseListScreen(
                         tint = Color(0xFF1F2937)
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                if (searchQuery.isNotEmpty()) {
+                    Text(
+                        text = searchQuery,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
+                        ),
+                        color = Color(0xFF1F2937),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 16.dp)
+                    )
+                } else {
                     Text(
                         text = "List of Expenses",
                         style = MaterialTheme.typography.headlineMedium.copy(
@@ -293,7 +303,10 @@ fun ExpenseListScreen(
                         ),
                         color = Color(0xFF1F2937),
                         textAlign = TextAlign.Center,
-                        maxLines = 1
+                        maxLines = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 16.dp)
                     )
                 }
                 Row {
@@ -308,16 +321,18 @@ fun ExpenseListScreen(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    IconButton(
-                        onClick = { showDatePickerDialog = true },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Select date",
-                            tint = Color(0xFF734656),
-                            modifier = Modifier.size(24.dp)
-                        )
+                    if (!showAllExpenses) {
+                        IconButton(
+                            onClick = { showDatePickerDialog = true },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Select date",
+                                tint = Color(0xFF734656),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -431,10 +446,15 @@ fun ExpenseListScreen(
                     items(days) { day ->
                         val hasExpenses = expenses.any { expense ->
                             try {
-                                expense.createdAt?.let {
+                                val matchesDate = expense.createdAt?.let {
                                     val createdAtDate = LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                                     createdAtDate == day
                                 } ?: false
+                                val matchesCategory = selectedSortCategory == null || expense.category == selectedSortCategory
+                                val matchesSearch = searchQuery.isEmpty() ||
+                                        expense.category?.contains(searchQuery, ignoreCase = true) == true ||
+                                        expense.remarks?.contains(searchQuery, ignoreCase = true) == true
+                                matchesDate && matchesCategory && matchesSearch
                             } catch (e: DateTimeParseException) {
                                 false
                             }
@@ -465,9 +485,7 @@ fun ExpenseListScreen(
                                 Text(
                                     text = day.dayOfWeek.toString().substring(0, 3),
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                    color = if (isSelected) Color.White.copy(alpha = 0.7f) else Color(
-                                        0xFF4B5563
-                                    )
+                                    color = if (isSelected) Color.White.copy(alpha = 0.7f) else Color(0xFF4B5563)
                                 )
                                 if (hasExpenses) {
                                     Box(
@@ -518,7 +536,7 @@ fun ExpenseListScreen(
                         }
                     }
                 } else {
-                    itemsIndexed(filteredExpenses) { _, expense ->
+                    itemsIndexed(filteredExpenses, key = { _, expense -> expense.expenseId ?: UUID.randomUUID().toString() }) { index, expense ->
                         val isSelected = expense in selectedExpenses
                         val interactionSource = remember { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
@@ -535,7 +553,7 @@ fun ExpenseListScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .scale(scale)
-                                .pointerInput(Unit) {
+                                .pointerInput(expense.expenseId) {
                                     detectTapGestures(
                                         onTap = {
                                             if (showCheckboxes) {
@@ -545,9 +563,18 @@ fun ExpenseListScreen(
                                                     selectedExpenses + expense
                                                 }
                                             } else {
+                                                // Clear previous state and set new expense data
+                                                selectedExpense = null
+                                                selectedImagePath = null
+                                                showFullScreenImage = false
+                                                showInfoDialog = false
                                                 selectedExpense = expense
                                                 selectedImagePath = expense.imagePaths?.firstOrNull()
                                                 showExpenseDialog = true
+                                                Log.d(
+                                                    "ExpenseListScreen",
+                                                    "Clicked expense at index $index: ID=${expense.expenseId}, Category=${expense.category}, ImagePath=$selectedImagePath"
+                                                )
                                             }
                                         },
                                         onLongPress = {
@@ -696,9 +723,7 @@ fun ExpenseListScreen(
                                                     .fillMaxSize()
                                                     .animateContentSize(animationSpec = tween(200)),
                                                 contentScale = ContentScale.Crop,
-                                                onLoading = {
-                                                    isImageLoading = true
-                                                },
+                                                onLoading = { isImageLoading = true },
                                                 onError = { error ->
                                                     isImageLoading = false
                                                     imageLoadFailed = true
@@ -954,7 +979,9 @@ fun ExpenseListScreen(
                         label = { Text("Search by category or remarks") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { showSearchDialog = false }),
+                        keyboardActions = KeyboardActions(
+                            onSearch = { showSearchDialog = false }
+                        ),
                         colors = TextFieldDefaults.outlinedTextFieldColors(
                             focusedBorderColor = themeColor,
                             unfocusedBorderColor = Color(0xFFE5E7EB),
@@ -1178,20 +1205,22 @@ fun ExpenseListScreen(
     }
 
     if (showExpenseDialog && selectedExpense != null) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = {
                 showExpenseDialog = false
                 selectedExpense = null
                 selectedImagePath = null
+                showFullScreenImage = false
+                showInfoDialog = false
+                Log.d("ExpenseListScreen", "Expense dialog dismissed, states cleared")
             },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(16.dp)),
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .clip(RoundedCornerShape(16.dp)),
                 color = Color(0xFFF5F5F5),
-                shape = RoundedCornerShape(16.dp),
                 shadowElevation = 8.dp
             ) {
                 Column(
@@ -1221,6 +1250,7 @@ fun ExpenseListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (tokenFetchFailed) {
+                                isImageLoading = false
                                 Text(
                                     text = "Authentication error: Please log in again",
                                     style = MaterialTheme.typography.bodyMedium,
@@ -1277,9 +1307,7 @@ fun ExpenseListScreen(
                                         .fillMaxSize()
                                         .clickable { showFullScreenImage = true },
                                     contentScale = ContentScale.Crop,
-                                    onLoading = {
-                                        isImageLoading = true
-                                    },
+                                    onLoading = { isImageLoading = true },
                                     onError = { error ->
                                         isImageLoading = false
                                         imageLoadFailed = true
@@ -1314,7 +1342,8 @@ fun ExpenseListScreen(
                             if (isImageLoading && !imageLoadFailed) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(48.dp),
-                                    color = themeColor
+                                    color = themeColor,
+                                    strokeWidth = 4.dp
                                 )
                             }
                         }
@@ -1331,285 +1360,13 @@ fun ExpenseListScreen(
                     ) {
                         Button(
                             onClick = {
-                                selectedImagePath?.let { imagePath ->
-                                    scope.launch {
-                                        try {
-                                            if (selectedExpense?.expenseId?.startsWith("local_") == true) {
-                                                val uri = Uri.parse(imagePath)
-                                                val inputStream = context.contentResolver.openInputStream(uri)
-                                                val fileName = "Expense_${selectedExpense?.expenseId}_${System.currentTimeMillis()}.jpg"
-                                                val outputFile = File(
-                                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                                                    fileName
-                                                )
-                                                inputStream?.use { input ->
-                                                    FileOutputStream(outputFile).use { output ->
-                                                        input.copyTo(output)
-                                                    }
-                                                }
-                                                Toast.makeText(context, "Image saved to Downloads: $fileName", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
-                                                val fileName = "Expense_${selectedExpense?.expenseId}_${System.currentTimeMillis()}.jpg"
-                                                val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                                val request = DownloadManager.Request(Uri.parse(fullImageUrl)).apply {
-                                                    if (token != null) {
-                                                        addRequestHeader("Authorization", "Bearer $token")
-                                                    }
-                                                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                                                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                                    setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
-                                                }
-                                                downloadManager.enqueue(request)
-                                                Toast.makeText(context, "Downloading image to Downloads: $fileName", Toast.LENGTH_SHORT).show()
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e("ExpenseListScreen", "Failed to download image: ${e.message}")
-                                            Toast.makeText(context, "Failed to download image: ${e.message}", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                } ?: Toast.makeText(context, "No image available to download", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .padding(horizontal = 4.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 8.dp
-                            ),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Download",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        Button(
-                            onClick = {
-                                showExpenseDialog = false
-                                selectedExpense = null
-                                selectedImagePath = null
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .padding(horizontal = 4.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Transparent
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 8.dp
-                            ),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
-                                            start = Offset(0f, 0f),
-                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Close",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showExpenseDialog && selectedExpense != null) {
-        AlertDialog(
-            onDismissRequest = {
-                showExpenseDialog = false
-                selectedExpense = null
-                selectedImagePath = null
-            },
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(16.dp)),
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                color = Color(0xFFF5F5F5),
-                shape = RoundedCornerShape(16.dp),
-                shadowElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "${selectedExpense?.category ?: "Receipt"}",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 20.sp
-                        ),
-                        color = Color(0xFF734656),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    selectedImagePath?.let { imagePath ->
-                        var imageLoadFailed by remember { mutableStateOf(false) }
-                        if (tokenFetchFailed) {
-                            Text(
-                                text = "Authentication error: Please log in again",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF4B5563),
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                        } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
-                            val bitmap = try {
-                                val uri = Uri.parse(imagePath)
-                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
-                            } catch (e: Exception) {
-                                Log.e("ExpenseListScreen", "Failed to load local image: $imagePath, error: ${e.message}")
-                                null
-                            }
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(240.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(
-                                            1.5.dp,
-                                            Color(0xFF734656),
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable { showFullScreenImage = true },
-                                    contentScale = ContentScale.Crop
-                                )
-                            } ?: run {
-                                imageLoadFailed = true
-                                Text(
-                                    text = "No receipt photo available",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF4B5563),
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                            }
-                        } else {
-                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
-                            Log.d("ExpenseListScreen", "Loading server image: $fullImageUrl with token: ${token?.take(20)}...")
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(fullImageUrl)
-                                    .apply {
-                                        if (token != null) {
-                                            addHeader("Authorization", "Bearer $token")
-                                        } else {
-                                            imageLoadFailed = true
-                                        }
-                                    }
-                                    .diskCacheKey(fullImageUrl)
-                                    .memoryCacheKey(fullImageUrl)
-                                    .build(),
-                                contentDescription = "${selectedExpense?.category ?: "Receipt"} receipt",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(240.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        1.5.dp,
-                                        Color(0xFF734656),
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { showFullScreenImage = true },
-                                contentScale = ContentScale.Crop,
-                                onError = { error ->
-                                    imageLoadFailed = true
-                                    scope.launch {
-                                        Log.e("ExpenseListScreen", "Failed to load server image: $fullImageUrl, error: ${error.result.throwable.message}")
-                                        snackbarHostState.showSnackbar(
-                                            message = "Failed to load receipt image: ${error.result.throwable.message}",
-                                            duration = SnackbarDuration.Long
-                                        )
-                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
-                                            retryCount++
-                                            val tokenResult = authRepository.getValidToken()
-                                            if (tokenResult.isSuccess) {
-                                                token = tokenResult.getOrNull()
-                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
-                                            } else {
-                                                tokenFetchFailed = true
-                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
-                                                navController.navigate("login") {
-                                                    popUpTo("home") { inclusive = true }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                onSuccess = {
-                                    Log.d("ExpenseListScreen", "Successfully loaded server image: $fullImageUrl")
+                                if (selectedExpense != null) {
+                                    showInfoDialog = true
+                                    Log.d("ExpenseListScreen", "Info button clicked for expense: ID=${selectedExpense?.expenseId}, Category=${selectedExpense?.category}")
+                                } else {
+                                    Log.e("ExpenseListScreen", "Info button clicked but selectedExpense is null")
+                                    Toast.makeText(context, "Error: No expense selected", Toast.LENGTH_SHORT).show()
                                 }
-                            )
-                        }
-                    } ?: Text(
-                        text = "No receipt photo available",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4B5563),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Button(
-                            onClick = {
-                                showInfoDialog = true
-                                Log.d("ExpenseListScreen", "Info button clicked, showInfoDialog=$showInfoDialog")
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1618,10 +1375,6 @@ fun ExpenseListScreen(
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 8.dp
                             ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
@@ -1701,10 +1454,6 @@ fun ExpenseListScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
                             ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 8.dp
-                            ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Box(
@@ -1739,6 +1488,9 @@ fun ExpenseListScreen(
                                 showExpenseDialog = false
                                 selectedExpense = null
                                 selectedImagePath = null
+                                showFullScreenImage = false
+                                showInfoDialog = false
+                                Log.d("ExpenseListScreen", "Close button clicked, expense dialog dismissed")
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -1747,10 +1499,6 @@ fun ExpenseListScreen(
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 4.dp,
-                                pressedElevation = 8.dp
                             ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
@@ -1786,139 +1534,16 @@ fun ExpenseListScreen(
             }
         }
     }
-    if (showInfoDialog && selectedExpense != null) {
-        Dialog(
-            onDismissRequest = {
-                showInfoDialog = false
-            },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.95f)
-                    .clip(RoundedCornerShape(16.dp)),
-                color = Color(0xFFF5F5F5),
-                shadowElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Expense Details",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        ),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("Category: ")
-                                }
-                                append("${selectedExpense?.category ?: "N/A"}")
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("Amount: ")
-                                }
-                                append("₱${numberFormat.format(selectedExpense?.amount?.coerceAtLeast(0.0) ?: 0.0)}")
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("Date of Transaction: ")
-                                }
-                                append("${selectedExpense?.dateOfTransaction ?: "N/A"}")
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("Created At: ")
-                                }
-                                append(selectedExpense?.createdAt?.let {
-                                    val dateTime = java.time.LocalDateTime.parse(it)
-                                    dateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                                } ?: "N/A")
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("Remarks: ")
-                                }
-                                append("${selectedExpense?.remarks ?: "N/A"}")
-                            },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color(0xFF1F2937),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            showInfoDialog = false
-                        },
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        ),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Close",
-                                color = Color(0xFF734656),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     if (showFullScreenImage) {
         Dialog(
-            onDismissRequest = { showFullScreenImage = false },
+            onDismissRequest = {
+                showFullScreenImage = false
+                selectedExpense = null
+                selectedImagePath = null
+                showInfoDialog = false
+                Log.d("ExpenseListScreen", "Full-screen image dialog dismissed, states cleared")
+            },
             properties = DialogProperties(
                 usePlatformDefaultWidth = false,
                 decorFitsSystemWindows = false
@@ -1932,6 +1557,7 @@ fun ExpenseListScreen(
             ) {
                 selectedImagePath?.let { imagePath ->
                     var imageLoadFailed by remember { mutableStateOf(false) }
+                    var isImageLoading by remember { mutableStateOf(true) }
                     var scale by remember { mutableStateOf(1f) }
                     var offset by remember { mutableStateOf(Offset.Zero) }
                     var imageSize by remember { mutableStateOf(IntSize.Zero) }
@@ -1951,29 +1577,77 @@ fun ExpenseListScreen(
                         }
                     }
 
-                    if (tokenFetchFailed) {
-                        Text(
-                            text = "Authentication error: Please log in again",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                            color = Color.White,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
-                        val bitmap = try {
-                            val uri = Uri.parse(imagePath)
-                            BitmapFactory.decodeStream(
-                                context.contentResolver.openInputStream(uri)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (tokenFetchFailed) {
+                            isImageLoading = false
+                            Text(
+                                text = "Authentication error: Please log in again",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color.White,
+                                modifier = Modifier.padding(16.dp)
                             )
-                        } catch (e: Exception) {
-                            Log.e(
-                                "ExpenseListScreen",
-                                "Failed to load local full-screen image: $imagePath, error: ${e.message}"
-                            )
-                            null
-                        }
-                        bitmap?.let {
-                            Image(
-                                bitmap = it.asImageBitmap(),
+                        } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                            val bitmap = try {
+                                val uri = Uri.parse(imagePath)
+                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                            } catch (e: Exception) {
+                                Log.e("ExpenseListScreen", "Failed to load local full-screen image: $imagePath, error: ${e.message}")
+                                null
+                            }
+                            if (bitmap != null) {
+                                isImageLoading = false
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Full screen receipt photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .transformable(state = transformableState)
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(2.dp, themeColor, RoundedCornerShape(12.dp))
+                                        .onGloballyPositioned { coordinates ->
+                                            imageSize = coordinates.size
+                                            containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                        },
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                isImageLoading = false
+                                imageLoadFailed = true
+                                Text(
+                                    text = "No image available",
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                    color = Color.White,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        } else {
+                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
+                            Log.d("ExpenseListScreen", "Loading full-screen server image: $fullImageUrl with token: ${token?.take(20)}...")
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(fullImageUrl)
+                                    .apply {
+                                        if (token != null) {
+                                            addHeader("Authorization", "Bearer $token")
+                                        } else {
+                                            imageLoadFailed = true
+                                            isImageLoading = false
+                                        }
+                                    }
+                                    .diskCacheKey(fullImageUrl)
+                                    .memoryCacheKey(fullImageUrl)
+                                    .build(),
                                 contentDescription = "Full screen receipt photo",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -1990,97 +1664,48 @@ fun ExpenseListScreen(
                                         imageSize = coordinates.size
                                         containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
                                     },
-                                contentScale = ContentScale.Fit
-                            )
-                        } ?: run {
-                            imageLoadFailed = true
-                            Text(
-                                text = "No image available",
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-                                color = Color.White,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    } else {
-                        val fullImageUrl =
-                            "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
-                        Log.d(
-                            "ExpenseListScreen",
-                            "Loading full-screen server image: $fullImageUrl with token: ${
-                                token?.take(20)
-                            }..."
-                        )
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(fullImageUrl)
-                                .apply {
-                                    if (token != null) {
-                                        addHeader("Authorization", "Bearer $token")
-                                    } else {
-                                        imageLoadFailed = true
-                                    }
-                                }
-                                .diskCacheKey(fullImageUrl)
-                                .memoryCacheKey(fullImageUrl)
-                                .build(),
-                            contentDescription = "Full screen receipt photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .transformable(state = transformableState)
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offset.x,
-                                    translationY = offset.y
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(2.dp, themeColor, RoundedCornerShape(12.dp))
-                                .onGloballyPositioned { coordinates ->
-                                    imageSize = coordinates.size
-                                    containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
-                                },
-                            contentScale = ContentScale.Fit,
-                            onError = { error ->
-                                imageLoadFailed = true
-                                scope.launch {
-                                    Log.e(
-                                        "ExpenseListScreen",
-                                        "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}"
-                                    )
-                                    snackbarHostState.showSnackbar(
-                                        message = "Failed to load full screen image",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
-                                        retryCount++
-                                        val tokenResult = authRepository.getValidToken()
-                                        if (tokenResult.isSuccess) {
-                                            token = tokenResult.getOrNull()
-                                            Log.d(
-                                                "ExpenseListScreen",
-                                                "Retry token fetched: ${token?.take(20)}..."
-                                            )
-                                        } else {
-                                            tokenFetchFailed = true
-                                            Toast.makeText(
-                                                context,
-                                                "Authentication error: Please log in again",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                            navController.navigate("login") {
-                                                popUpTo("home") { inclusive = true }
+                                contentScale = ContentScale.Fit,
+                                onLoading = { isImageLoading = true },
+                                onError = { error ->
+                                    isImageLoading = false
+                                    imageLoadFailed = true
+                                    scope.launch {
+                                        Log.e("ExpenseListScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                        snackbarHostState.showSnackbar(
+                                            message = "Failed to load full screen image",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                            retryCount++
+                                            val tokenResult = authRepository.getValidToken()
+                                            if (tokenResult.isSuccess) {
+                                                token = tokenResult.getOrNull()
+                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                            } else {
+                                                tokenFetchFailed = true
+                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                navController.navigate("login") {
+                                                    popUpTo("home") { inclusive = true }
+                                                }
                                             }
                                         }
                                     }
+                                },
+                                onSuccess = {
+                                    isImageLoading = false
+                                    Log.d("ExpenseListScreen", "Successfully loaded full-screen server image: $fullImageUrl")
                                 }
-                            },
-                            onSuccess = {
-                                Log.d(
-                                    "ExpenseListScreen",
-                                    "Successfully loaded full-screen server image: $fullImageUrl"
-                                )
-                            }
-                        )
+                            )
+                        }
+                        if (isImageLoading && !imageLoadFailed) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .align(Alignment.Center),
+                                color = themeColor,
+                                strokeWidth = 6.dp
+                            )
+                        }
                     }
                 } ?: Text(
                     text = "No image available",
@@ -2089,7 +1714,329 @@ fun ExpenseListScreen(
                     modifier = Modifier.padding(16.dp)
                 )
                 IconButton(
-                    onClick = { showFullScreenImage = false },
+                    onClick = {
+                        showFullScreenImage = false
+                        selectedExpense = null
+                        selectedImagePath = null
+                        showInfoDialog = false
+                        Log.d("ExpenseListScreen", "Full-screen image dialog closed via button")
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .background(Color(0xFFE5E7EB), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close image",
+                        tint = Color(0xFF1F2937)
+                    )
+                }
+            }
+        }
+    }
+
+    // Info Dialog Implementation
+    if (showInfoDialog && selectedExpense != null) {
+        Dialog(
+            onDismissRequest = {
+                showInfoDialog = false
+                Log.d("ExpenseListScreen", "Info dialog dismissed for expense: ${selectedExpense?.expenseId}")
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = Color(0xFFF5F5F5),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Expense Details",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp
+                        ),
+                        color = Color(0xFF734656),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    Text(
+                        text = "ID: ${selectedExpense?.expenseId ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Category: ${selectedExpense?.category ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Remarks: ${selectedExpense?.remarks ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Amount: ₱${selectedExpense?.amount?.let { numberFormat.format(it) } ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Date: ${selectedExpense?.createdAt?.let {
+                            try {
+                                val parsedDate = LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                parsedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"))
+                            } catch (e: Exception) {
+                                "N/A"
+                            }
+                        } ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            showInfoDialog = false
+                            Log.d("ExpenseListScreen", "Info dialog closed via button for expense: ${selectedExpense?.expenseId}")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFF8A5B6E).copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Close",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showFullScreenImage) {
+        Dialog(
+            onDismissRequest = {
+                showFullScreenImage = false
+                selectedExpense = null
+                selectedImagePath = null
+                showInfoDialog = false
+                Log.d("ExpenseListScreen", "Full-screen image dialog dismissed, states cleared")
+            },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                selectedImagePath?.let { imagePath ->
+                    var imageLoadFailed by remember { mutableStateOf(false) }
+                    var isImageLoading by remember { mutableStateOf(true) }
+                    var scale by remember { mutableStateOf(1f) }
+                    var offset by remember { mutableStateOf(Offset.Zero) }
+                    var imageSize by remember { mutableStateOf(IntSize.Zero) }
+                    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+
+                    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+                        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+                        val scaledWidth = imageSize.width * newScale
+                        val scaledHeight = imageSize.height * newScale
+                        val maxX = maxOf(0f, (scaledWidth - containerSize.width) / 2f)
+                        val maxY = maxOf(0f, (scaledHeight - containerSize.height) / 2f)
+                        val newOffsetX = (offset.x + offsetChange.x).coerceIn(-maxX, maxX)
+                        val newOffsetY = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
+                        if (newScale != scale || newOffsetX != offset.x || newOffsetY != offset.y) {
+                            scale = newScale
+                            offset = Offset(newOffsetX, newOffsetY)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (tokenFetchFailed) {
+                            isImageLoading = false
+                            Text(
+                                text = "Authentication error: Please log in again",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                color = Color.White,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        } else if (selectedExpense?.expenseId?.startsWith("local_") == true) {
+                            val bitmap = try {
+                                val uri = Uri.parse(imagePath)
+                                BitmapFactory.decodeStream(context.contentResolver.openInputStream(uri))
+                            } catch (e: Exception) {
+                                Log.e("ExpenseListScreen", "Failed to load local full-screen image: $imagePath, error: ${e.message}")
+                                null
+                            }
+                            if (bitmap != null) {
+                                isImageLoading = false
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Full screen receipt photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .transformable(state = transformableState)
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(2.dp, themeColor, RoundedCornerShape(12.dp))
+                                        .onGloballyPositioned { coordinates ->
+                                            imageSize = coordinates.size
+                                            containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                        },
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                isImageLoading = false
+                                imageLoadFailed = true
+                                Text(
+                                    text = "No image available",
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                    color = Color.White,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        } else {
+                            val fullImageUrl = "${ApiConfig.BASE_URL}api/expenses/${selectedExpense?.expenseId}/images"
+                            Log.d("ExpenseListScreen", "Loading full-screen server image: $fullImageUrl with token: ${token?.take(20)}...")
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(fullImageUrl)
+                                    .apply {
+                                        if (token != null) {
+                                            addHeader("Authorization", "Bearer $token")
+                                        } else {
+                                            imageLoadFailed = true
+                                            isImageLoading = false
+                                        }
+                                    }
+                                    .diskCacheKey(fullImageUrl)
+                                    .memoryCacheKey(fullImageUrl)
+                                    .build(),
+                                contentDescription = "Full screen receipt photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .transformable(state = transformableState)
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offset.x,
+                                        translationY = offset.y
+                                    )
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(2.dp, themeColor, RoundedCornerShape(12.dp))
+                                    .onGloballyPositioned { coordinates ->
+                                        imageSize = coordinates.size
+                                        containerSize = coordinates.parentLayoutCoordinates?.size ?: IntSize.Zero
+                                    },
+                                contentScale = ContentScale.Fit,
+                                onLoading = { isImageLoading = true },
+                                onError = { error ->
+                                    isImageLoading = false
+                                    imageLoadFailed = true
+                                    scope.launch {
+                                        Log.e("ExpenseListScreen", "Failed to load full-screen server image: $fullImageUrl, error: ${error.result.throwable.message}")
+                                        snackbarHostState.showSnackbar(
+                                            message = "Failed to load full screen image",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (error.result.throwable.message?.contains("401") == true && retryCount < 2) {
+                                            retryCount++
+                                            val tokenResult = authRepository.getValidToken()
+                                            if (tokenResult.isSuccess) {
+                                                token = tokenResult.getOrNull()
+                                                Log.d("ExpenseListScreen", "Retry token fetched: ${token?.take(20)}...")
+                                            } else {
+                                                tokenFetchFailed = true
+                                                Toast.makeText(context, "Authentication error: Please log in again", Toast.LENGTH_SHORT).show()
+                                                navController.navigate("login") {
+                                                    popUpTo("home") { inclusive = true }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                onSuccess = {
+                                    isImageLoading = false
+                                    Log.d("ExpenseListScreen", "Successfully loaded full-screen server image: $fullImageUrl")
+                                }
+                            )
+                        }
+                        if (isImageLoading && !imageLoadFailed) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .align(Alignment.Center),
+                                color = themeColor,
+                                strokeWidth = 6.dp
+                            )
+                        }
+                    }
+                } ?: Text(
+                    text = "No image available",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp)
+                )
+                IconButton(
+                    onClick = {
+                        showFullScreenImage = false
+                        selectedExpense = null
+                        selectedImagePath = null
+                        showInfoDialog = false
+                        Log.d("ExpenseListScreen", "Full-screen image dialog closed via button")
+                    },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)

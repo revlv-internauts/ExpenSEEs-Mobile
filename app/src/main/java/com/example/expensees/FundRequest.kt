@@ -897,7 +897,7 @@ fun FundRequest(
                                             duration = SnackbarDuration.Short
                                         )
                                     }
-                                } else {
+                                }else {
                                     val submittedBudgetName = budgetName
                                     val budget = SubmittedBudget(
                                         budgetId = null,
@@ -905,7 +905,8 @@ fun FundRequest(
                                         expenses = expenses.toList(),
                                         total = totalExpenses,
                                         status = BudgetStatus.PENDING,
-                                        budgetDate = budgetDate
+                                        budgetDate = budgetDate,
+                                        remarks = null
                                     )
                                     coroutineScope.launch {
                                         try {
@@ -991,6 +992,7 @@ fun FundRequest(
         }
     }
     if (showDialog) {
+        val dialogSnackbarHostState = remember { SnackbarHostState() } // Separate SnackbarHostState for dialog
         Dialog(
             onDismissRequest = { showDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -1187,6 +1189,71 @@ fun FundRequest(
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+                    // Add SnackbarHost for the dialog
+                    SnackbarHost(
+                        hostState = dialogSnackbarHostState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        snackbar = { snackbarData ->
+                            Snackbar(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFF5F5F5))
+                                    .padding(12.dp),
+                                containerColor = Color(0xFFF5F5F5),
+                                contentColor = Color(0xFF1F2937),
+                                shape = RoundedCornerShape(12.dp),
+                                content = {
+                                    Text(
+                                        text = snackbarData.visuals.message,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 16.sp
+                                        ),
+                                        color = Color(0xFF1F2937),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                },
+                                action = {
+                                    snackbarData.visuals.actionLabel?.let { label ->
+                                        Button(
+                                            onClick = { snackbarData.performAction() },
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp)),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color.Transparent
+                                            ),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        brush = Brush.linearGradient(
+                                                            colors = listOf(Color(0xFFE5E7EB), Color(0xFFD1D5DB)),
+                                                            start = Offset(0f, 0f),
+                                                            end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                                        ),
+                                                        shape = RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = Color(0xFF3B82F6),
+                                                    style = MaterialTheme.typography.labelLarge.copy(
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -1236,7 +1303,7 @@ fun FundRequest(
                             onClick = {
                                 if (category.isBlank() || quantity.isBlank() || amountPerUnit.isBlank()) {
                                     coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
+                                        dialogSnackbarHostState.showSnackbar(
                                             message = "Please fill in all required fields",
                                             actionLabel = "OK",
                                             duration = SnackbarDuration.Short
@@ -1247,8 +1314,8 @@ fun FundRequest(
                                     val amount = amountPerUnit.toDoubleOrNull() ?: 0.0
                                     if (qty <= 0 || amount <= 0.0) {
                                         coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = "Quantity and amount must be greater than zero",
+                                            dialogSnackbarHostState.showSnackbar(
+                                                message = "Quantity and amount must be less than billions",
                                                 actionLabel = "OK",
                                                 duration = SnackbarDuration.Short
                                             )

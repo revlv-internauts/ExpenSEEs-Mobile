@@ -624,8 +624,19 @@ fun BudgetCard(
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 14.sp
                         ),
-                        color = statusColors[budget.status] ?: Color(0xFF4B5563)
+                        color = statusColors[budget.status] ?: Color(0xFF4B4E38)
                     )
+                    if (!budget.remarks.isNullOrEmpty()) {
+                        Text(
+                            text = "Remarks: ${budget.remarks}",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 14.sp
+                            ),
+                            color = Color(0xFF4B5563),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

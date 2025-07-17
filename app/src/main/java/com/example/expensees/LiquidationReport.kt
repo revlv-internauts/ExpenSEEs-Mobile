@@ -250,7 +250,7 @@ fun LiquidationReport(
                 .offset(x = offsetX.value.dp)
                 .alpha(alpha.value)
                 .background(
-                    color = Color(0xFF3B82F6).copy(alpha = 0.9f),
+                    color = Color(0xFF734656).copy(alpha = 0.9f), // Changed to match theme
                     shape = RoundedCornerShape(8.dp)
                 )
                 .padding(12.dp)

@@ -75,15 +75,6 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "About the App",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 22.sp
-                ),
-                color = Color(0xFF734656),
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            Text(
                 text = "ExpenSEEs is a mobile expense tracker app designed to help users manage their daily expenses with ease. Built over six weeks in 2025, it reflects our commitment to creating a simple yet powerful tool for financial control. With intuitive features for tracking, categorizing, and visualizing expenses, ExpenSEEs empowers users to gain better insight into their spending habits.",
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,

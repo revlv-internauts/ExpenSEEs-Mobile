@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 
 import android.content.ContextWrapper
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.border
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -380,12 +381,6 @@ fun CustomTextField(
 ) {
     val focusInteractionSource = remember { MutableInteractionSource() }
     val isFocused by focusInteractionSource.collectIsFocusedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.02f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
-        label = "field_scale"
-    )
-
     val keyboardController = LocalSoftwareKeyboardController.current
     var isPasswordVisible by remember { mutableStateOf(false) }
 
@@ -406,12 +401,25 @@ fun CustomTextField(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .scale(scale)
+                .background(Color.Transparent)
+                .border(
+                    width = 1.dp, // Fixed border width
+                    color = if (isFocused) Color(0xFF80DEEA) else Color(0xFFE0E0E0),
+                    shape = RoundedCornerShape(8.dp)
+                )
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (leadingIcon != null) {
                 leadingIcon()
+                Spacer(modifier = Modifier.width(8.dp))
+                Divider(
+                    color = Color(0xFFE0E0E0).copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(24.dp)
+                        .align(Alignment.CenterVertically)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
             }
             OutlinedTextField(
@@ -457,10 +465,10 @@ fun CustomTextField(
                         }
                     }
                 } else null,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(0.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF80DEEA),
-                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
                     focusedLabelColor = Color(0xFFF5F5F5),
                     unfocusedLabelColor = Color(0xFFE0E0E0),
                     cursorColor = Color(0xFF80DEEA),

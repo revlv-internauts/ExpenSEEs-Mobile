@@ -5,10 +5,12 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
@@ -17,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -190,57 +194,75 @@ fun DetailedLiquidationReport(
                 .padding(
                     top = innerPadding.calculateTopPadding(),
                     bottom = innerPadding.calculateBottomPadding(),
-                    start = 8.dp,
-                    end = 8.dp
+                    start = 16.dp,
+                    end = 16.dp
                 ),
             horizontalAlignment = Alignment.Start
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Transparent
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Status: ${report!!.status.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        ),
-                        color = Color(0xFF6B7280)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(statusColors[report!!.status] ?: Color(0xFF4CAF50))
-                    )
+                    Column {
+                        Text(
+                            text = report!!.budgetName ?: "N/A",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "Status: ${report!!.status.lowercase(Locale.US).replaceFirstChar { it.uppercase() }}",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                ),
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(statusColors[report!!.status] ?: Color(0xFF4CAF50))
+                            )
+                        }
+                        Text(
+                            text = "Remarks: ${report!!.remarks ?: "No remarks provided"}",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
-                Text(
-                    text = "Remarks: ${report!!.remarks ?: "No remarks provided"}",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
-                    ),
-                    color = Color(0xFF6B7280),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = report!!.budgetName ?: "N/A",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
-                    ),
-                    color = Color(0xFF111827)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Divider(
-                    color = Color(0xFFE5E7EB),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
             }
 
             Text(
@@ -261,8 +283,14 @@ fun DetailedLiquidationReport(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFF1F5F9))
-                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                                )
+                            )
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -271,7 +299,7 @@ fun DetailedLiquidationReport(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = Color(0xFF111827),
+                            color = Color.White,
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
@@ -281,7 +309,7 @@ fun DetailedLiquidationReport(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = Color(0xFF111827),
+                            color = Color.White,
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
@@ -291,7 +319,7 @@ fun DetailedLiquidationReport(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = Color(0xFF111827),
+                            color = Color.White,
                             modifier = Modifier.weight(3f),
                             textAlign = TextAlign.Center
                         )
@@ -301,7 +329,7 @@ fun DetailedLiquidationReport(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             ),
-                            color = Color(0xFF111827),
+                            color = Color.White,
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
@@ -316,7 +344,7 @@ fun DetailedLiquidationReport(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -379,43 +407,65 @@ fun DetailedLiquidationReport(
                 }
             }
 
-            Column(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp)
-                    .background(Color(0xFFF8FAFC)),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(vertical = 12.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Transparent
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Text(
-                    text = "Total Budgeted: ₱${numberFormat.format(totalBudgeted)}",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    ),
-                    color = Color(0xFF111827)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Total Spent: ₱${numberFormat.format(totalSpent)}",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    ),
-                    color = Color(0xFF111827)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (totalRemaining >= 0) {
-                        "Total Remaining: ₱${numberFormat.format(totalRemaining)}"
-                    } else {
-                        "Total Over Budget: ₱${numberFormat.format(-totalRemaining)}"
-                    },
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    ),
-                    color = if (totalRemaining >= 0) Color(0xFF16A34A) else Color(0xFFDC2626)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF734656), Color(0xFF8A5B6E)),
+                                start = Offset(0f, 0f),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Total Budgeted: ₱${numberFormat.format(totalBudgeted)}",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Total Spent: ₱${numberFormat.format(totalSpent)}",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (totalRemaining >= 0) {
+                                "Total Remaining: ₱${numberFormat.format(totalRemaining)}"
+                            } else {
+                                "Total Over Budget: ₱${numberFormat.format(-totalRemaining)}"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            ),
+                            color = if (totalRemaining >= 0) Color(0xFF66FF66) else Color(0xFFFF0000)
+                        )
+                    }
+                }
             }
         }
     }

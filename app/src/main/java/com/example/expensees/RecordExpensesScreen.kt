@@ -102,16 +102,35 @@ fun RecordExpensesScreen(
     val scope = rememberCoroutineScope()
 
     val calendar = Calendar.getInstance()
+    val currentDate = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
     val datePickerDialog = remember {
         DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
-                dateOfTransaction = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                // Format selected date
+                val selectedDate = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                // Validate that the selected date is not in the future
+                if (selectedDate.timeInMillis <= currentDate) {
+                    dateOfTransaction = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                } else {
+                    Toast.makeText(context, "Cannot select a future date", Toast.LENGTH_SHORT).show()
+                }
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
-        )
+        ).apply {
+            // Set maximum date to current date to restrict future dates
+            datePicker.maxDate = currentDate
+        }
     }
 
     val takePictureLauncher =

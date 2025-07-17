@@ -30,7 +30,8 @@ data class SubmittedBudget(
     @SerializedName("expenses") val expenses: List<ExpenseItem>,
     @SerializedName("total") val total: Double,
     @SerializedName("status") val status: BudgetStatus,
-    @SerializedName("budgetDate") val budgetDate: String?
+    @SerializedName("budgetDate") val budgetDate: String?,
+    @SerializedName("remarks") val remarks: String?
 )
 
 
