@@ -335,20 +335,6 @@ fun LoginScreen(
                         )
                     }
                 }
-
-                // Recover Password Button
-                TextButton(
-                    onClick = { navController.navigate("forgot_password") },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Recover Password",
-                        color = Color(0xFFEEECE1),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
 
             // Version Text

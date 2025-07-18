@@ -59,7 +59,6 @@ data class Expense(
 )
 
 
-
 data class LiquidationReportData(
     @SerializedName("liquidationId") val liquidationId: String,
     @SerializedName("budgetId") val budgetId: String,

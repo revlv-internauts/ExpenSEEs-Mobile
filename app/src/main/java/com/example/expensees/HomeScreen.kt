@@ -808,8 +808,7 @@ fun HomeScreen(
                                                     }
                                                 }
                                             },
-                                            ${if (chartType == "bar") """
-                                            scales: {
+                                            scales: type === 'bar' ? {
                                                 x: {
                                                     ticks: {
                                                         font: { size: 12 },
@@ -832,8 +831,7 @@ fun HomeScreen(
                                                         maxTicksLimit: 6
                                                     }
                                                 }
-                                            },
-                                            """ else ""}
+                                            } : {},
                                             onClick: (event, elements, chart) => {
                                                 if (elements.length > 0) {
                                                     const index = elements[0].index;

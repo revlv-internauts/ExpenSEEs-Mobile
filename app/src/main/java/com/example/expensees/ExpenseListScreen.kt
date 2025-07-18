@@ -573,7 +573,7 @@ fun ExpenseListScreen(
                                                 showExpenseDialog = true
                                                 Log.d(
                                                     "ExpenseListScreen",
-                                                    "Clicked expense at index $index: ID=${expense.expenseId}, Category=${expense.category}, ImagePath=$selectedImagePath"
+                                                    "Clicked expense at index $index: ID=${ expenses[index].expenseId}, Category=${expense.category}, ImagePath=$selectedImagePath"
                                                 )
                                             }
                                         },
@@ -1768,12 +1768,6 @@ fun ExpenseListScreen(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     Text(
-                        text = "ID: ${selectedExpense?.expenseId ?: "N/A"}",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
-                        color = Color(0xFF1F2937),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
                         text = "Category: ${selectedExpense?.category ?: "N/A"}",
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
                         color = Color(0xFF1F2937),
@@ -1792,7 +1786,20 @@ fun ExpenseListScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Text(
-                        text = "Date: ${selectedExpense?.createdAt?.let {
+                        text = "Date of Transaction: ${selectedExpense?.createdAt?.let {
+                            try {
+                                val parsedDate = LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                parsedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"))
+                            } catch (e: Exception) {
+                                "N/A"
+                            }
+                        } ?: "N/A"}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Created At: ${selectedExpense?.createdAt?.let {
                             try {
                                 val parsedDate = LocalDateTime.parse(it, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                                 parsedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm"))
